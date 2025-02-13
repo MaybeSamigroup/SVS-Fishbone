@@ -243,13 +243,16 @@ namespace Fishbone
         static void WorldSavePrefix(SaveData.WorldData __instance) =>
             Enumerable.Range(0, 24).Do(index => __instance.Charas.ContainsKey(index)
                 .Maybe(() => __instance.Charas[index].NotifyActorSerialize(index)));
-
         [HarmonyPostfix]
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(SaveData.WorldData), nameof(SaveData.WorldData.Load), typeof(string))]
         static void WorldLoadPostfix(SaveData.WorldData __result) =>
             Enumerable.Range(0, 24).Do(index => __result.Charas.ContainsKey(index)
                 .Maybe(() => __result.Charas[index].NotifyActorDeserialize(index)));
+        [HarmonyPostfix]
+        [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(SV.EntryScene.CharaEntry), nameof(SV.EntryScene.CharaEntry.Entry), typeof(int), typeof(HumanData), typeof(bool))]
+        static void CharaEntryPostfix(int index, SaveData.Actor __result) => __result.NotifyActorDeserialize(index);
     }
     [BepInProcess(Process)]
     [BepInPlugin(Guid, Name, Version)]
