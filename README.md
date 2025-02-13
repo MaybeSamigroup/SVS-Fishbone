@@ -40,7 +40,7 @@ Notified when coordinate is serialized in Character Creation.
 
 ## OnCoordinateInitialize
 
-When character coordinates is reset to default in H Scene.
+Notified When character coordinates is reset to default in H Scene.
 
 ## OnCoordinateDeserialize
 
@@ -50,8 +50,10 @@ Notified when coordinate is deserialized in Character Creation or H Scene.
 
 Notified when actor serialized in simulation mode. aka, when auto or manually saved.
 
+Actor bound to the serialized data is indicated by index from ```Game.saveData.Chars``.
+
 ## OnActorDeserialize 
 
-Notified when actor or human deserialized in simulation mode.
+Notified when actors are deserialized in just before entering simulation mode.
 
-Can be notified multiple time for an actor, because humans are instanciated multiple times. (hi-poly/low-poly variant etc)
+Actor bound to the deserialized data is indicated by index from ```Game.saveData.Chars``.
