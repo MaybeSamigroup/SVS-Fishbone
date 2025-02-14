@@ -154,7 +154,7 @@ namespace Fishbone
             static delegate { Plugin.Instance.Log.LogDebug("Coordinate Serialize"); };
         public static event Action<Human, CoordLimit, ZipArchive> OnCoordinateDeserialize =
             static delegate { Plugin.Instance.Log.LogDebug("Coordinate Deserialize"); };
-        public static event Action<Human, ZipArchive> OnCoordinateInitialize =
+        public static event Action<int, ZipArchive> OnCoordinateInitialize =
             static delegate { Plugin.Instance.Log.LogDebug("Coordinate Initialize"); };
         public static event Action<int, ZipArchive> OnActorSerialize =
             static delegate { Plugin.Instance.Log.LogDebug("Actor Serialize"); };
@@ -182,9 +182,9 @@ namespace Fishbone
         internal static void NotifyCharacterCreationDeserialize(this HumanData data, CharaLimit limit) =>
             OnCharacterCreationDeserialize.Invoke(limit, data.GameParameter.imageData.Extract().ToArchive());
         internal static void NotifyCoordinateDeserialize(this Human human, string path, CoordLimit limit) =>
-            OnCoordinateDeserialize(human, limit, File.ReadAllBytes(path).Extract().ToArchive());
+            OnCoordinateDeserialize.Invoke(human, limit, File.ReadAllBytes(path).Extract().ToArchive());
         internal static void NotifyCoordinateInitialize(this Human human) =>
-            OnCoordinateInitialize(human, human.data.GameParameter.imageData.Extract().ToArchive());
+            OnCoordinateInitialize.Invoke(human.GetActorIndex(), human.data.GameParameter.imageData.Extract().ToArchive());
         internal static void NotifyCoordinateSerialize(this string path) =>
             File.WriteAllBytes(path, File.ReadAllBytes(path).Implant(new MemoryStream() 
                 .With(stream => new ZipArchive(stream, ZipArchiveMode.Create)
@@ -195,7 +195,7 @@ namespace Fishbone
                     .With(stream => new ZipArchive(stream, ZipArchiveMode.Create)
                     .With(archive => OnActorSerialize.Invoke(index, archive)).Dispose()).ToArray()))
                     .With(ApplyToHuman(actor.chaCtrl));
-        internal static void UpdateImageData(int index, Il2CppBytes imageData) =>
+        private static void UpdateImageData(int index, Il2CppBytes imageData) =>
             Game.saveData.Charas[index].gameParameter.imageData = imageData;
         private static Action<Il2CppBytes> ApplyToHuman(Human human) =>
             imageData => (human != null).Maybe(() => human.data.GameParameter.imageData = imageData);
@@ -252,7 +252,7 @@ namespace Fishbone
         [HarmonyPostfix]
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(SV.EntryScene.CharaEntry), nameof(SV.EntryScene.CharaEntry.Entry), typeof(int), typeof(HumanData), typeof(bool))]
-        static void CharaEntryPostfix(int index, SaveData.Actor __result) => __result.NotifyActorDeserialize(index);
+        static void CharaEntryPostfix(SaveData.Actor __result) => __result.NotifyActorDeserialize(__result.GetActorIndex());
     }
     [BepInProcess(Process)]
     [BepInPlugin(Guid, Name, Version)]
