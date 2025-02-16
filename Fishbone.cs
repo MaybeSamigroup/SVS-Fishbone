@@ -23,7 +23,7 @@ namespace Fishbone
 {
     public static class Util
     {
-        static readonly Il2CppSystem.Threading.CancellationTokenSource Canceler = new();
+        internal static readonly Il2CppSystem.Threading.CancellationTokenSource Canceler = new();
         static Action AwaitDestroy<T>(Action onSetup, Action onDestroy) where T : SingletonInitializer<T> =>
             () => SingletonInitializer<T>.Instance.gameObject
                     .GetComponentInChildren<ObservableDestroyTrigger>()
@@ -94,6 +94,7 @@ namespace Fishbone
         internal static string CurrentSource => HSceneSelectCoordinateCard._filename;
         internal static Button CoordReset => HSceneSelectCoordinateCard._beforeCoode;
         internal static Button CoordLoad => HSceneSelectCoordinateCard._decide;
+        internal static Button End => SV.H.HScene.Instance.option._btnExit;
         internal static CoordLimit CoordLimit => HSceneSelectCoordinateCard._togglesParts
                 .Where(item => item.isOn)
                 .Select(item => item.name switch
@@ -103,19 +104,21 @@ namespace Fishbone
                     "Toggle Accessory" => CoordLimit.Accessory,
                     _ => CoordLimit.None
                 }).Aggregate(CoordLimit.None, (x, y) => x | y);
-        static Action ListenCoordLoad => () =>
-            CoordLoad.onClick.AddListener(CoordinateLoad);
-        static Action ListenCoordReset => () =>
-            CoordReset.onClick.AddListener(CoordinateReset);
-        static Action IgnoreCoordLoad => () =>
-            CoordLoad.onClick.AddListener(CoordinateLoad);
-        static Action IgnoreCoordReset => () =>
-            CoordReset.onClick.AddListener(CoordinateReset);
+        static Action Listen => (Action)
+            (() => CoordLoad.onClick.AddListener(CoordinateLoad)) +
+            (() => CoordReset.onClick.AddListener(CoordinateReset)) +
+            (() => End.onClick.AddListener(CoordinateResetAll));
+        static Action Ignore => (Action)
+            (() => CoordLoad.onClick.RemoveListener(CoordinateLoad)) +
+            (() => CoordReset.onClick.RemoveListener(CoordinateReset)) +
+            (() => End.onClick.RemoveListener(CoordinateResetAll));
         static Action CoordinateLoad => () =>
             CurrentTarget.NotifyCoordinateDeserialize(CurrentSource, CoordLimit);
         static Action CoordinateReset => () =>
             CurrentTarget.NotifyCoordinateInitialize();
-        internal static void Initialize() => Util.Hook<SV.H.HScene>(ListenCoordLoad + ListenCoordReset, IgnoreCoordLoad + IgnoreCoordReset);
+        static Action CoordinateResetAll => () =>
+            SV.H.HScene.Instance.Actors.Do(actor => actor.Human.NotifyCoordinateInitialize());
+        internal static void Initialize() => Util.Hook<SV.H.HScene>(Listen, Ignore);
     }
     internal static class UIRef
     {
@@ -204,6 +207,11 @@ namespace Fishbone
     }
     static class Hooks
     {
+        [HarmonyPrefix]
+        [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(SV.H.HScene), nameof(SV.H.HScene.End), [])]
+        static void HSceneEndPrefix() => 
+            SV.H.HScene.Instance.Actors.Do(actor => actor.Human.NotifyCoordinateInitialize());
         [HarmonyPrefix]
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.SaveCharaFileBeforeAction), typeof(string), typeof(Il2CppSystem.Action))]
