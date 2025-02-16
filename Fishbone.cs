@@ -199,7 +199,8 @@ namespace Fishbone
                     .With(archive => OnActorSerialize.Invoke(index, archive)).Dispose()).ToArray()))
                     .With(ApplyToHuman(actor.chaCtrl));
         private static void UpdateImageData(int index, Il2CppBytes imageData) =>
-            Game.saveData.Charas[index].gameParameter.imageData = imageData;
+            Game.saveData.Charas[index].gameParameter.imageData = imageData
+                .With(() => OnActorDeserialize(index, imageData.Extract().ToArchive()));
         private static Action<Il2CppBytes> ApplyToHuman(Human human) =>
             imageData => (human != null).Maybe(() => human.data.GameParameter.imageData = imageData);
         internal static void NotifyActorDeserialize(this SaveData.Actor actor, int index) =>
@@ -220,7 +221,7 @@ namespace Fishbone
             (dst == HumanCustom.Instance?.HumanData, src == HumanCustom.Instance?.HumanData) switch
             {
                 (true, false) => src.NotifyCharacterCreationDeserialize,
-                (false, true) => _ => src.NotifyCharacterCreationSerialize(dst.GetActorIndex()),
+                (false, true) => _ => src.NotifyCharacterCreationSerialize(src.GetActorIndex()),
                 _ => (limit) => { }
             };
         [HarmonyPrefix]
