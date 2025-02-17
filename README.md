@@ -4,7 +4,12 @@ plugin api to serialize and deserialize character or coordinate bound extension 
 
 # Prerequests
 
- * BepinEx v6
+ * [BepInEx](https://github.com/BepInEx/BepInEx)
+   * v6.0.0 be 725 or later
+ * [ByteFiddler]
+   * v1.0 or later and suitable configuration
+
+Confirmed working under SVS 1.1.4/1.1.3 + [SVS-HF Patch](https://github.com/ManlyMarco/SVS-HF_Patch) 1.5/1.6 environment.
 
 # Installation
 
