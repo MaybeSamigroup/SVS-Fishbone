@@ -40,14 +40,10 @@ namespace Fishbone
         public static Either Either(bool value) => value ? (left, right) => right() : (left, right) => left();
         public static void Either(this bool value, Action left, Action right) => Either(value)(left, right);
         public static void Maybe(this bool value, Action maybe) => value.Either(() => { }, maybe);
+        public static T With<T>(this T input, Action<T> sideEffect) => input.With(() => sideEffect(input));
         public static T With<T>(this T input, Action sideEffect)
         {
             sideEffect();
-            return input;
-        }
-        public static T With<T>(this T input, Action<T> sideEffect)
-        {
-            sideEffect(input);
             return input;
         }
     }
@@ -181,7 +177,7 @@ namespace Fishbone
                     .With(archive => OnCharacterCreationSerialize.Invoke(archive)).Dispose()).ToArray());
         internal static void NotifyCharacterCreationSerialize(this HumanData data, int index) =>
             data.NotifyCharacterCreationSerialize()
-                .With(imageData => (index > 0).Maybe(() => UpdateImageData(index, imageData)));
+                .With(imageData => (index >= 0).With(() => Plugin.Instance.Log.LogInfo(index)).Maybe(() => UpdateImageData(index, imageData)));
         internal static void NotifyCharacterCreationDeserialize(this HumanData data, CharaLimit limit) =>
             OnCharacterCreationDeserialize.Invoke(limit, data.GameParameter.imageData.Extract().ToArchive());
         internal static void NotifyCoordinateDeserialize(this Human human, string path, CoordLimit limit) =>
@@ -217,12 +213,15 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.SaveCharaFileBeforeAction), typeof(string), typeof(Il2CppSystem.Action))]
         static void HumanDataSaveFilePrefix(HumanData __instance) => __instance.NotifyCharacterCreationSerialize();
+        static int CharacterCreationTarget = -1;
+        static void ProcessTargetActor(HumanData data) =>
+            (data.GetActorIndex() >= 0 || SV.SimulationScene.Instance == null).Maybe(() => CharacterCreationTarget = data.GetActorIndex());
         static Action<CharaLimit> OnCopy(HumanData dst, HumanData src) =>
             (dst == HumanCustom.Instance?.HumanData, src == HumanCustom.Instance?.HumanData) switch
             {
-                (true, false) => src.NotifyCharacterCreationDeserialize,
-                (false, true) => _ => src.NotifyCharacterCreationSerialize(src.GetActorIndex()),
-                _ => (limit) => { }
+                (true, false) => src.With(ProcessTargetActor).NotifyCharacterCreationDeserialize,
+                (false, true) => _ => src.NotifyCharacterCreationSerialize(CharacterCreationTarget),
+                _ => _ => { }
             };
         [HarmonyPrefix]
         [HarmonyWrapSafe]
@@ -235,7 +234,7 @@ namespace Fishbone
         [HarmonyPrefix]
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.LoadFile), typeof(Il2CppSystem.IO.BinaryReader), typeof(CharaLoadFlgs))]
-        static void HumanDataLoadFilePostfix(ref CharaLoadFlgs flags) =>
+        static void HumanDataLoadFilePrefix(ref CharaLoadFlgs flags) =>
             flags = flags switch
             {
                 CharaLoadFlgs.FileView => flags,
@@ -271,7 +270,7 @@ namespace Fishbone
         public const string Process = "SamabakeScramble";
         public const string Name = "Fishbone";
         public const string Guid = $"{Process}.{Name}";
-        public const string Version = "1.1.1";
+        public const string Version = "1.1.2";
         private Harmony Patch;
         public override void Load() =>
             Patch = Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks")

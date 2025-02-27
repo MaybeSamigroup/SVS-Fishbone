@@ -6,7 +6,7 @@ plugin api to serialize and deserialize character or coordinate bound extension 
 
  * [BepInEx](https://github.com/BepInEx/BepInEx)
    * v6.0.0 be 725 or later
- * [ByteFiddler]
+ * [ByteFiddler](https://github.com/BepInEx/BepInEx)
    * v1.0 or later and suitable configuration
 
 Confirmed working under SVS 1.1.4/1.1.3 + [SVS-HF Patch](https://github.com/ManlyMarco/SVS-HF_Patch) 1.5/1.6 environment.
@@ -55,10 +55,10 @@ Notified when coordinate is deserialized in Character Creation or H Scene.
 
 Notified when actor serialized in simulation mode. aka, when auto or manually saved.
 
-Actor bound to the serialized data is indicated by index from ```Game.saveData.Chars``.
+Actor bound to the serialized data is indicated by index from ```Game.saveData.Chars```.
 
 ## OnActorDeserialize 
 
 Notified when actors are deserialized in just before entering simulation mode.
 
-Actor bound to the deserialized data is indicated by index from ```Game.saveData.Chars``.
+Actor bound to the deserialized data is indicated by index from ```Game.saveData.Chars```.
