@@ -177,7 +177,7 @@ namespace Fishbone
                     .With(archive => OnCharacterCreationSerialize.Invoke(archive)).Dispose()).ToArray());
         internal static void NotifyCharacterCreationSerialize(this HumanData data, int index) =>
             data.NotifyCharacterCreationSerialize()
-                .With(imageData => (index >= 0).With(() => Plugin.Instance.Log.LogInfo(index)).Maybe(() => UpdateImageData(index, imageData)));
+                .With(imageData => (index >= 0).Maybe(() => UpdateImageData(index, imageData)));
         internal static void NotifyCharacterCreationDeserialize(this HumanData data, CharaLimit limit) =>
             OnCharacterCreationDeserialize.Invoke(limit, data.GameParameter.imageData.Extract().ToArchive());
         internal static void NotifyCoordinateDeserialize(this Human human, string path, CoordLimit limit) =>
