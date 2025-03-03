@@ -2,7 +2,7 @@
 
 plugin api to serialize and deserialize character or coordinate bound extension data, for SamabakeScramble
 
-# Prerequests
+# Prerequisites
 
  * [BepInEx](https://github.com/BepInEx/BepInEx)
    * v6.0.0 be 725 or later
