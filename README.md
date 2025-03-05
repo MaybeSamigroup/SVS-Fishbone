@@ -55,10 +55,10 @@ Notified when coordinate is deserialized in Character Creation or H Scene.
 
 Notified when actor serialized in simulation mode. aka, when auto or manually saved.
 
-Actor bound to the serialized data is indicated by index from ```Game.saveData.Chars```.
+Actor bound to the serialized data is indicated by index from ```Manager.Game.saveData.Chars```.
 
 ## OnActorDeserialize 
 
 Notified when actors are deserialized in just before entering simulation mode.
 
-Actor bound to the deserialized data is indicated by index from ```Game.saveData.Chars```.
+Actor bound to the deserialized data is indicated by index from ```Manager.Game.saveData.Chars```.
