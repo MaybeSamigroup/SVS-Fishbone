@@ -147,7 +147,7 @@ namespace Fishbone
     {
         public static event Action<ZipArchive> OnCharacterCreationSerialize =
             static delegate { Plugin.Instance.Log.LogDebug("Character Serialize"); };
-        public static event Action<CharaLimit, ZipArchive> OnCharacterCreationDeserialize =
+        public static event Action<HumanData, CharaLimit, ZipArchive> OnCharacterCreationDeserialize =
             static delegate { Plugin.Instance.Log.LogDebug("Character Deserialize"); };
         public static event Action<ZipArchive> OnCoordinateSerialize =
             static delegate { Plugin.Instance.Log.LogDebug("Coordinate Serialize"); };
@@ -179,7 +179,7 @@ namespace Fishbone
             data.NotifyCharacterCreationSerialize()
                 .With(imageData => (index >= 0).Maybe(() => UpdateImageData(index, imageData)));
         internal static void NotifyCharacterCreationDeserialize(this HumanData data, CharaLimit limit) =>
-            OnCharacterCreationDeserialize.Invoke(limit, data.GameParameter.imageData.Extract().ToArchive());
+            OnCharacterCreationDeserialize.Invoke(data, limit, data.GameParameter.imageData.Extract().ToArchive());
         internal static void NotifyCoordinateDeserialize(this Human human, string path, CoordLimit limit) =>
             OnCoordinateDeserialize.Invoke(human, limit, File.ReadAllBytes(path).Extract().ToArchive());
         internal static void NotifyCoordinateInitialize(this Human human) =>
@@ -270,7 +270,7 @@ namespace Fishbone
         public const string Process = "SamabakeScramble";
         public const string Name = "Fishbone";
         public const string Guid = $"{Process}.{Name}";
-        public const string Version = "1.1.2";
+        public const string Version = "1.2.0";
         private Harmony Patch;
         public override void Load() =>
             Patch = Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks")
