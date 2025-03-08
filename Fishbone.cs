@@ -109,7 +109,7 @@ namespace Fishbone
             (() => CoordReset.onClick.RemoveListener(CoordinateReset)) +
             (() => End.onClick.RemoveListener(CoordinateResetAll));
         static Action CoordinateLoad => () =>
-            CurrentTarget.NotifyCoordinateDeserialize(CurrentSource, CoordLimit);
+            CurrentTarget.PrepareNotifyCoordinateDeserialize(CurrentSource, CoordLimit);
         static Action CoordinateReset => () =>
             CurrentTarget.NotifyCoordinateInitialize();
         static Action CoordinateResetAll => () =>
@@ -136,7 +136,7 @@ namespace Fishbone
                     _ => CoordLimit.None,
                 }).Aggregate(CoordLimit.None, static (x, y) => x | y);
         static Action CoordinateLoad => () =>
-            HumanCustom.Instance.Human.NotifyCoordinateDeserialize(CurrentSource, CoordLimit);
+            HumanCustom.Instance.Human.PrepareNotifyCoordinateDeserialize(CurrentSource, CoordLimit);
         static Action ListenCoordinateLoad => () =>
             CoordinateLoadButton.onClick.AddListener(CoordinateLoad);
         static Action IgnoreCoordinateLoad => () =>
@@ -151,7 +151,7 @@ namespace Fishbone
             static delegate { Plugin.Instance.Log.LogDebug("Character Deserialize"); };
         public static event Action<ZipArchive> OnCoordinateSerialize =
             static delegate { Plugin.Instance.Log.LogDebug("Coordinate Serialize"); };
-        public static event Action<Human, CoordLimit, ZipArchive> OnCoordinateDeserialize =
+        public static event Action<Human, HumanDataCoordinate, CoordLimit, ZipArchive> OnCoordinateDeserialize =
             static delegate { Plugin.Instance.Log.LogDebug("Coordinate Deserialize"); };
         public static event Action<int, ZipArchive> OnCoordinateInitialize =
             static delegate { Plugin.Instance.Log.LogDebug("Coordinate Initialize"); };
@@ -180,8 +180,12 @@ namespace Fishbone
                 .With(imageData => (index >= 0).Maybe(() => UpdateImageData(index, imageData)));
         internal static void NotifyCharacterCreationDeserialize(this HumanData data, CharaLimit limit) =>
             OnCharacterCreationDeserialize.Invoke(data, limit, data.GameParameter.imageData.Extract().ToArchive());
-        internal static void NotifyCoordinateDeserialize(this Human human, string path, CoordLimit limit) =>
-            OnCoordinateDeserialize.Invoke(human, limit, File.ReadAllBytes(path).Extract().ToArchive());
+        internal static Action<HumanDataCoordinate> NotifyCoordinateDeserialize = coordinate => {};
+        internal static void PrepareNotifyCoordinateDeserialize(this Human human, string path, CoordLimit limit) =>
+            NotifyCoordinateDeserialize = coordinate =>
+                OnCoordinateDeserialize
+                    .With(() => NotifyCoordinateDeserialize = coordinate => {})
+                    .Invoke(human, coordinate, limit, File.ReadAllBytes(path).Extract().ToArchive());
         internal static void NotifyCoordinateInitialize(this Human human) =>
             OnCoordinateInitialize.Invoke(human.GetActorIndex(), human.data.GameParameter.imageData.Extract().ToArchive());
         internal static void NotifyCoordinateSerialize(this string path) =>
@@ -245,6 +249,11 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.SaveFile), typeof(string), typeof(byte))]
         static void HumanDataCoordinateSaveFilePrefix(string path) => path.NotifyCoordinateSerialize();
+        [HarmonyPostfix]
+        [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.LoadBytes), typeof(Il2CppBytes), typeof(Il2CppSystem.Version))]
+        static void HumanDataCoordinateLoadBytesPostfix(HumanDataCoordinate __instance) =>
+            Event.NotifyCoordinateDeserialize(__instance);
         [HarmonyPrefix]
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(SaveData.WorldData), nameof(SaveData.WorldData.Save), typeof(string))]
@@ -270,7 +279,7 @@ namespace Fishbone
         public const string Process = "SamabakeScramble";
         public const string Name = "Fishbone";
         public const string Guid = $"{Process}.{Name}";
-        public const string Version = "1.2.0";
+        public const string Version = "1.3.0";
         private Harmony Patch;
         public override void Load() =>
             Patch = Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks")
