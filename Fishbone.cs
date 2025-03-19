@@ -145,19 +145,19 @@ namespace Fishbone
     }
     public static class Event
     {
-        public static event Action<ZipArchive> OnCharacterCreationSerialize =
+        public static event Action<HumanData, ZipArchive> OnCharacterCreationSerialize =
             static delegate { Plugin.Instance.Log.LogDebug("Character Serialize"); };
         public static event Action<HumanData, CharaLimit, ZipArchive> OnCharacterCreationDeserialize =
             static delegate { Plugin.Instance.Log.LogDebug("Character Deserialize"); };
-        public static event Action<ZipArchive> OnCoordinateSerialize =
+        public static event Action<HumanDataCoordinate, ZipArchive> OnCoordinateSerialize =
             static delegate { Plugin.Instance.Log.LogDebug("Coordinate Serialize"); };
         public static event Action<Human, HumanDataCoordinate, CoordLimit, ZipArchive> OnCoordinateDeserialize =
             static delegate { Plugin.Instance.Log.LogDebug("Coordinate Deserialize"); };
-        public static event Action<int, ZipArchive> OnCoordinateInitialize =
+        public static event Action<int, HumanDataCoordinate, ZipArchive> OnCoordinateInitialize =
             static delegate { Plugin.Instance.Log.LogDebug("Coordinate Initialize"); };
-        public static event Action<int, ZipArchive> OnActorSerialize =
+        public static event Action<int, HumanData, ZipArchive> OnActorSerialize =
             static delegate { Plugin.Instance.Log.LogDebug("Actor Serialize"); };
-        public static event Action<int, ZipArchive> OnActorDeserialize =
+        public static event Action<int, HumanData, ZipArchive> OnActorDeserialize =
             static delegate { Plugin.Instance.Log.LogDebug("Actor Deserialize"); };
         public static int GetActorIndex(this Il2CppBytes imageData) =>
             Enumerable.Range(0, 24).Where(Game.saveData.Charas.ContainsKey)
@@ -174,10 +174,10 @@ namespace Fishbone
             data.GameParameter.imageData = data.GameParameter.imageData
                 .Implant(new MemoryStream()
                     .With(stream => new ZipArchive(stream, ZipArchiveMode.Create)
-                    .With(archive => OnCharacterCreationSerialize.Invoke(archive)).Dispose()).ToArray());
+                    .With(archive => OnCharacterCreationSerialize.Invoke(data, archive)).Dispose()).ToArray());
         internal static void NotifyCharacterCreationSerialize(this HumanData data, int index) =>
             data.NotifyCharacterCreationSerialize()
-                .With(imageData => (index >= 0).Maybe(() => UpdateImageData(index, imageData)));
+                .With(imageData => (index >= 0).Maybe(() => UpdateImageData(index, Game.saveData.Charas[index], imageData)));
         internal static void NotifyCharacterCreationDeserialize(this HumanData data, CharaLimit limit) =>
             OnCharacterCreationDeserialize.Invoke(data, limit, data.GameParameter.imageData.Extract().ToArchive());
         internal static Action<HumanDataCoordinate> NotifyCoordinateDeserialize = coordinate => {};
@@ -187,24 +187,25 @@ namespace Fishbone
                     .With(() => NotifyCoordinateDeserialize = coordinate => {})
                     .Invoke(human, coordinate, limit, File.ReadAllBytes(path).Extract().ToArchive());
         internal static void NotifyCoordinateInitialize(this Human human) =>
-            OnCoordinateInitialize.Invoke(human.GetActorIndex(), human.data.GameParameter.imageData.Extract().ToArchive());
+            OnCoordinateInitialize.Invoke(human.GetActorIndex(),
+                human.coorde.nowCoordinate, human.data.GameParameter.imageData.Extract().ToArchive());
         internal static void NotifyCoordinateSerialize(this string path) =>
             File.WriteAllBytes(path, File.ReadAllBytes(path).Implant(new MemoryStream() 
                 .With(stream => new ZipArchive(stream, ZipArchiveMode.Create)
-                .With(archive => OnCoordinateSerialize.Invoke(archive)).Dispose()).ToArray()));
+                .With(archive => OnCoordinateSerialize.Invoke(HumanCustom.Instance.Human.coorde.Now, archive)).Dispose()).ToArray()));
         internal static void NotifyActorSerialize(this SaveData.Actor actor, int index) =>
             (actor.gameParameter.imageData = actor.gameParameter.imageData 
                 .Implant(new MemoryStream()
                     .With(stream => new ZipArchive(stream, ZipArchiveMode.Create)
-                    .With(archive => OnActorSerialize.Invoke(index, archive)).Dispose()).ToArray()))
+                    .With(archive => OnActorSerialize.Invoke(index, actor.charFile, archive)).Dispose()).ToArray()))
                     .With(ApplyToHuman(actor.chaCtrl));
-        private static void UpdateImageData(int index, Il2CppBytes imageData) =>
-            Game.saveData.Charas[index].gameParameter.imageData = imageData
-                .With(() => OnActorDeserialize(index, imageData.Extract().ToArchive()));
+        private static void UpdateImageData(int index, SaveData.Actor actor, Il2CppBytes imageData) =>
+            actor.gameParameter.imageData = imageData
+                .With(() => OnActorDeserialize(index, actor.charFile, imageData.Extract().ToArchive()));
         private static Action<Il2CppBytes> ApplyToHuman(Human human) =>
             imageData => (human != null).Maybe(() => human.data.GameParameter.imageData = imageData);
         internal static void NotifyActorDeserialize(this SaveData.Actor actor, int index) =>
-            OnActorDeserialize(index, actor.gameParameter.imageData.Extract().ToArchive());
+            OnActorDeserialize(index, actor.charFile, actor.gameParameter.imageData.Extract().ToArchive());
     }
     static class Hooks
     {
@@ -279,7 +280,7 @@ namespace Fishbone
         public const string Process = "SamabakeScramble";
         public const string Name = "Fishbone";
         public const string Guid = $"{Process}.{Name}";
-        public const string Version = "1.3.0";
+        public const string Version = "1.4.0";
         private Harmony Patch;
         public override void Load() =>
             Patch = Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks")
