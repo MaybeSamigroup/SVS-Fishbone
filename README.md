@@ -1,64 +1,83 @@
 # SVS-Fishbone
 
-plugin api to serialize and deserialize character or coordinate bound extension data, for SamabakeScramble
+Plugin API to serialize and deserialize character or coordinate-bound extension data, for SamabakeScramble and DigitalCraft.
 
-# Prerequisites
+## Prerequisites
 
- * [BepInEx](https://github.com/BepInEx/BepInEx)
-   * v6.0.0 be 725 or later
- * [ByteFiddler](https://github.com/BepInEx/BepInEx)
-   * v1.0 or later and suitable configuration
+* [BepInEx](https://github.com/BepInEx/BepInEx)
+  * v6.0.0 be 725 or later
+* [ByteFiddler](https://github.com/BepInEx/BepInEx)
+  * v1.0 or later and suitable configuration
 
-Confirmed working under SVS 1.1.4/1.1.3 + [SVS-HF Patch](https://github.com/ManlyMarco/SVS-HF_Patch) 1.5/1.6 environment.
+Confirmed working under SamabakeScramble 1.1.6 and DigitalCraft 2.0.0.
 
-# Installation
+## Installation
 
-Extract the release to game root.
+Extract the release to your game root directory.
 
-# How it works
+## How it works
 
-Fishbone extensions are stick in to game character/coordinate poatrait, as a PNG private extension chunk of "fsBN".
+Fishbone extensions are embedded into game character or coordinate portraits as a PNG private extension chunk named `"fsBN"`.  
+This allows arbitrary plugin data to be stored and retrieved alongside character or coordinate files, visible in the file explorer.
 
-For coordinate, where you see at file explorer.
+## How to use
 
-For character, where you see at in game character selection view.
+Plugin authors who want to use Fishbone should subscribe to any of the provided events.
 
-# How to use
+Extension storages are provided as `ZipArchive`, shared by all plugins.  
+**It is strongly advised to use each plugin's GUID as a directory name for your data, and to organize sub-entries accordingly.**
 
-Plugin authors who want to use fishbone, should subscribe all or some of these event.
+---
 
-Extension storages are provided as ZipArchive, shared by all plugin.
+## Provided Events
 
-So strongly advised to use each plugin Guid named directories and it's sub entries.
+Fishbone exposes a set of events for both character and coordinate serialization/deserialization.  
+These events allow plugins to read or write extension data at various points in the character/coordinate lifecycle.
 
-## OnCharacterCreationSerialize
+### Character Events
 
-Notified when character is serialized in Character Creation.
+- `OnPreCharacterDeserialize`
+- `OnPostCharacterDeserialize`
+- `OnCharacterSerialize`
+- `OnActorDeserialize`
+- `OnActorSerialize`
+- `OnPreActorHumanize`
+- `OnPostActorHumanize`
 
-## OnCharacterCreationDeserialize
+### Coordinate Events
 
-Notified when character is deserialized in Character Creation.
+- `OnPreCoordinateDeserialize`
+- `OnPostCoordinateDeserialize`
+- `OnCoordinateSerialize`
+- `OnPreCoordinateReload`
+- `OnPostCoordinateReload`
 
-## OnCoordinateSerialize
+Each event provides access to the relevant data and a `ZipArchive` representing the extension storage.
 
-Notified when coordinate is serialized in Character Creation.
+---
 
-## OnCoordinateInitialize
+## Example: Subscribing to an Event
 
-Notified When character coordinates is reset to default in H Scene.
+```csharp
+Fishbone.Event.OnPostCharacterDeserialize += (human, limit, archive, storage) =>
+{
+    // Read or write your plugin's data in archive here
+    // e.g., using archive.CreateEntry("YourPluginGuid/yourdata.bin")
+};
+```
 
-## OnCoordinateDeserialize
+---
 
-Notified when coordinate is deserialized in Character Creation or H Scene.
+## Notes
 
-## OnActorSerialize
+- Fishbone is compatible with both SamabakeScramble and DigitalCraft, with process-specific logic for each.
+- Extension data is preserved across character and coordinate saves/loads.
+- Use the provided events to ensure your plugin data is always synchronized with the game state.
 
-Notified when actor serialized in simulation mode. aka, when auto or manually saved.
+---
 
-Actor bound to the serialized data is indicated by index from ```Manager.Game.saveData.Chars```.
+## License
 
-## OnActorDeserialize 
+See [LICENSE](LICENSE) for details.
 
-Notified when actors are deserialized in just before entering simulation mode.
-
-Actor bound to the deserialized data is indicated by index from ```Manager.Game.saveData.Chars```.
+---

@@ -1,23 +1,21 @@
 using HarmonyLib;
-using BepInEx;
-using BepInEx.Unity.IL2CPP;
 using System;
 using System.IO;
 using System.IO.Compression;
 using System.Collections.Generic;
+using System.Threading;
 using System.Linq;
 using UniRx;
 using UniRx.Triggers;
 using Cysharp.Threading.Tasks;
-using UnityEngine.UI;
 using ILLGames.Unity.Component;
-using Manager;
 using Character;
-using CharacterCreation;
-using CharaLoadFlgs = Character.HumanData.LoadFileInfo.Flags;
-using CharaLimit = Character.HumanData.LoadLimited.Flags;
+using ILLGames.IO;
+using LoadFlags = Character.HumanData.LoadFileInfo.Flags;
 using CoordLimit = Character.HumanDataCoordinate.LoadLimited.Flags;
 using Il2CppBytes = Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<byte>;
+using Il2CppReader = Il2CppSystem.IO.BinaryReader;
+using Il2CppStream = Il2CppSystem.IO.Stream;
 
 namespace Fishbone
 {
@@ -30,16 +28,31 @@ namespace Fishbone
                     .AddDisposableOnDestroy(Disposable.Create(onDestroy + AwaitSetup<T>(onSetup, onDestroy)));
         static Action AwaitSetup<T>(Action onSetup, Action onDestroy) where T : SingletonInitializer<T> =>
             () => UniTask.NextFrame().ContinueWith((Action)(() => Hook<T>(onSetup, onDestroy)));
+        /// <summary>
+        /// utility function to hook singleton initializer instance setup & destroy
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="onSetup"></param>
+        /// <param name="onDestroy"></param>
         public static void Hook<T>(Action onSetup, Action onDestroy) where T : SingletonInitializer<T> =>
             SingletonInitializer<T>.WaitUntilSetup(Canceler.Token)
                 .ContinueWith(onSetup + AwaitDestroy<T>(onSetup, onDestroy));
     }
     public delegate void Either(Action a, Action b);
+    /// <summary>
+    /// functional utilities for favor
+    /// </summary>
     public static class FunctionalExtension
     {
         public static Either Either(bool value) => value ? (left, right) => right() : (left, right) => left();
         public static void Either(this bool value, Action left, Action right) => Either(value)(left, right);
         public static void Maybe(this bool value, Action maybe) => value.Either(() => { }, maybe);
+        public static Action Curry<V1, V2, V3>(this V1 v1, V2 v2, V3 v3, Action<V1, V2, V3> action) => () => action(v1, v2, v3);
+        public static Action Curry<V1, V2>(this V1 v1, V2 v2, Action<V1, V2> action) => () => action(v1, v2);
+        public static Action Curry<V1>(this V1 v1, Action<V1> action) => () => action(v1);
+        public static T With<V1, V2, V3, T>(this T input, Action<V1, V2, V3, T> sideEffect, V1 v1, V2 v2, V3 v3) => input.With(() => sideEffect(v1, v2, v3, input));
+        public static T With<V1, V2, T>(this T input, Action<V1, V2, T> sideEffect, V1 v1, V2 v2) => input.With(() => sideEffect(v1, v2, input));
+        public static T With<V1, T>(this T input, Action<V1, T> sideEffect, V1 v1) => input.With(() => sideEffect(v1, input));
         public static T With<T>(this T input, Action<T> sideEffect) => input.With(() => sideEffect(input));
         public static T With<T>(this T input, Action sideEffect)
         {
@@ -47,20 +60,48 @@ namespace Fishbone
             return input;
         }
     }
-    public static class Codec
+    /// <summary>
+    /// purpose specific portable network graphics encoder
+    /// </summary>
+    public static class Encode
     {
-        private static readonly uint[] TABLE = [.. Enumerable.Range(0, 256).Select(i => (uint)i).Select(i => Enumerable.Range(0, 8).Aggregate(i, (i, _) => (i & 1) == 1 ? (0xEDB88320U ^ (i >> 1)) : (i >> 1)))];
+        private static readonly uint[] TABLE = [.. Enumerable.Range(0, 256)
+            .Select(i => (uint)i).Select(i => Enumerable.Range(0, 8).Aggregate(i, (i, _) => (i & 1) == 1 ? (0xEDB88320U ^ (i >> 1)) : (i >> 1)))];
+        public static uint CRC32(this IEnumerable<byte> values) =>
+            values.Aggregate(0xFFFFFFFFU, (crc32, value) => TABLE[(crc32 ^ value) & 0xff] ^ (crc32 >> 8)) ^ 0xFFFFFFFFU;
         public static uint FromNetworkOrderBytes(this IEnumerable<byte> values) =>
             ((uint)values.ElementAt(0) << 24) | ((uint)values.ElementAt(1) << 16) | ((uint)values.ElementAt(2) << 8) | values.ElementAt(3);
         public static byte[] ToNetworkOrderBytes(this uint value) =>
             [(byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value];
-        public static uint CRC32(this IEnumerable<byte> values) =>
-            values.Aggregate(0xFFFFFFFFU, (crc32, value) => TABLE[(crc32 ^ value) & 0xff] ^ (crc32 >> 8)) ^ 0xFFFFFFFFU;
-        private static IEnumerable<byte> Compose(this IEnumerable<byte> values) =>
+        private static IEnumerable<byte> Suffix(this IEnumerable<byte> values) =>
                 values.Concat(CRC32(values).ToNetworkOrderBytes());
-        private static IEnumerable<byte> ToChunk(this IEnumerable<byte> values) =>
-            ((uint)values.Count()).ToNetworkOrderBytes().Concat(Enumerable.Concat([(byte)'f', (byte)'s', (byte)'B', (byte)'N'], values).Compose());
-        public static byte[] Extract(this IEnumerable<byte> values) => values?.Skip(8)?.ProcessSize()?.ToArray() ?? [];
+        private static IEnumerable<byte> ToChunk(IEnumerable<byte> name, IEnumerable<byte> values) =>
+            ((uint)values.Count()).ToNetworkOrderBytes().Concat(Enumerable.Concat(name, values).Suffix());
+        private static IEnumerable<byte> ProcessName(this uint size, IEnumerable<byte> image, IEnumerable<byte> data) =>
+            (image.ElementAt(4), image.ElementAt(5), image.ElementAt(6), image.ElementAt(7)) switch
+            {
+                ((byte)'I', (byte)'E', (byte)'N', (byte)'D') => data.Concat(image),
+                ((byte)'f', (byte)'s', (byte)'B', (byte)'N') => data.Concat(image.Skip((int)size + 12)),
+                _ => image.Take((int)size + 12).Concat(image.Skip((int)size + 12).ProcessSize(data))
+            };
+        private static IEnumerable<byte> ProcessSize(this IEnumerable<byte> image, IEnumerable<byte> data) =>
+            image.FromNetworkOrderBytes().ProcessName(image, data);
+        public static byte[] Implant(this IEnumerable<byte> pngData, byte[] data) =>
+            [.. pngData.Take(8), .. pngData.Skip(8).ProcessSize(ToChunk([(byte)'f', (byte)'s', (byte)'B', (byte)'N'], data))];
+        public static byte[] Implant(this byte[] data) =>
+             [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A
+            , ..ToChunk([(byte)'I', (byte)'H', (byte)'D', (byte)'R'], [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0])
+            , ..ToChunk([(byte)'I', (byte)'D', (byte)'A', (byte)'T'], [])
+            , ..ToChunk([(byte)'f', (byte)'s', (byte)'B', (byte)'N'], data)
+            , ..ToChunk([(byte)'I', (byte)'E', (byte)'N', (byte)'D'], [])];
+    }
+    /// <summary>
+    /// purpose specific portable network graphics decoder
+    /// </summary>
+    public static class Decode
+    {
+        public static byte[] Extract(this IEnumerable<byte> values) =>
+            values?.Skip(8)?.ProcessSize()?.ToArray() ?? [];
         private static IEnumerable<byte> ProcessSize(this IEnumerable<byte> image) =>
             image.Take(4).FromNetworkOrderBytes().ProcessName(image.Skip(4));
         private static IEnumerable<byte> ProcessName(this uint size, IEnumerable<byte> image) =>
@@ -70,223 +111,170 @@ namespace Fishbone
                 ((byte)'f', (byte)'s', (byte)'B', (byte)'N') => image.Skip(4).Take((int)size),
                 _ => image.Skip((int)size + 8).ProcessSize()
             };
-        public static byte[] Implant(this IEnumerable<byte> image, IEnumerable<byte> data) =>
-            [.. image.Take(8), .. image.Skip(8).ProcessSize(data.ToChunk())];
-        private static IEnumerable<byte> ProcessSize(this IEnumerable<byte> image, IEnumerable<byte> data) =>
-            image.FromNetworkOrderBytes().ProcessName(image, data);
-        private static IEnumerable<byte> ProcessName(this uint size, IEnumerable<byte> image, IEnumerable<byte> data) =>
-            (image.ElementAt(4), image.ElementAt(5), image.ElementAt(6), image.ElementAt(7)) switch
-            {
-                ((byte)'I', (byte)'E', (byte)'N', (byte)'D') => data.Concat(image),
-                ((byte)'f', (byte)'s', (byte)'B', (byte)'N') => data.Concat(image.Skip((int)size + 12)),
-                _ => image.Take((int)size + 12).Concat(image.Skip((int)size + 12).ProcessSize(data))
-            };
     }
-    internal static class UIRefHScene
+    public static partial class Event
     {
-        internal static SV.H.UI.ClothesSettingMenu.SelectCoodinateCard HSceneSelectCoordinateCard =>
-            SV.H.HScene.Instance.ClothesSlideSetting.SelectCoodinateCard;
-        internal static Human CurrentTarget => HSceneSelectCoordinateCard._actor.Human;
-        internal static string CurrentSource => HSceneSelectCoordinateCard._filename;
-        internal static Button CoordReset => HSceneSelectCoordinateCard._beforeCoode;
-        internal static Button CoordLoad => HSceneSelectCoordinateCard._decide;
-        internal static Button End => SV.H.HScene.Instance.option._btnExit;
-        internal static CoordLimit CoordLimit => HSceneSelectCoordinateCard._togglesParts
-                .Where(item => item.isOn)
-                .Select(item => item.name switch
-                {
-                    "Toggle Hair" => CoordLimit.Hair,
-                    "Toggle Codenate" => CoordLimit.Clothes,
-                    "Toggle Accessory" => CoordLimit.Accessory,
-                    _ => CoordLimit.None
-                }).Aggregate(CoordLimit.None, (x, y) => x | y);
-        static Action Listen => (Action)
-            (() => CoordLoad.onClick.AddListener(CoordinateLoad)) +
-            (() => CoordReset.onClick.AddListener(CoordinateReset)) +
-            (() => End.onClick.AddListener(CoordinateResetAll));
-        static Action Ignore => (Action)
-            (() => CoordLoad.onClick.RemoveListener(CoordinateLoad)) +
-            (() => CoordReset.onClick.RemoveListener(CoordinateReset)) +
-            (() => End.onClick.RemoveListener(CoordinateResetAll));
-        static Action CoordinateLoad => () =>
-            CurrentTarget.PrepareNotifyCoordinateDeserialize(CurrentSource, CoordLimit);
-        static Action CoordinateReset => () =>
-            CurrentTarget.NotifyCoordinateInitialize();
-        static Action CoordinateResetAll => () =>
-            SV.H.HScene.Instance.Actors.Do(actor => actor.Human.NotifyCoordinateInitialize());
-        internal static void Initialize() => Util.Hook<SV.H.HScene>(Listen, Ignore);
+        static void UpdateExtension(this Action<ZipArchive> action, MemoryStream stream) =>
+            new ZipArchive(stream, ZipArchiveMode.Update).With(action).Dispose();
+        static byte[] UpdateExtension(this byte[] bytes, Action<ZipArchive> action) =>
+            new MemoryStream()
+                .With(stream => stream.Write(bytes.Length > 0 ? bytes : NoExtension))
+                .With(stream => stream.Position = 0)
+                .With(action.UpdateExtension).ToArray();
+        internal static ZipArchive ToArchive(this byte[] bytes) =>
+            new ZipArchive(new MemoryStream(bytes.Length > 0 ? bytes : NoExtension), ZipArchiveMode.Read);
+        internal static void Implant(this HumanData data, byte[] bytes) =>
+            data.PngData = data?.PngData?.Implant(bytes) ?? bytes.Implant();
     }
-    internal static class UIRef
+    /// <summary>
+    /// struggling trace of coordinate deserialize capturing
+    /// </summary>
+    static partial class Hooks
     {
-        static string CurrentSource =>
-            HumanCustom.Instance.CustomCoordinateFile._listCtrl.GetSelectTopInfo().FullPath;
-        static Button CoordinateLoadButton =>
-            HumanCustom.Instance.CustomCoordinateFile._fileWindow._btnLoad;
-        static CoordLimit CoordLimit =>
-            HumanCustom.Instance.CustomCoordinateFile._fileWindow
-                ._coordinateCategory._toggles
-                .Where(item => item.isOn)
-                .Select(item => item.name switch
-                {
-                    "tglItem01" => CoordLimit.Clothes,
-                    "tglItem02" => CoordLimit.Accessory,
-                    "tglItem03" => CoordLimit.Hair,
-                    "tglItem04" => CoordLimit.FaceMakeup,
-                    "tglItem05" => CoordLimit.BodyMakeup,
-                    _ => CoordLimit.None,
-                }).Aggregate(CoordLimit.None, static (x, y) => x | y);
-        static Action CoordinateLoad => () =>
-            HumanCustom.Instance.Human.PrepareNotifyCoordinateDeserialize(CurrentSource, CoordLimit);
-        static Action ListenCoordinateLoad => () =>
-            CoordinateLoadButton.onClick.AddListener(CoordinateLoad);
-        static Action IgnoreCoordinateLoad => () =>
-            CoordinateLoadButton.onClick.RemoveListener(CoordinateLoad);
-        internal static void Initialize() => Util.Hook<HumanCustom>(ListenCoordinateLoad, IgnoreCoordinateLoad);
-    }
-    public static class Event
-    {
-        public static event Action<HumanData, ZipArchive> OnCharacterCreationSerialize =
-            static delegate { Plugin.Instance.Log.LogDebug("Character Serialize"); };
-        public static event Action<HumanData, CharaLimit, ZipArchive> OnCharacterCreationDeserialize =
-            static delegate { Plugin.Instance.Log.LogDebug("Character Deserialize"); };
-        public static event Action<HumanDataCoordinate, ZipArchive> OnCoordinateSerialize =
-            static delegate { Plugin.Instance.Log.LogDebug("Coordinate Serialize"); };
-        public static event Action<Human, HumanDataCoordinate, CoordLimit, ZipArchive> OnCoordinateDeserialize =
-            static delegate { Plugin.Instance.Log.LogDebug("Coordinate Deserialize"); };
-        public static event Action<int, HumanDataCoordinate, ZipArchive> OnCoordinateInitialize =
-            static delegate { Plugin.Instance.Log.LogDebug("Coordinate Initialize"); };
-        public static event Action<int, HumanData, ZipArchive> OnActorSerialize =
-            static delegate { Plugin.Instance.Log.LogDebug("Actor Serialize"); };
-        public static event Action<int, HumanData, ZipArchive> OnActorDeserialize =
-            static delegate { Plugin.Instance.Log.LogDebug("Actor Deserialize"); };
-        public static int GetActorIndex(this Il2CppBytes imageData) =>
-            Enumerable.Range(0, 24).Where(Game.saveData.Charas.ContainsKey)
-                .Where(index => Game.saveData.Charas[index].gameParameter.imageData == imageData).FirstOrDefault(-1);
-        public static int GetActorIndex(this Human human) => human?.fileGameParam?.imageData?.GetActorIndex() ?? -1;
-        public static int GetActorIndex(this HumanData data) => data?.GameParameter?.imageData?.GetActorIndex() ?? -1;
-        public static int GetActorIndex(this SaveData.Actor actor) => actor?.gameParameter?.imageData?.GetActorIndex() ?? -1;
-        static readonly byte[] EmptyBytes = new MemoryStream()
-            .With(stream => new ZipArchive(stream, ZipArchiveMode.Create).Dispose()).ToArray();
-        static ZipArchive EmptyArchive => new(new MemoryStream(EmptyBytes), ZipArchiveMode.Read);
-        static ZipArchive ToArchive(this byte[] bytes) =>
-            bytes.Length > 0 ? new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read) : EmptyArchive;
-        internal static Il2CppBytes NotifyCharacterCreationSerialize(this HumanData data) =>
-            data.GameParameter.imageData = data.GameParameter.imageData
-                .Implant(new MemoryStream()
-                    .With(stream => new ZipArchive(stream, ZipArchiveMode.Create)
-                    .With(archive => OnCharacterCreationSerialize.Invoke(data, archive)).Dispose()).ToArray());
-        internal static void NotifyCharacterCreationSerialize(this HumanData data, int index) =>
-            data.NotifyCharacterCreationSerialize()
-                .With(imageData => (index >= 0).Maybe(() => UpdateImageData(index, Game.saveData.Charas[index], imageData)));
-        internal static void NotifyCharacterCreationDeserialize(this HumanData data, CharaLimit limit) =>
-            OnCharacterCreationDeserialize.Invoke(data, limit, data.GameParameter.imageData.Extract().ToArchive());
-        internal static Action<HumanDataCoordinate> NotifyCoordinateDeserialize = coordinate => {};
-        internal static void PrepareNotifyCoordinateDeserialize(this Human human, string path, CoordLimit limit) =>
-            NotifyCoordinateDeserialize = coordinate =>
-                OnCoordinateDeserialize
-                    .With(() => NotifyCoordinateDeserialize = coordinate => {})
-                    .Invoke(human, coordinate, limit, File.ReadAllBytes(path).Extract().ToArchive());
-        internal static void NotifyCoordinateInitialize(this Human human) =>
-            OnCoordinateInitialize.Invoke(human.GetActorIndex(),
-                human.coorde.nowCoordinate, human.data.GameParameter.imageData.Extract().ToArchive());
-        internal static void NotifyCoordinateSerialize(this string path) =>
-            File.WriteAllBytes(path, File.ReadAllBytes(path).Implant(new MemoryStream() 
-                .With(stream => new ZipArchive(stream, ZipArchiveMode.Create)
-                .With(archive => OnCoordinateSerialize.Invoke(HumanCustom.Instance.Human.coorde.Now, archive)).Dispose()).ToArray()));
-        internal static void NotifyActorSerialize(this SaveData.Actor actor, int index) =>
-            (actor.gameParameter.imageData = actor.gameParameter.imageData 
-                .Implant(new MemoryStream()
-                    .With(stream => new ZipArchive(stream, ZipArchiveMode.Create)
-                    .With(archive => OnActorSerialize.Invoke(index, actor.charFile, archive)).Dispose()).ToArray()))
-                    .With(ApplyToHuman(actor.chaCtrl));
-        private static void UpdateImageData(int index, SaveData.Actor actor, Il2CppBytes imageData) =>
-            actor.gameParameter.imageData = imageData
-                .With(() => OnActorDeserialize(index, actor.charFile, imageData.Extract().ToArchive()));
-        private static Action<Il2CppBytes> ApplyToHuman(Human human) =>
-            imageData => (human != null).Maybe(() => human.data.GameParameter.imageData = imageData);
-        internal static void NotifyActorDeserialize(this SaveData.Actor actor, int index) =>
-            OnActorDeserialize(index, actor.charFile, actor.gameParameter.imageData.Extract().ToArchive());
-    }
-    static class Hooks
-    {
+        /// <summary>
+        /// intercepted png data during character or coordinate card loading
+        /// </summary>
+        static ThreadLocal<byte[]> Extension = new ThreadLocal<byte[]>();
+        static void GetPngSizeSkip(Il2CppStream stream, long offset, long length) { }
+        static void GetPngSizeProc(Il2CppStream stream, long offset, long length) =>
+            Extension.Value = new Il2CppBytes(length).With(buffer => stream.Read(buffer)).With(() => stream.Position = offset).Extract();
+        /// <summary>
+        /// action to do when GetPngSize captured
+        /// </summary>
+        static Action<Il2CppStream, long, long> OnGetPngSize = GetPngSizeProc;
+        /// <summary>
+        /// capture card load begining
+        /// prepare GetPngSize hook when flags lack Png
+        /// </summary>
+        /// <param name="flags"></param>
         [HarmonyPrefix]
         [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(SV.H.HScene), nameof(SV.H.HScene.End), [])]
-        static void HSceneEndPrefix() => 
-            SV.H.HScene.Instance.Actors.Do(actor => actor.Human.NotifyCoordinateInitialize());
-        [HarmonyPrefix]
-        [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(HumanData), nameof(HumanData.SaveCharaFileBeforeAction), typeof(string), typeof(Il2CppSystem.Action))]
-        static void HumanDataSaveFilePrefix(HumanData __instance) => __instance.NotifyCharacterCreationSerialize();
-        static int CharacterCreationTarget = -1;
-        static void ProcessTargetActor(HumanData data) =>
-            (data.GetActorIndex() >= 0 || SV.SimulationScene.Instance == null).Maybe(() => CharacterCreationTarget = data.GetActorIndex());
-        static Action<CharaLimit> OnCopy(HumanData dst, HumanData src) =>
-            (dst == HumanCustom.Instance?.HumanData, src == HumanCustom.Instance?.HumanData) switch
-            {
-                (true, false) => src.With(ProcessTargetActor).NotifyCharacterCreationDeserialize,
-                (false, true) => _ => src.NotifyCharacterCreationSerialize(CharacterCreationTarget),
-                _ => _ => { }
-            };
-        [HarmonyPrefix]
-        [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(HumanData), nameof(HumanData.Copy), typeof(HumanData), typeof(HumanData))]
-        static void HumanDataCopyPrefix(HumanData dst, HumanData src) => OnCopy(dst, src)(CharaLimit.All);
-        [HarmonyPrefix]
-        [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(HumanData), nameof(HumanData.CopyLimited), typeof(bool), typeof(HumanData), typeof(HumanData), typeof(CharaLimit))]
-        static void HumanDataCopyLimitedPrefix(HumanData dst, HumanData src, CharaLimit flags) => OnCopy(dst, src)(flags);
-        [HarmonyPrefix]
-        [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(HumanData), nameof(HumanData.LoadFile), typeof(Il2CppSystem.IO.BinaryReader), typeof(CharaLoadFlgs))]
-        static void HumanDataLoadFilePrefix(ref CharaLoadFlgs flags) =>
-            flags = flags switch
-            {
-                CharaLoadFlgs.FileView => flags,
-                CharaLoadFlgs.FileViewUploader => flags,
-                _ => flags | CharaLoadFlgs.GameParam
-            };
+        [HarmonyPatch(typeof(HumanData), nameof(HumanData.LoadFile), typeof(Il2CppReader), typeof(LoadFlags))]
+        static void SetGetPngBytesHook(LoadFlags flags) =>
+            OnGetPngSize = (flags & LoadFlags.Png) == LoadFlags.None ? GetPngSizeProc : GetPngSizeSkip;
+        /// <summary>
+        /// capture character card load complete
+        /// reset GetPngSize hook to do nothing
+        /// </summary>
         [HarmonyPostfix]
         [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.SaveFile), typeof(string), typeof(byte))]
-        static void HumanDataCoordinateSaveFilePrefix(string path) => path.NotifyCoordinateSerialize();
+        [HarmonyPatch(typeof(HumanData), nameof(HumanData.LoadFile), typeof(Il2CppReader), typeof(LoadFlags))]
+        static void ResetGetPngBytesHook() => OnGetPngSize = GetPngSizeSkip;
+        /// <summary>
+        /// capture GetPngSize call and intercept ignored png data if necessary
+        /// </summary>
+        /// <param name="st"></param>
+        /// <param name="__result"></param>
         [HarmonyPostfix]
         [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(PngFile), nameof(PngFile.GetPngSize), typeof(Il2CppStream))]
+        static void GetPngSizePostfix(Il2CppStream st, long __result) => OnGetPngSize(st, st.Position, __result);
+        /// <summary>
+        /// coordinate load limitation infered from function calling
+        /// </summary>
+        static ThreadLocal<CoordLimit> CoordLimits = new ThreadLocal<CoordLimit>();
+        static ThreadLocal<bool> CoordLimitsCheck = new ThreadLocal<bool>();
+        /// <summary>
+        /// capture entrying SkipPng and intercept skipped png data
+        /// from ghidra inspection, SkipPng is only called during coordinate loading operation
+        /// </summary>
+        /// <param name="br"></param>
+        [HarmonyPrefix]
+        [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(PngFile), nameof(PngFile.SkipPng), typeof(Il2CppReader))]
+        static void SkipPngPrefix(Il2CppReader br) =>
+            Extension.Value = PngFile.LoadPngBytes(br.With(() => br.BaseStream.Position = 0)).With(() => br.BaseStream.Position = 0).Extract();
+        /// <summary>
+        /// capture leaving SkipPng and prepare limitation inference
+        /// </summary>
+        [HarmonyPostfix]
+        [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(PngFile), nameof(PngFile.SkipPng), typeof(Il2CppReader))]
+        static void SkipPngPostfix() => CoordLimits.Value = CoordLimit.None;
+        /// <summary>
+        /// loaded coordinate data is copied completley maybe for verification
+        /// so stop limitation inference before HumanData.CopyLimited and HumanDataCoorinate.LoadBytes
+        /// </summary>
+        [HarmonyPrefix]
+        [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanData), nameof(HumanData.CopyLimited))]
         [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.LoadBytes), typeof(Il2CppBytes), typeof(Il2CppSystem.Version))]
-        static void HumanDataCoordinateLoadBytesPostfix(HumanDataCoordinate __instance) =>
-            Event.NotifyCoordinateDeserialize(__instance);
+        static void DisableCoordinateLimitCheck() => CoordLimitsCheck.Value = false;
+        /// <summary>
+        /// loaded coordinate data is copied completley maybe for verification
+        /// restart limitation inference after HumanData.CopyLimited and HumanDataCoorinate.LoadBytes
+        /// </summary>
+        [HarmonyPostfix]
+        [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanData), nameof(HumanData.CopyLimited))]
+        [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.LoadBytes), typeof(Il2CppBytes), typeof(Il2CppSystem.Version))]
+        static void EnableCoordinateLimitCheck() => CoordLimitsCheck.Value = true;
+        /// <summary>
+        /// capture if limitation meets clothes
+        /// </summary>
+        [HarmonyPostfix]
+        [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanDataClothes), nameof(HumanDataClothes.CopyBase))]
+        static void HumanDataClothesCopyPostfix() => CoordLimitsCheck.Value.Maybe(() => CoordLimits.Value |= CoordLimit.Clothes);
+        /// <summary>
+        /// capture if limitation meets accessory
+        /// </summary>
+        [HarmonyPostfix]
+        [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanDataAccessory), nameof(HumanDataAccessory.Copy))]
+        static void HumanDataAccessoryCopyPostfix() => CoordLimitsCheck.Value.Maybe(() => CoordLimits.Value |= CoordLimit.Accessory);
+        /// <summary>
+        /// capture if limitation meets hair
+        /// </summary>
+        [HarmonyPostfix]
+        [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanDataHair), nameof(HumanDataHair.Copy))]
+        static void HumanDataHairCopyPostfix() => CoordLimitsCheck.Value.Maybe(() => CoordLimits.Value |= CoordLimit.Hair);
+        /// <summary>
+        /// capture if limitation meets face makeup
+        /// </summary>
+        [HarmonyPostfix]
+        [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanDataFaceMakeup), nameof(HumanDataFaceMakeup.Copy))]
+        static void HumanDataFaceMakeupCopyPostfix() => CoordLimitsCheck.Value.Maybe(() => CoordLimits.Value |= CoordLimit.FaceMakeup);
+        /// <summary>
+        /// capture if limitation meets body makeup
+        /// </summary>
+        [HarmonyPostfix]
+        [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanDataBodyMakeup), nameof(HumanDataBodyMakeup.Copy))]
+        static void HumanDataBodyMakeupCopyPostfix() => CoordLimitsCheck.Value.Maybe(() => CoordLimits.Value |= CoordLimit.BodyMakeup);
+        /// <summary>
+        /// capture coordinate deserialize begining
+        /// </summary>
+        /// <param name="__instance"></param>
         [HarmonyPrefix]
         [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(SaveData.WorldData), nameof(SaveData.WorldData.Save), typeof(string))]
-        static void WorldSavePrefix(SaveData.WorldData __instance) =>
-            Enumerable.Range(0, 24).Do(index => __instance.Charas.ContainsKey(index)
-                .Maybe(() => __instance.Charas[index].NotifyActorSerialize(index)));
+        [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), typeof(Human.ReloadFlags))]
+        static void HumanReloadCoordinatePrefix(Human __instance) =>
+            (CoordLimits.Value != CoordLimit.None)
+                .Maybe(CoordLimits.Value.Curry(Extension.Value, __instance.NotifyPreCoordinateDeserialize));
+        /// <summary>
+        /// capture coordinate deserialize complete
+        /// </summary>
+        /// <param name="__instance"></param>
         [HarmonyPostfix]
         [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(SaveData.WorldData), nameof(SaveData.WorldData.Load), typeof(string))]
-        static void WorldLoadPostfix(SaveData.WorldData __result) =>
-            Enumerable.Range(0, 24).Do(index => __result.Charas.ContainsKey(index)
-                .Maybe(() => __result.Charas[index].NotifyActorDeserialize(index)));
+        [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), typeof(Human.ReloadFlags))]
+        static void HumanReloadCoordinateWithFlagsPostfix(Human __instance) =>
+            (CoordLimits.Value, Extension.Value) = CoordLimits.Value switch
+            {
+                CoordLimit.None => (CoordLimit.None, Extension.Value),
+                _ => (CoordLimit.None, Array.Empty<byte>()).With(CoordLimits.Value.Curry(Extension.Value, __instance.NotifyPostCoordinateDeserialize))
+            };
+        /// <summary>
+        /// capture coordinate reloading complete
+        /// </summary>
+        /// <param name="__instance"></param>
         [HarmonyPostfix]
         [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(SV.EntryScene.CharaEntry), nameof(SV.EntryScene.CharaEntry.Entry), typeof(int), typeof(HumanData), typeof(bool))]
-        static void CharaEntryPostfix(SaveData.Actor __result) => __result.NotifyActorDeserialize(__result.GetActorIndex());
-    }
-    [BepInProcess(Process)]
-    [BepInPlugin(Guid, Name, Version)]
-    public class Plugin : BasePlugin
-    {
-        internal static Plugin Instance;
-        public const string Process = "SamabakeScramble";
-        public const string Name = "Fishbone";
-        public const string Guid = $"{Process}.{Name}";
-        public const string Version = "1.4.0";
-        private Harmony Patch;
-        public override void Load() =>
-            Patch = Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks")
-                .With(UIRef.Initialize)
-                .With(UIRefHScene.Initialize)
-                .With(() => Instance = this);
-        public override bool Unload() => true.With(Patch.UnpatchSelf) && base.Unload();
+        [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), [])]
+        static void HumanReloadCoordinatePostfix(Human __instance) =>
+            __instance.NotifyPostCoordinateReload();
     }
 }
