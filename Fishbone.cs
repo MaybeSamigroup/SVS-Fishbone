@@ -132,12 +132,14 @@ namespace Fishbone
     static partial class Hooks
     {
         /// <summary>
-        /// intercepted png data during character or coordinate card loading
+        /// intercepted png data during character card loading
         /// </summary>
-        static ThreadLocal<byte[]> Extension = new ThreadLocal<byte[]>();
+        static byte[] CharaExtension = [];
         static void GetPngSizeSkip(Il2CppStream stream, long offset, long length) { }
         static void GetPngSizeProc(Il2CppStream stream, long offset, long length) =>
-            Extension.Value = new Il2CppBytes(length).With(buffer => stream.Read(buffer)).With(() => stream.Position = offset).Extract();
+            CharaExtension = new Il2CppBytes(length)
+                .With(buffer => stream.Read(buffer))
+                .With(() => stream.Position = offset).Extract();
         /// <summary>
         /// action to do when GetPngSize captured
         /// </summary>
@@ -159,7 +161,8 @@ namespace Fishbone
         [HarmonyPostfix]
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.LoadFile), typeof(Il2CppReader), typeof(LoadFlags))]
-        static void ResetGetPngBytesHook() => OnGetPngSize = GetPngSizeSkip;
+        static void ResetGetPngBytesHook() =>
+            OnGetPngSize = GetPngSizeSkip;
         /// <summary>
         /// capture GetPngSize call and intercept ignored png data if necessary
         /// </summary>
@@ -168,12 +171,20 @@ namespace Fishbone
         [HarmonyPostfix]
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(PngFile), nameof(PngFile.GetPngSize), typeof(Il2CppStream))]
-        static void GetPngSizePostfix(Il2CppStream st, long __result) => OnGetPngSize(st, st.Position, __result);
+        static void GetPngSizePostfix(Il2CppStream st, long __result) =>
+            OnGetPngSize(st, st.Position, __result);
         /// <summary>
         /// coordinate load limitation infered from function calling
         /// </summary>
-        static ThreadLocal<CoordLimit> CoordLimits = new ThreadLocal<CoordLimit>();
-        static ThreadLocal<bool> CoordLimitsCheck = new ThreadLocal<bool>();
+        static CoordLimit CoordLimits = CoordLimit.None;
+        /// <summary>
+        /// intercepted png data during coordinate card loading
+        /// </summary>
+        static byte[] CoordExtension = [];
+        static Action<CoordLimit> CoordLimitsCheck;
+        static void CoordLimitsCheckSkip(CoordLimit _) { }
+        static void CoordLimitsCheckProc(CoordLimit limit) =>
+            CoordLimits |= limit;
         /// <summary>
         /// capture entrying SkipPng and intercept skipped png data
         /// from ghidra inspection, SkipPng is only called during coordinate loading operation
@@ -183,14 +194,15 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(PngFile), nameof(PngFile.SkipPng), typeof(Il2CppReader))]
         static void SkipPngPrefix(Il2CppReader br) =>
-            Extension.Value = PngFile.LoadPngBytes(br.With(() => br.BaseStream.Position = 0)).With(() => br.BaseStream.Position = 0).Extract();
+            CoordExtension = PngFile.LoadPngBytes(br.With(() => br.BaseStream.Position = 0)).With(() => br.BaseStream.Position = 0).Extract();
         /// <summary>
         /// capture leaving SkipPng and prepare limitation inference
         /// </summary>
         [HarmonyPostfix]
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(PngFile), nameof(PngFile.SkipPng), typeof(Il2CppReader))]
-        static void SkipPngPostfix() => CoordLimits.Value = CoordLimit.None;
+        static void SkipPngPostfix() =>
+            CoordLimits = CoordLimit.None;
         /// <summary>
         /// loaded coordinate data is copied completley maybe for verification
         /// so stop limitation inference before HumanData.CopyLimited and HumanDataCoorinate.LoadBytes
@@ -199,7 +211,8 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.CopyLimited))]
         [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.LoadBytes), typeof(Il2CppBytes), typeof(Il2CppSystem.Version))]
-        static void DisableCoordinateLimitCheck() => CoordLimitsCheck.Value = false;
+        static void DisableCoordinateLimitCheck() =>
+            CoordLimitsCheck = CoordLimitsCheckSkip;
         /// <summary>
         /// loaded coordinate data is copied completley maybe for verification
         /// restart limitation inference after HumanData.CopyLimited and HumanDataCoorinate.LoadBytes
@@ -208,42 +221,48 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.CopyLimited))]
         [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.LoadBytes), typeof(Il2CppBytes), typeof(Il2CppSystem.Version))]
-        static void EnableCoordinateLimitCheck() => CoordLimitsCheck.Value = true;
+        static void EnableCoordinateLimitCheck() =>
+            CoordLimitsCheck = CoordLimitsCheckProc;
         /// <summary>
         /// capture if limitation meets clothes
         /// </summary>
         [HarmonyPostfix]
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanDataClothes), nameof(HumanDataClothes.CopyBase))]
-        static void HumanDataClothesCopyPostfix() => CoordLimitsCheck.Value.Maybe(() => CoordLimits.Value |= CoordLimit.Clothes);
+        static void HumanDataClothesCopyPostfix() =>
+            CoordLimitsCheck(CoordLimit.Clothes);
         /// <summary>
         /// capture if limitation meets accessory
         /// </summary>
         [HarmonyPostfix]
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanDataAccessory), nameof(HumanDataAccessory.Copy))]
-        static void HumanDataAccessoryCopyPostfix() => CoordLimitsCheck.Value.Maybe(() => CoordLimits.Value |= CoordLimit.Accessory);
+        static void HumanDataAccessoryCopyPostfix() =>
+            CoordLimitsCheck(CoordLimit.Accessory);
         /// <summary>
         /// capture if limitation meets hair
         /// </summary>
         [HarmonyPostfix]
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanDataHair), nameof(HumanDataHair.Copy))]
-        static void HumanDataHairCopyPostfix() => CoordLimitsCheck.Value.Maybe(() => CoordLimits.Value |= CoordLimit.Hair);
+        static void HumanDataHairCopyPostfix() =>
+            CoordLimitsCheck(CoordLimit.Hair);
         /// <summary>
         /// capture if limitation meets face makeup
         /// </summary>
         [HarmonyPostfix]
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanDataFaceMakeup), nameof(HumanDataFaceMakeup.Copy))]
-        static void HumanDataFaceMakeupCopyPostfix() => CoordLimitsCheck.Value.Maybe(() => CoordLimits.Value |= CoordLimit.FaceMakeup);
+        static void HumanDataFaceMakeupCopyPostfix() =>
+            CoordLimitsCheck(CoordLimit.FaceMakeup);
         /// <summary>
         /// capture if limitation meets body makeup
         /// </summary>
         [HarmonyPostfix]
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanDataBodyMakeup), nameof(HumanDataBodyMakeup.Copy))]
-        static void HumanDataBodyMakeupCopyPostfix() => CoordLimitsCheck.Value.Maybe(() => CoordLimits.Value |= CoordLimit.BodyMakeup);
+        static void HumanDataBodyMakeupCopyPostfix() =>
+            CoordLimitsCheck(CoordLimit.BodyMakeup);
         /// <summary>
         /// capture coordinate deserialize begining
         /// </summary>
@@ -251,9 +270,9 @@ namespace Fishbone
         [HarmonyPrefix]
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), typeof(Human.ReloadFlags))]
-        static void HumanReloadCoordinatePrefix(Human __instance) =>
-            (CoordLimits.Value != CoordLimit.None)
-                .Maybe(CoordLimits.Value.Curry(Extension.Value, __instance.NotifyPreCoordinateDeserialize));
+        static void HumanReloadCoordinateWithFlagsPrefix(Human __instance) =>
+            (CoordLimits != CoordLimit.None)
+                .Maybe(CoordLimits.Curry(CoordExtension, __instance.NotifyPreCoordinateDeserialize));
         /// <summary>
         /// capture coordinate deserialize complete
         /// </summary>
@@ -262,10 +281,11 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), typeof(Human.ReloadFlags))]
         static void HumanReloadCoordinateWithFlagsPostfix(Human __instance) =>
-            (CoordLimits.Value, Extension.Value) = CoordLimits.Value switch
+            (CoordLimits, CoordExtension) = CoordLimits switch
             {
-                CoordLimit.None => (CoordLimit.None, Extension.Value),
-                _ => (CoordLimit.None, Array.Empty<byte>()).With(CoordLimits.Value.Curry(Extension.Value, __instance.NotifyPostCoordinateDeserialize))
+                CoordLimit.None => (CoordLimit.None, []),
+                _ => (CoordLimit.None, Array.Empty<byte>())
+                    .With(CoordLimits.Curry(CoordExtension, __instance.NotifyPostCoordinateDeserialize))
             };
         /// <summary>
         /// capture coordinate reloading complete

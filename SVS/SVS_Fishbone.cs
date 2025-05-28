@@ -10,6 +10,7 @@ using Cysharp.Threading.Tasks;
 using Manager;
 using Character;
 using CharacterCreation;
+using SV.CoordeSelectScene;
 using ILLGames.Extensions;
 using CharaLimit = Character.HumanData.LoadLimited.Flags;
 using CoordLimit = Character.HumanDataCoordinate.LoadLimited.Flags;
@@ -30,13 +31,6 @@ namespace Fishbone
         static void UpdateExtension(Action<ZipArchive> action) =>
             CustomExtension = CustomExtension.UpdateExtension(action);
         /// <summary>
-        /// do extension update operation and store back resulting extension.
-        /// </summary>
-        /// <param name="data">human data which associated with extension</param>
-        /// <param name="action">extension update operation</param>
-        static void UpdateExtension(this HumanData data, Action<ZipArchive> action) =>
-            data.PngData.Implant(CustomExtension = CustomExtension.UpdateExtension(action));
-        /// <summary>
         /// extract extension data from character card.
         /// if failes, falls back to legacy game parameter image extraction.
         /// </summary>
@@ -48,7 +42,7 @@ namespace Fishbone
         internal static byte[] Extract(this HumanData data) =>
             data.Extract(data?.PngData?.Extract() ?? []);
     }
-    public static partial class Hooks
+    static partial class Hooks
     {
         /// <summary>
         /// capture coordinate save operation and overrite extension data
@@ -111,7 +105,7 @@ namespace Fishbone
     }
     static partial class Hooks
     {
-        static Action<Human> DoNothing = _ => { };
+        internal static Action<Human> DoNothing = _ => { };
         static Action<Human> OnHumanReloading = DoNothing;
         /// <summary>
         /// capture human reloading complete.
@@ -152,7 +146,7 @@ namespace Fishbone
         /// <param name="dst"></param>
         /// <param name="src"></param>
         /// <returns>action to do when reloading complete</returns>
-        static Action<Human> HumanDataCopySkip(HumanData dst, HumanData src) => DoNothing;
+        static Func<HumanData, HumanData, Action<Human>> HumanDataCopySkip = (_, _) => DoNothing;
         /// <summary>
         /// human data copy action during Character Creation.
         /// </summary>
@@ -174,7 +168,7 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.CopyLimited))]
         static void HumanDataCopyLimitedPrefix(HumanData dst, HumanData src, CharaLimit flags) =>
-            OnHumanReloading = dst.NotifyPreCharacterDeserialize(flags, src.Extract(Extension.Value));
+            OnHumanReloading = dst.NotifyPreCharacterDeserialize(flags, src.Extract(CharaExtension));
         /// <summary>
         /// capture character card loading caused by Character Creation scene loading or resetting.
         /// </summary>
@@ -188,8 +182,12 @@ namespace Fishbone
         /// <summary>
         /// switching human data copy actions
         /// </summary>
-        internal static void InitializeHumanDataCopyHook() =>
-            Util.Hook<HumanCustom>(() => OnHumanDataCopy = HumanDataCopyProc, () => OnHumanDataCopy = HumanDataCopySkip);
+        internal static void InitializeHookSwitch() =>
+            Util.Hook<HumanCustom>(
+                () => (OnHumanDataCopy, OnCoordinateTypeChange, OnCoordinateTypeChangeProc) =
+                        (HumanDataCopyProc, OnCoordinateTypeChangeSkip, OnCoordinateTypeChangeSkip),
+                () => (OnHumanDataCopy, OnCoordinateTypeChange, OnCoordinateTypeChangeProc) =
+                        (HumanDataCopySkip, Event.NotifyPreActorCoordinateReload, Event.NotifyPreActorCoordinateReload));
     }
     public static partial class Event
     {
@@ -277,7 +275,7 @@ namespace Fishbone
         public static event Action<SaveData.Actor, HumanData, ZipArchive, ZipArchive> OnCharacterSerializeToActor =
             (actor, _, _, _) => Plugin.Instance.Log.LogDebug($"Character Serialize To Actor: {actor.charasGameParam.Index}");
     }
-    public static partial class Hooks
+    static partial class Hooks
     {
         /// <summary>
         /// capture coordinate reload begining during Character Creation
@@ -314,12 +312,6 @@ namespace Fishbone
         internal static void NotifyPreCoordinateReload(this Human human, int type) =>
             UpdateExtension(archive => OnPreCoordinateReload(human, type, archive));
         /// <summary>
-        /// notify complete of coordinate reload to listeners
-        /// </summary>
-        /// <param name="human"></param>
-        internal static void NotifyPostCoordinateReload(this Human human) =>
-            OnPostCoordinateReload(human, human.fileStatus.coordinateType, human.ToArchive());
-        /// <summary>
         /// coodinate deserialize begining event
         /// param1: human to apply coordinate
         /// param2: human data coordinate to applying
@@ -341,20 +333,12 @@ namespace Fishbone
         ///  coordinate reload begining event
         /// param1: human to apply coordinate
         /// param2: chenged to coordinate index
-        /// param3: update mode extension from Character Creation storage
+        /// param3: (In Character Creation) update mode extension from Character Creation storage
+        ///         (In Other Scenes) readonly mode extension of reloading Actor
         /// </summary>
         public static event Action<Human, int, ZipArchive> OnPreCoordinateReload =
-            (_, _, _) => Plugin.Instance.Log.LogDebug("Pre Coordinate Reload");
-        /// <summary>
-        /// coordinate reload complete event
-        /// param1: coordinate applied human
-        /// param2: chenged to coordinate index
-        /// param3: readonly mode extension of reloaded human
-        /// </summary>
-        public static event Action<Human, int, ZipArchive> OnPostCoordinateReload =
-            (human, _, _) => Plugin.Instance.Log.LogDebug($"Coordinate Reload: {human.name}");
+            (human, _, _) => Plugin.Instance.Log.LogDebug($"Pre Coordinate Reload: {human.name}");
     }
-
     public static partial class Event
     {
         /// <summary>
@@ -391,13 +375,14 @@ namespace Fishbone
         /// human to actor transform
         /// lookup for high poly human then falls back to low poly human.
         /// </summary>
-        static bool ToActor(this Human human, out SaveData.Actor actor) =>
+        internal static bool ToActor(this Human human, out SaveData.Actor actor) =>
             null != (actor =
                 TaskCharaInfos.Where(info => info?.chaCtrl == human)
                     .Select(info => info.actor).FirstOrDefault() ??
                 Game.Charas?._entries
                     ?.Where(entry => entry?.value?.chaCtrl == human)
-                    ?.Select(entry => entry.value)?.FirstOrDefault());
+                    ?.Select(entry => entry.value)?.FirstOrDefault() ??
+                Game.Charas?._entries?.First(entry => entry.value.IsPC)?.value);
         /// <summary>
         /// actor to extension conversion for listeners
         /// </summary>
@@ -432,7 +417,7 @@ namespace Fishbone
         static void WorldLoadPostfix(SaveData.WorldData __result) =>
             __result.Charas._entries
                 .Where(entry => entry != null && entry.value != null)
-                .Do(entry => entry.value.NotifyActorSerialize());
+                .Do(entry => entry.value.NotifyActorDeserialize());
         /// <summary>
         /// capture actor entry from character card at Simulation Entry Scene
         /// </summary>
@@ -441,15 +426,15 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(SV.EntryScene.CharaEntry), nameof(SV.EntryScene.CharaEntry.Entry))]
         static void CharaEntryPostfix(SaveData.Actor __result) =>
-            __result.NotifyDeserialize();
+            __result.NotifyActorDeserialize();
     }
-    static partial class Event
+    public static partial class Event
     {
         /// <summary>
         /// notify actor deserialize to listeners
         /// </summary>
         /// <param name="actor"></param>
-        internal static void NotifyDeserialize(this SaveData.Actor actor) =>
+        internal static void NotifyActorDeserialize(this SaveData.Actor actor) =>
             OnActorDeserialize(actor, (ActorExtensions[actor.charasGameParam.Index] = actor.Extract()).ToArchive());
         /// <summary>
         /// actor deserialize event
@@ -473,7 +458,7 @@ namespace Fishbone
                 ._entries.Where(entry => entry != null && entry.value != null)
                 .Do(entry => entry.value.NotifyActorSerialize());
     }
-    static partial class Event
+    public static partial class Event
     {
         /// <summary>
         /// notify actor serialize to listeners
@@ -491,6 +476,9 @@ namespace Fishbone
     }
     static partial class Hooks
     {
+        static Action<Human, int> OnCoordinateTypeChangeSkip = (_, _) => { };
+        static Action<Human, int> OnCoordinateTypeChangeProc = Event.NotifyPreActorCoordinateReload;
+        static Action<Human, int> OnCoordinateTypeChange = Event.NotifyPreActorCoordinateReload;
         /// <summary>
         /// capture bigining of actor binding to low poly human at Simulation Scene
         /// </summary>
@@ -499,8 +487,9 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(SV.Chara.Base), nameof(SV.Chara.Base.SetActive))]
         static void SVCharaBaseSetActivePrefix(SV.Chara.Base __instance) =>
-            (__instance.charaData != null)
-                .Maybe(() => Game.Charas[__instance.charaData.charasGameParam.Index].NotifyPreActorHumanize());
+            (OnCoordinateTypeChange, OnHumanDataCopy) = __instance.charaData == null
+                ? (OnCoordinateTypeChangeProc, HumanDataCopySkip)
+                : (OnCoordinateTypeChangeSkip, __instance.charaData.NotifyPreActorHumanize);
         /// <summary>
         /// capture bigining of actor binding to high poly human at Simulation Scene
         /// </summary>
@@ -510,8 +499,11 @@ namespace Fishbone
         [HarmonyPatch(typeof(SV.Talk.TalkTaskBase), nameof(SV.Talk.TalkTaskBase.LoadPlayerHighPoly))]
         [HarmonyPatch(typeof(SV.Talk.TalkTaskBase), nameof(SV.Talk.TalkTaskBase.LoadHighPoly))]
         static void SVTalkTalkTaskBaseLoadHighPolyPrefix(SV.Chara.AI _ai) =>
-            (_ai?.charaData?.charasGameParam?.Index != null)
-                .Maybe(() => Game.Charas[_ai.charaData.charasGameParam.Index].NotifyPreActorHumanize());
+            (OnCoordinateTypeChange, OnHumanDataCopy) = _ai?.charaData?.charasGameParam?.Index == null
+             ? (OnCoordinateTypeChangeProc, HumanDataCopySkip) :
+               (OnCoordinateTypeChangeSkip, _ai.charaData.NotifyPreActorHumanize);
+        static Action<Human> NotifyPreActorHumanize(this SaveData.CharaData charaData, HumanData dst, HumanData src) =>
+            DoNothing.With(dst.Curry(Game.Charas[charaData.charasGameParam.Index].NotifyPreActorHumanize));
         /// <summary>
         /// capture actor binding to human at Simulation Scene
         /// </summary>
@@ -520,8 +512,24 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(SaveData.CharaData), nameof(SaveData.CharaData.SetRoot))]
         static void SaveDataCharaDataSetRootPostfix(SaveData.CharaData __instance) =>
-            (__instance.chaCtrl != null).Maybe(__instance.chaCtrl
-                .Curry(Game.Charas[__instance.charasGameParam.Index].NotifyPostActorHumanize));
+            (__instance.chaCtrl != null).Maybe(__instance.NotifyPostActorHumanize);
+        static void NotifyPostActorHumanize(this SaveData.CharaData charaData) =>
+            ((OnCoordinateTypeChange, OnHumanDataCopy) = (OnCoordinateTypeChangeProc, HumanDataCopySkip))
+                .With(charaData.chaCtrl.Curry(Game.Charas[charaData.charasGameParam.Index].NotifyPostActorHumanize));
+        /// <summary>
+        /// capture coordinate reload begining
+        /// </summary>
+        /// <param name="__instance"></param>
+        [HarmonyPrefix]
+        [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanCoordinate), nameof(HumanCoordinate.ChangeCoordinateType), typeof(ChaFileDefine.CoordinateType), typeof(bool))]
+        static void HumanCoordinateChangeCoordinateType(HumanCoordinate __instance, ChaFileDefine.CoordinateType type) =>
+            OnCoordinateTypeChange(__instance.human, (int)type);
+        [HarmonyPostfix]
+        [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(CoordeSelect), nameof(CoordeSelect.PlayAnimation))]
+        static void CoordeSelectPlayAnimationPostfix(CoordeSelect __instance) =>
+            __instance._hiPoly.NotifyPostCoordinateReload();
     }
     public static partial class Event
     {
@@ -529,23 +537,35 @@ namespace Fishbone
         /// notify begining of actor binding to human at Simulation Scene
         /// </summary>
         /// <param name="actor"></param>
-        /// <param name="human"></param>
-        internal static void NotifyPreActorHumanize(this SaveData.Actor actor) =>
-            OnPreActorHumanize(actor, actor.ToExtension().ToArchive());
+        /// <param name="data"></param>
+        internal static void NotifyPreActorHumanize(this SaveData.Actor actor, HumanData data) =>
+            OnPreActorHumanize(actor, data, actor.ToArchive());
         /// <summary>
-        /// notify actor binding to human at Simulation Scene
+        /// notify complete of actor binding to human at Simulation Scene
         /// </summary>
         /// <param name="actor"></param>
         /// <param name="human"></param>
         internal static void NotifyPostActorHumanize(this SaveData.Actor actor, Human human) =>
-            OnPostActorHumanize(actor, human, actor.ToExtension().ToArchive());
+            OnPostActorHumanize(actor, human, actor.ToArchive());
+        /// <summary>
+        /// notify complete of coordinate reload to listeners
+        /// </summary>
+        /// <param name="human"></param>
+        internal static void NotifyPreActorCoordinateReload(this Human human, int type) =>
+            OnPreCoordinateReload(human, type, human.ToArchive());
+        /// <summary>
+        /// notify complete of coordinate reload to listeners
+        /// </summary>
+        /// <param name="human"></param>
+        internal static void NotifyPostCoordinateReload(this Human human) =>
+            OnPostCoordinateReload(human, human.fileStatus.coordinateType, human.ToArchive());
         /// <summary>
         /// actor binding to human event
         /// param1: binding actor
         /// param2: archive to load extension
         /// </summary>
-        public static event Action<SaveData.Actor, ZipArchive> OnPreActorHumanize =
-            (actor, _) => Plugin.Instance.Log.LogDebug($"Pre Actor Humanized: {actor.charasGameParam.Index}");
+        public static event Action<SaveData.Actor, HumanData, ZipArchive> OnPreActorHumanize =
+            (actor, _, _) => Plugin.Instance.Log.LogDebug($"Pre Actor Humanized: {actor.charasGameParam.Index}");
         /// <summary>
         /// actor binding to human event
         /// param1: binding actor
@@ -554,6 +574,14 @@ namespace Fishbone
         /// </summary>
         public static event Action<SaveData.Actor, Human, ZipArchive> OnPostActorHumanize =
             (actor, human, _) => Plugin.Instance.Log.LogDebug($"Post Actor Humanized: {actor.charasGameParam.Index}, {human.name}");
+        /// <summary>
+        /// coordinate reload complete event
+        /// param1: coordinate applied human
+        /// param2: chenged to coordinate index
+        /// param3: readonly mode extension of reloaded human
+        /// </summary>
+        public static event Action<Human, int, ZipArchive> OnPostCoordinateReload =
+            (human, _, _) => Plugin.Instance.Log.LogDebug($"Post Coordinate Reload: {human.name}");
     }
     [BepInProcess(Process)]
     [BepInPlugin(Guid, Name, Version)]
@@ -567,7 +595,9 @@ namespace Fishbone
         private Harmony Patch;
         public override void Load() =>
             Patch = Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks")
-                .With(() => Instance = this).With(Hooks.InitializeHumanDataCopyHook);
-        public override bool Unload() => true.With(Patch.UnpatchSelf) && base.Unload();
+                .With(() => Instance = this)
+                .With(Hooks.InitializeHookSwitch);
+        public override bool Unload() =>
+            true.With(Patch.UnpatchSelf) && base.Unload();
     }
 }

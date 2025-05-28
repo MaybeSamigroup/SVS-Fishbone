@@ -37,10 +37,6 @@
 			<HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UnityEngine.CoreModule.dll</HintPath>
 			<Private>False</Private>
 		</Reference>
-		<Reference Include="UnityEngine.UI">
-			<HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UnityEngine.UI.dll</HintPath>
-			<Private>False</Private>
-		</Reference>
 		<Reference Include="UniRx">
 			<HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UniRx.dll</HintPath>
 			<Private>False</Private>
@@ -63,6 +59,6 @@
 	</Target>
 	<Target Name="Release" AfterTargets="Build">
 		<Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="GameRoot\BepinEx\plugins"/>
-		<ZipDirectory SourceDirectory="GameRoot" Overwrite="true" DestinationFile="release.zip"/>
+		<ZipDirectory SourceDirectory="GameRoot" Overwrite="true" DestinationFile="$(GameName).zip"/>
 	</Target>
 </Project>

@@ -12,7 +12,7 @@ using Il2CppWriter = Il2CppSystem.IO.BinaryWriter;
 
 namespace Fishbone
 {
-    static partial class Event
+    public static partial class Event
     {
         /// <summary>
         /// default data for character card without extension
@@ -38,6 +38,7 @@ namespace Fishbone
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.SaveFile), typeof(Il2CppWriter), typeof(bool))]
         static void HumanDataSaveFilePrefix(HumanData __instance, Il2CppWriter bw) =>
             bw.Write(__instance.PngData);
+        static int LoadStack = 0;
         /// <summary>
         /// capture character deserialize begining from card and duplication
         /// </summary>
@@ -47,11 +48,12 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.LoadFile), typeof(Il2CppReader), typeof(LoadFlags))]
         static void LoadCharaFilePostfix(HumanData __instance, LoadFlags flags) =>
-            Extension.Value = flags switch
+            (LoadStack, CharaExtension) = (LoadStack + 1, flags switch
             {
-                LoadFlags.Craft or LoadFlags.CraftLoad => Array.Empty<byte>().With(Extension.Value.Curry(__instance.NotifyDeserialize)),
+                LoadFlags.Craft or LoadFlags.CraftLoad => Array.Empty<byte>()
+                    .With(CharaExtension.Curry(__instance.NotifyDeserialize)),
                 _ => Array.Empty<byte>()
-            };
+            });
         /// <summary>
         /// chapture character deserialize complete from card
         /// </summary>
@@ -60,25 +62,27 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(Human), nameof(Human.Create))]
         static void HumanCreatePostfix(Human __result) =>
-            __result.NotifyDeserialize();
+            LoadStack = (LoadStack - 1).With(__result.NotifyDeserialize);
         /// <summary>
-        /// chapture character deserialize complete from duplication
+        /// capture human reloading complete.
+        /// only notified to listeners when human data updated.
         /// </summary>
         /// <param name="__instance"></param>
         [HarmonyPostfix]
         [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(Human), nameof(Human.Reload), [])]
-        static void HumanReloadPostfix(Human __instance) =>
-            __instance.NotifyDeserialize();
+        [HarmonyPatch(typeof(Human.Reloading), nameof(Human.Reloading.Dispose))]
+        static void HumanReloadingDisposePostfix(Human.Reloading __instance) =>
+            LoadStack = LoadStack == 0 || __instance._isReloading ?
+                LoadStack : (LoadStack - 1).With(__instance._human.NotifyDeserialize);
         /// <summary>
         /// capture coordinate reload begining
         /// </summary>
         /// <param name="__instance"></param>
         [HarmonyPrefix]
         [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(HumanCoordinate), nameof(HumanCoordinate.ChangeCoordinateTypeAndReload), typeof(ChaFileDefine.CoordinateType), typeof(bool))]
-        static void HumanCoordinateChangeCoordinateTypeAndReloadPrefix(HumanCoordinate __instance, ChaFileDefine.CoordinateType type) =>
-            __instance.human.NotifyPreCoordinateReload((int)type);
+        [HarmonyPatch(typeof(HumanCoordinate), nameof(HumanCoordinate.ChangeCoordinateType), typeof(ChaFileDefine.CoordinateType), typeof(bool))]
+        static void HumanCoordinateChangeCoordinateType(HumanCoordinate __instance, ChaFileDefine.CoordinateType type) =>
+            (LoadStack == 0).Maybe(() => __instance.human.NotifyPreCoordinateReload((int)type));
     }
     public static partial class Event
     {
@@ -163,7 +167,7 @@ namespace Fishbone
         /// param3: readonly mode extension of reloading human
         /// </summary>
         public static event Action<Human, int, ZipArchive> OnPreCoordinateReload =
-            (_, _, _) => Plugin.Instance.Log.LogDebug("Pre Coordinate Reload");
+            (human, type, _) => Plugin.Instance.Log.LogDebug($"Pre Coordinate Reload: {human.name}/{type}");
         /// <summary>
         /// coordinate reload complete event
         /// param1: coordinate applied human
@@ -171,9 +175,8 @@ namespace Fishbone
         /// param3: readonly mode extension of reloaded human
         /// </summary>
         public static event Action<Human, int, ZipArchive> OnPostCoordinateReload =
-            (human, _, _) => Plugin.Instance.Log.LogDebug($"Coordinate Reload: {human.name}");
+            (human, type, _) => Plugin.Instance.Log.LogDebug($"Post Coordinate Reload: {human.name}/{type}");
     }
-
     [BepInProcess(Process)]
     [BepInPlugin(Guid, Name, Version)]
     public class Plugin : BasePlugin
@@ -186,6 +189,7 @@ namespace Fishbone
         private Harmony Patch;
         public override void Load() =>
             Patch = Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks").With(() => Instance = this);
-        public override bool Unload() => true.With(Patch.UnpatchSelf) && base.Unload();
+        public override bool Unload() =>
+            true.With(Patch.UnpatchSelf) && base.Unload();
     }
 }

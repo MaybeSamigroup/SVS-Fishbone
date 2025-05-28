@@ -4,16 +4,23 @@ Plugin API to serialize and deserialize character or coordinate-bound extension 
 
 ## Prerequisites
 
-* [BepInEx](https://github.com/BepInEx/BepInEx)
-  * v6.0.0 be 725 or later
-* [ByteFiddler](https://github.com/BepInEx/BepInEx)
-  * v1.0 or later and suitable configuration
+- [SVS-HF_Patch](https://github.com/BepInEx/BepInEx)
 
-Confirmed working under SamabakeScramble 1.1.6 and DigitalCraft 2.0.0.
+Confirmed working under SamabakeScramble 1.1.6 and DigitalCraft 2.1.0.
 
 ## Installation
 
-Extract the release to your game root directory.
+Extract the release to your game install directory.
+
+## Migration from 1.x.x release
+
+Remove Fishbone.dll from BepinEx/plugins.
+
+Plugin assembly names are now SVS_Fishbone.dll and DC_Fishbone.dll.
+
+Cards made with 1.x.x is still supported to load in SVS, but not in DC.
+
+To use them in DC, should saved agein with 2.x.x.
 
 ## How it works
 
@@ -37,20 +44,32 @@ These events allow plugins to read or write extension data at various points in 
 ### Character Events
 
 - `OnPreCharacterDeserialize`
+  - SVS and DC
 - `OnPostCharacterDeserialize`
+  - SVS and DC
 - `OnCharacterSerialize`
+  - SVS Only
 - `OnActorDeserialize`
+  - SVS Only
 - `OnActorSerialize`
+  - SVS Only
 - `OnPreActorHumanize`
+  - SVS Only
 - `OnPostActorHumanize`
+  - SVS Only
 
 ### Coordinate Events
 
 - `OnPreCoordinateDeserialize`
+  - SVS and DC
 - `OnPostCoordinateDeserialize`
+  - SVS and DC
 - `OnCoordinateSerialize`
+  - SVS Only
 - `OnPreCoordinateReload`
+  - SVS and DC
 - `OnPostCoordinateReload`
+  - SVS and DC
 
 Each event provides access to the relevant data and a `ZipArchive` representing the extension storage.
 
@@ -61,8 +80,9 @@ Each event provides access to the relevant data and a `ZipArchive` representing 
 ```csharp
 Fishbone.Event.OnPostCharacterDeserialize += (human, limit, archive, storage) =>
 {
-    // Read or write your plugin's data in archive here
-    // e.g., using archive.CreateEntry("YourPluginGuid/yourdata.bin")
+    // In this case, archive contains extension from deserialized card.
+    // Acoording to limit, update your plugin's data in storage here.
+    // e.g., using storage.CreateEntry("YourPluginGuid/yourdata.bin")
 };
 ```
 
