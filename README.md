@@ -8,9 +8,66 @@ Plugin API to serialize and deserialize character or coordinate-bound extension 
 
 Confirmed working under SamabakeScramble 1.1.6 and DigitalCraft 2.1.0.
 
-## Installation
+## Installation (SVS)
 
 Extract the release to your game install directory.
+
+## Installation (DC)
+
+For the first words, I can't figure out valid version of BepinEx bleeding edge release for Digital Craft 2.1.0.
+
+Then this instruction uses  SVS-HF_Patch 1.7 content for alternative.
+
+Copy these files and directories from SVS install directory to DC install directory:
+
+- Entire direcory: dotnet
+- Entire direcory: BepinEx\core
+- Single file: BepingEx\config\BepInEx.cfg
+
+Modify BepInEx.cfg;  rewrite GolobalMetadataPath of to default, because Digital Craft's metadata is not encrypted.
+
+```diff
+# Default value: {GameDataPath}/il2cpp_data/Metadata/global-metadata.dat
+-GlobalMetadataPath = {BepInEx}/{ProcessName}/decrypted_global-metadata.dat
++GlobalMetadataPath = {GameDataPath}/il2cpp_data/Metadata/global-metadata.dat
+```
+
+Copy these files from SVS install directory to where DC executable placed directory. (directory named DigitalCraft under install directory; where you found DigitalCraft.exe)
+
+- .doorstop_version
+- hid.dll
+- doorstop_config.ini
+
+Modify doorstop_config.ini to fit directory structure of  Digital Craft.
+
+```diff
+[General]
+
+# Enable Doorstop?
+enabled = true
+
+# Path to the assembly to load and execute
+# NOTE: The entrypoint must be of format `static void Doorstop.Entrypoint.Start()`
+-target_assembly = BepInEx\core\BepInEx.Unity.IL2CPP.dll
++target_assembly = ..\BepInEx\core\BepInEx.Unity.IL2CPP.dll
+```
+
+```diff
+[Il2Cpp]
+
+# Path to coreclr.dll that contains the CoreCLR runtime
+-coreclr_path = dotnet\coreclr.dll
++coreclr_path = ..\dotnet\coreclr.dll
+
+# Path to the directory containing the managed core libraries for CoreCLR (mscorlib, System, etc.)
+-corlib_dir = dotnet
++corlib_dir = ..\dotnet
+```
+
+Make these directories under Digital Craft install directory and place patchers and plugins you want to apply.
+
+- BepingEx\patchers
+- BepingEx\plugins
 
 ## Migration from 1.x.x release
 
