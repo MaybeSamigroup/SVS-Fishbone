@@ -10,13 +10,14 @@ Confirmed working under SamabakeScramble 1.1.6 and DigitalCraft 2.1.0.
 
 ## Installation (SVS)
 
-Extract the [latest release](releases/latest) SamabakeScramble.zip to your SamabakeScramble install directory.
+Extract the [latest release](https://github.com/MaybeSamigroup/SVS-Fishbone/releases/latest) SamabakeScramble.zip to your SamabakeScramble install directory.
+
 
 ## Installation (DC with HC)
 
 Apply latest [HF patch for HoneyCome and DigitalCraft](https://github.com/ManlyMarco/HC-HF_Patch)
 
-Extract the [latest release](releases/latest) DigitalCraft.zip to your HoneyCome install directory.
+Extract the [latest release](https://github.com/MaybeSamigroup/SVS-Fishbone/releases/latest) DigitalCraft.zip to your HoneyCome install directory.
 
 ## Installation (DC Standalone)
 
@@ -75,7 +76,7 @@ Make these directories under Digital Craft install directory and place patchers 
 1. BepInEx\patchers
 1. BepInEx\plugins
 
-Extract the [latest release](releases/latest) DigitalCraft.zip to your DigitalCraft install directory.
+Extract the [latest release](https://github.com/MaybeSamigroup/SVS-Fishbone/releases/latest) DigitalCraft.zip to your DigitalCraft install directory.
 
 As final state, you should have following directories and files in Digital Craft install directory.
 
