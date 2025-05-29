@@ -2,17 +2,23 @@
 
 Plugin API to serialize and deserialize character or coordinate-bound extension data, for SamabakeScramble and DigitalCraft.
 
-## Prerequisites
+## Prerequisites (SVS)
 
-- [SVS-HF_Patch](https://github.com/BepInEx/BepInEx)
+- [HF Patch for Summer Vacation Scramble](https://github.com/ManlyMarco/SVS-HF_Patch)
 
 Confirmed working under SamabakeScramble 1.1.6 and DigitalCraft 2.1.0.
 
 ## Installation (SVS)
 
-Extract the release to your game install directory.
+Extract the [latest release](releases/latest) SamabakeScramble.zip to your SamabakeScramble install directory.
 
-## Installation (DC)
+## Installation (DC with HC)
+
+Apply latest [HF patch for HoneyCome and DigitalCraft](https://github.com/ManlyMarco/HC-HF_Patch)
+
+Extract the [latest release](releases/latest) DigitalCraft.zip to your HoneyCome install directory.
+
+## Installation (DC Standalone)
 
 For the first words, I can't figure out valid version of BepinEx bleeding edge release for Digital Craft 2.1.0.
 
@@ -20,9 +26,9 @@ Then this instruction uses  SVS-HF_Patch 1.7 content for alternative.
 
 Copy these files and directories from SVS install directory to DC install directory:
 
-- Entire direcory: dotnet
-- Entire direcory: BepinEx\core
-- Single file: BepingEx\config\BepInEx.cfg
+1. Entire direcory: dotnet
+1. Entire direcory: BepInEx\core
+1. Single file: BepInEx\config\BepInEx.cfg
 
 Modify BepInEx.cfg;  rewrite GolobalMetadataPath of to default, because Digital Craft's metadata is not encrypted.
 
@@ -34,9 +40,9 @@ Modify BepInEx.cfg;  rewrite GolobalMetadataPath of to default, because Digital 
 
 Copy these files from SVS install directory to where DC executable placed directory. (directory named DigitalCraft under install directory; where you found DigitalCraft.exe)
 
-- .doorstop_version
-- hid.dll
-- doorstop_config.ini
+1. .doorstop_version
+1. hid.dll
+1. doorstop_config.ini
 
 Modify doorstop_config.ini to fit directory structure of  Digital Craft.
 
@@ -66,8 +72,21 @@ enabled = true
 
 Make these directories under Digital Craft install directory and place patchers and plugins you want to apply.
 
-- BepingEx\patchers
-- BepingEx\plugins
+1. BepInEx\patchers
+1. BepInEx\plugins
+
+Extract the [latest release](releases/latest) DigitalCraft.zip to your DigitalCraft install directory.
+
+As final state, you should have following directories and files in Digital Craft install directory.
+
+1. dotnet
+1. BepInEx\core
+1. BepInEx\config\BepInEx.cfg
+1. DigitalCraft\.doorstop_version
+1. DigitalCraft\doorstop_config.ini
+1. DigitalCraft\hid.dll
+1. BepInEx\patchers
+1. BepInEx\plugins\DC_SardineTail.dll
 
 ## Migration from 1.x.x release
 
