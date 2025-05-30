@@ -3,7 +3,7 @@
         <TargetFramework>net6</TargetFramework>
         <AssemblyName>DC_Fishbone</AssemblyName>
         <Description>plugin api to serialize and deserialize character or coordinate bound extension data, for DigitalCraft</Description>
-        <Version>2.0.0</Version>
+        <Version>2.0.1</Version>
         <LangVersion>latest</LangVersion>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<GameName>DigitalCraft</GameName>

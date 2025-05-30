@@ -525,11 +525,24 @@ namespace Fishbone
         [HarmonyPatch(typeof(HumanCoordinate), nameof(HumanCoordinate.ChangeCoordinateType), typeof(ChaFileDefine.CoordinateType), typeof(bool))]
         static void HumanCoordinateChangeCoordinateType(HumanCoordinate __instance, ChaFileDefine.CoordinateType type) =>
             OnCoordinateTypeChange(__instance.human, (int)type);
+        /// <summary>
+        /// capture coordinate reloading complete
+        /// </summary>
+        /// <param name="__instance"></param>
         [HarmonyPostfix]
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(CoordeSelect), nameof(CoordeSelect.PlayAnimation))]
         static void CoordeSelectPlayAnimationPostfix(CoordeSelect __instance) =>
             __instance._hiPoly.NotifyPostCoordinateReload();
+        /// <summary>
+        /// capture coordinate reloading complete
+        /// </summary>
+        /// <param name="__instance"></param>
+        [HarmonyPostfix]
+        [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), [])]
+        static void HumanReloadCoordinatePostfix(Human __instance) =>
+            __instance.NotifyPostCoordinateReload();
     }
     public static partial class Event
     {
@@ -585,13 +598,10 @@ namespace Fishbone
     }
     [BepInProcess(Process)]
     [BepInPlugin(Guid, Name, Version)]
-    public class Plugin : BasePlugin
+    public partial class Plugin : BasePlugin
     {
-        internal static Plugin Instance;
         public const string Process = "SamabakeScramble";
-        public const string Name = "Fishbone";
         public const string Guid = $"{Process}.{Name}";
-        public const string Version = "2.0.0";
         private Harmony Patch;
         public override void Load() =>
             Patch = Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks")

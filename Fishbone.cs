@@ -1,9 +1,9 @@
 using HarmonyLib;
+using BepInEx.Unity.IL2CPP;
 using System;
 using System.IO;
 using System.IO.Compression;
 using System.Collections.Generic;
-using System.Threading;
 using System.Linq;
 using UniRx;
 using UniRx.Triggers;
@@ -287,14 +287,11 @@ namespace Fishbone
                 _ => (CoordLimit.None, Array.Empty<byte>())
                     .With(CoordLimits.Curry(CoordExtension, __instance.NotifyPostCoordinateDeserialize))
             };
-        /// <summary>
-        /// capture coordinate reloading complete
-        /// </summary>
-        /// <param name="__instance"></param>
-        [HarmonyPostfix]
-        [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), [])]
-        static void HumanReloadCoordinatePostfix(Human __instance) =>
-            __instance.NotifyPostCoordinateReload();
+    }
+    public partial class Plugin : BasePlugin
+    {
+        public const string Name = "Fishbone";
+        public const string Version = "2.0.1";
+        internal static Plugin Instance;
     }
 }

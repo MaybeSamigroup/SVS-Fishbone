@@ -48,12 +48,12 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.LoadFile), typeof(Il2CppReader), typeof(LoadFlags))]
         static void LoadCharaFilePostfix(HumanData __instance, LoadFlags flags) =>
-            (LoadStack, CharaExtension) = (LoadStack + 1, flags switch
+            (LoadStack, CharaExtension) = flags switch
             {
-                LoadFlags.Craft or LoadFlags.CraftLoad => Array.Empty<byte>()
-                    .With(CharaExtension.Curry(__instance.NotifyDeserialize)),
-                _ => Array.Empty<byte>()
-            });
+                LoadFlags.Craft or LoadFlags.CraftLoad =>
+                    (LoadStack + 1, Array.Empty<byte>()).With(CharaExtension.Curry(__instance.NotifyPreDeserialize)),
+                _ => (LoadStack, Array.Empty<byte>())
+            };
         /// <summary>
         /// chapture character deserialize complete from card
         /// </summary>
@@ -62,9 +62,20 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(Human), nameof(Human.Create))]
         static void HumanCreatePostfix(Human __result) =>
-            LoadStack = (LoadStack - 1).With(__result.NotifyDeserialize);
+            LoadStack = (LoadStack - 1).With(__result.NotifyPostDeserialize);
         /// <summary>
-        /// capture human reloading complete.
+        /// capture human reloading complete. (Before 2.1.0)
+        /// only notified to listeners when human data updated.
+        /// </summary>
+        /// <param name="__instance"></param>
+        [HarmonyPostfix]
+        [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(Human), nameof(Human.Reload), [])]
+        static void HumanReloadPostfix(Human __instance) =>
+            LoadStack = LoadStack == 0 || __instance.isReloading ?
+                LoadStack : (LoadStack - 1).With(__instance.NotifyPostDeserialize);
+        /// <summary>
+        /// capture human reloading complete. (After 2.1.0)
         /// only notified to listeners when human data updated.
         /// </summary>
         /// <param name="__instance"></param>
@@ -73,7 +84,7 @@ namespace Fishbone
         [HarmonyPatch(typeof(Human.Reloading), nameof(Human.Reloading.Dispose))]
         static void HumanReloadingDisposePostfix(Human.Reloading __instance) =>
             LoadStack = LoadStack == 0 || __instance._isReloading ?
-                LoadStack : (LoadStack - 1).With(__instance._human.NotifyDeserialize);
+                LoadStack : (LoadStack - 1).With(__instance._human.NotifyPostDeserialize);
         /// <summary>
         /// capture coordinate reload begining
         /// </summary>
@@ -83,6 +94,16 @@ namespace Fishbone
         [HarmonyPatch(typeof(HumanCoordinate), nameof(HumanCoordinate.ChangeCoordinateType), typeof(ChaFileDefine.CoordinateType), typeof(bool))]
         static void HumanCoordinateChangeCoordinateType(HumanCoordinate __instance, ChaFileDefine.CoordinateType type) =>
             (LoadStack == 0).Maybe(() => __instance.human.NotifyPreCoordinateReload((int)type));
+        /// <summary>
+        /// capture coordinate reloading complete
+        /// </summary>
+        /// <param name="__instance"></param>
+        [HarmonyPostfix]
+        [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), [])]
+        static void HumanReloadCoordinatePostfix(Human __instance) =>
+            __instance.NotifyPostCoordinateReload();
+
     }
     public static partial class Event
     {
@@ -91,13 +112,13 @@ namespace Fishbone
         /// </summary>
         /// <param name="data"></param>
         /// <param name="bytes"></param>
-        internal static void NotifyDeserialize(this HumanData data, byte[] bytes) =>
+        internal static void NotifyPreDeserialize(this HumanData data, byte[] bytes) =>
             OnPreCharacterDeserialize(data, bytes.With(data.Implant).ToArchive());
         /// <summary>
         /// notify complete of character deserialize to listeners
         /// </summary>
         /// <param name="human"></param>
-        internal static void NotifyDeserialize(this Human human) =>
+        internal static void NotifyPostDeserialize(this Human human) =>
             OnPostCharacterDeserialize(human, human.ToArchive());
         /// <summary>
         /// notify begining of coordinate deserialize to listeners
@@ -179,13 +200,10 @@ namespace Fishbone
     }
     [BepInProcess(Process)]
     [BepInPlugin(Guid, Name, Version)]
-    public class Plugin : BasePlugin
+    public partial class Plugin : BasePlugin
     {
-        internal static Plugin Instance;
         public const string Process = "DigitalCraft";
-        public const string Name = "Fishbone";
         public const string Guid = $"{Process}.{Name}";
-        public const string Version = "2.0.0";
         private Harmony Patch;
         public override void Load() =>
             Patch = Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks").With(() => Instance = this);
