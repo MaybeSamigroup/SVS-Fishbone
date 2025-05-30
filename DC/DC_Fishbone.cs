@@ -102,8 +102,7 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), [])]
         static void HumanReloadCoordinatePostfix(Human __instance) =>
-            __instance.NotifyPostCoordinateReload();
-
+            (LoadStack == 0).Maybe(__instance.NotifyPostCoordinateReload);
     }
     public static partial class Event
     {
