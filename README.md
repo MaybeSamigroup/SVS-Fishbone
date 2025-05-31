@@ -23,7 +23,7 @@ Extract the [latest release](https://github.com/MaybeSamigroup/SVS-Fishbone/rele
 ## Prerequisites (DC Standalone)
 
 - [BepInEx](https://github.com/BepInEx/BepInE)
-  - [Bleeding Edge (BE) build](https://builds.bepinex.dev/projects/bepinex_be) #735 or later
+  - [Bleeding Edge (BE) build](https://builds.bepinex.dev/projects/bepinex_be) #697 or later
 
 ## Installation (DC Standalone)
 

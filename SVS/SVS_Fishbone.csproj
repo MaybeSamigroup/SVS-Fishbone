@@ -3,7 +3,6 @@
         <TargetFramework>net6</TargetFramework>
         <AssemblyName>SVS_Fishbone</AssemblyName>
         <Description>plugin api to serialize and deserialize character or coordinate bound extension data, for SamabakeScramble</Description>
-        <Version>2.0.1</Version>
         <LangVersion>latest</LangVersion>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<GameName>SamabakeScramble</GameName>

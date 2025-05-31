@@ -291,7 +291,7 @@ namespace Fishbone
     public partial class Plugin : BasePlugin
     {
         public const string Name = "Fishbone";
-        public const string Version = "2.0.1";
+        public const string Version = "2.0.2";
         internal static Plugin Instance;
     }
 }
