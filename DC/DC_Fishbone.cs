@@ -19,8 +19,8 @@ namespace Fishbone
         /// </summary>
         static readonly byte[] NoExtension = new MemoryStream()
             .With(stream => new ZipArchive(stream, ZipArchiveMode.Create).Dispose()).ToArray();
-        public static ZipArchive ToArchive(this Human human) =>
-            human.ToExtension().ToArchive();
+        public static void ReferenceExtension(this Human human, Action<ZipArchive> action) =>
+            human.ToExtension().ReferenceExtension(action);
         static byte[] ToExtension(this Human human) =>
             human.data.PngData.Extract();
         static void UpdateExtension(this Human human, Action<ZipArchive> action) =>
@@ -51,8 +51,8 @@ namespace Fishbone
             (LoadStack, CharaExtension) = flags switch
             {
                 LoadFlags.Craft or LoadFlags.CraftLoad =>
-                    (LoadStack + 1, Array.Empty<byte>()).With(CharaExtension.Curry(__instance.NotifyPreDeserialize)),
-                _ => (LoadStack, Array.Empty<byte>())
+                    (LoadStack + 1, Array.Empty<byte>()).With(Event.NotifyPreDeserialize.Apply(__instance).Apply(CharaExtension)),
+                _ => (LoadStack, [])
             };
         /// <summary>
         /// chapture character deserialize complete from card
@@ -62,7 +62,7 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(Human), nameof(Human.Create))]
         static void HumanCreatePostfix(Human __result) =>
-            LoadStack = (LoadStack - 1).With(__result.NotifyPostDeserialize);
+            LoadStack = (LoadStack - 1).With(Event.NotifyPostDeserialize.Apply(__result));
         /// <summary>
         /// capture human reloading complete. (Before 2.1.0)
         /// only notified to listeners when human data updated.
@@ -73,7 +73,7 @@ namespace Fishbone
         [HarmonyPatch(typeof(Human), nameof(Human.Reload), [])]
         static void HumanReloadPostfix(Human __instance) =>
             LoadStack = LoadStack == 0 || __instance.isReloading ?
-                LoadStack : (LoadStack - 1).With(__instance.NotifyPostDeserialize);
+                LoadStack : (LoadStack - 1).With(Event.NotifyPostDeserialize.Apply(__instance));
         /// <summary>
         /// capture human reloading complete. (After 2.1.0)
         /// only notified to listeners when human data updated.
@@ -84,7 +84,7 @@ namespace Fishbone
         [HarmonyPatch(typeof(Human.Reloading), nameof(Human.Reloading.Dispose))]
         static void HumanReloadingDisposePostfix(Human.Reloading __instance) =>
             LoadStack = LoadStack == 0 || __instance._isReloading ?
-                LoadStack : (LoadStack - 1).With(__instance._human.NotifyPostDeserialize);
+                LoadStack : (LoadStack - 1).With(Event.NotifyPostDeserialize.Apply(__instance._human));
         /// <summary>
         /// capture coordinate reload begining
         /// </summary>
@@ -93,7 +93,7 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanCoordinate), nameof(HumanCoordinate.ChangeCoordinateType), typeof(ChaFileDefine.CoordinateType), typeof(bool))]
         static void HumanCoordinateChangeCoordinateType(HumanCoordinate __instance, ChaFileDefine.CoordinateType type) =>
-            (LoadStack == 0).Maybe(() => __instance.human.NotifyPreCoordinateReload((int)type));
+            (LoadStack == 0).Maybe(Event.NotifyPreCoordinateReload.Apply(__instance.human).Apply((int)type));
         /// <summary>
         /// capture coordinate reloading complete
         /// </summary>
@@ -102,7 +102,7 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), [])]
         static void HumanReloadCoordinatePostfix(Human __instance) =>
-            (LoadStack == 0).Maybe(__instance.NotifyPostCoordinateReload);
+            (LoadStack == 0).Maybe(Event.NotifyPostCoordinateReload.Apply(__instance));
     }
     public static partial class Event
     {
@@ -111,42 +111,44 @@ namespace Fishbone
         /// </summary>
         /// <param name="data"></param>
         /// <param name="bytes"></param>
-        internal static void NotifyPreDeserialize(this HumanData data, byte[] bytes) =>
-            OnPreCharacterDeserialize(data, bytes.With(data.Implant).ToArchive());
+        internal static Action<HumanData, byte[]> NotifyPreDeserialize =>
+            (data, bytes) => bytes.With(data.Implant).ReferenceExtension(OnPreCharacterDeserialize.Apply(data));
         /// <summary>
         /// notify complete of character deserialize to listeners
         /// </summary>
         /// <param name="human"></param>
-        internal static void NotifyPostDeserialize(this Human human) =>
-            OnPostCharacterDeserialize(human, human.ToArchive());
+        internal static Action<Human> NotifyPostDeserialize =>
+            (human) => human.ReferenceExtension(archive => OnPostCharacterDeserialize(human, archive));
         /// <summary>
         /// notify begining of coordinate deserialize to listeners
         /// </summary>
         /// <param name="human"></param>
         /// <param name="limits"></param>
         /// <param name="bytes"></param>
-        internal static void NotifyPreCoordinateDeserialize(this Human human, CoordLimit limits, byte[] bytes) =>
-            human.UpdateExtension(storage => OnPreCoordinateDeserialize(human, human.coorde.nowCoordinate, limits, bytes.ToArchive(), storage));
+        internal static Action<Human, CoordLimit, byte[]> NotifyPreCoordinateDeserialize =>
+            (human, limits, bytes) => human.UpdateExtension(bytes.ReferenceExtension(
+                OnPreCoordinateDeserialize.Apply(human).Apply(human.coorde.nowCoordinate).Apply(limits)));
         /// <summary>
         /// notify complete of coordinate deserialize to listeners
         /// </summary>
         /// <param name="human"></param>
         /// <param name="limits"></param>
         /// <param name="bytes"></param>
-        internal static void NotifyPostCoordinateDeserialize(this Human human, CoordLimit limits, byte[] bytes) =>
-            human.UpdateExtension(storage => OnPostCoordinateDeserialize(human, human.coorde.nowCoordinate, limits, bytes.ToArchive(), storage));
+        internal static Action<Human, CoordLimit, byte[]> NotifyPostCoordinateDeserialize =>
+            (human, limits, bytes) => human.UpdateExtension(bytes.ReferenceExtension(
+                OnPostCoordinateDeserialize.Apply(human).Apply(human.coorde.nowCoordinate).Apply(limits)));
         /// <summary>
         /// notify begining of coordinate reload to listeners
         /// </summary>
         /// <param name="human"></param>
-        internal static void NotifyPreCoordinateReload(this Human human, int type) =>
-            OnPreCoordinateReload(human, type, human.ToArchive());
+        internal static Action<Human, int> NotifyPreCoordinateReload =>
+            (human, type) => human.ReferenceExtension(OnPreCoordinateReload.Apply(human).Apply(type));
         /// <summary>
         /// notify complete of coordinate reload to listeners
         /// </summary>
         /// <param name="human"></param>
-        internal static void NotifyPostCoordinateReload(this Human human) =>
-            OnPostCoordinateReload(human, human.fileStatus.coordinateType, human.ToArchive());
+        internal static Action<Human> NotifyPostCoordinateReload =>
+            (human) => human.ReferenceExtension(OnPostCoordinateReload.Apply(human).Apply(human.fileStatus.coordinateType));
         /// <summary>
         /// character deserialize begining event.
         /// param1: human data applying to human

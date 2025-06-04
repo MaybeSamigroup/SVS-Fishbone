@@ -16,6 +16,7 @@ using CoordLimit = Character.HumanDataCoordinate.LoadLimited.Flags;
 using Il2CppBytes = Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<byte>;
 using Il2CppReader = Il2CppSystem.IO.BinaryReader;
 using Il2CppStream = Il2CppSystem.IO.Stream;
+using BepInEx.Logging;
 
 namespace Fishbone
 {
@@ -37,6 +38,24 @@ namespace Fishbone
         public static void Hook<T>(Action onSetup, Action onDestroy) where T : SingletonInitializer<T> =>
             SingletonInitializer<T>.WaitUntilSetup(Canceler.Token)
                 .ContinueWith(onSetup + AwaitDestroy<T>(onSetup, onDestroy));
+        public static void Try(this ManualLogSource log, Action action)
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception e)
+            {
+                log.LogError(e.StackTrace);
+            }
+        }
+        public static void Try<T>(this ManualLogSource log, Action<T> action, T input) where T : IDisposable
+        {
+            using (input)
+            {
+                log.Try(action.Apply(input));
+            }
+        }
     }
     public delegate void Either(Action a, Action b);
     /// <summary>
@@ -44,21 +63,35 @@ namespace Fishbone
     /// </summary>
     public static class FunctionalExtension
     {
-        public static Either Either(bool value) => value ? (left, right) => right() : (left, right) => left();
-        public static void Either(this bool value, Action left, Action right) => Either(value)(left, right);
-        public static void Maybe(this bool value, Action maybe) => value.Either(() => { }, maybe);
-        public static Action Curry<V1, V2, V3>(this V1 v1, V2 v2, V3 v3, Action<V1, V2, V3> action) => () => action(v1, v2, v3);
-        public static Action Curry<V1, V2>(this V1 v1, V2 v2, Action<V1, V2> action) => () => action(v1, v2);
-        public static Action Curry<V1>(this V1 v1, Action<V1> action) => () => action(v1);
-        public static T With<V1, V2, V3, T>(this T input, Action<V1, V2, V3, T> sideEffect, V1 v1, V2 v2, V3 v3) => input.With(() => sideEffect(v1, v2, v3, input));
-        public static T With<V1, V2, T>(this T input, Action<V1, V2, T> sideEffect, V1 v1, V2 v2) => input.With(() => sideEffect(v1, v2, input));
-        public static T With<V1, T>(this T input, Action<V1, T> sideEffect, V1 v1) => input.With(() => sideEffect(v1, input));
         public static T With<T>(this T input, Action<T> sideEffect) => input.With(() => sideEffect(input));
         public static T With<T>(this T input, Action sideEffect)
         {
             sideEffect();
             return input;
         }
+        public static Either Either(this bool value) => value ? (_, a2) => a2() : (a1, _) => a1();
+        public static void Either(this bool value, Action a1, Action a2) => Either(value)(a1, a2);
+        public static void Maybe(this bool value, Action action) => Either(value)(() => { }, action);
+        public static Action<V2, V3, V4, V5> Apply<V1, V2, V3, V4, V5>(this Action<V1, V2, V3, V4, V5> action, V1 value) =>
+            (v2, v3, v4, v5) => action(value, v2, v3, v4, v5);
+        public static Action<V2, V3, V4> Apply<V1, V2, V3, V4>(this Action<V1, V2, V3, V4> action, V1 value) =>
+            (v2, v3, v4) => action(value, v2, v3, v4);
+        public static Action<V2, V3> Apply<V1, V2, V3>(this Action<V1, V2, V3> action, V1 value) =>
+            (v2, v3) => action(value, v2, v3);
+        public static Action<V2> Apply<V1, V2>(this Action<V1, V2> action, V1 value) =>
+            (v2) => action(value, v2);
+        public static Action Apply<V1>(this Action<V1> action, V1 value) =>
+            () => action(value);
+        public static Func<V2, V3, V4, V5, R> Apply<V1, V2, V3, V4, V5, R>(this Func<V1, V2, V3, V4, V5, R> action, V1 value) =>
+            (v2, v3, v4, v5) => action(value, v2, v3, v4, v5);
+        public static Func<V2, V3, V4, R> Apply<V1, V2, V3, V4, R>(this Func<V1, V2, V3, V4, R> action, V1 value) =>
+            (v2, v3, v4) => action(value, v2, v3, v4);
+        public static Func<V2, V3, R> Apply<V1, V2, V3, R>(this Func<V1, V2, V3, R> action, V1 value) =>
+            (v2, v3) => action(value, v2, v3);
+        public static Func<V2, R> Apply<V1, V2, R>(this Func<V1, V2, R> action, V1 value) =>
+            (v2) => action(value, v2);
+        public static Func<R> Apply<V1, R>(this Func<V1, R> action, V1 value) =>
+            () => action(value);
     }
     /// <summary>
     /// purpose specific portable network graphics encoder
@@ -89,7 +122,7 @@ namespace Fishbone
         public static byte[] Implant(this IEnumerable<byte> pngData, byte[] data) =>
             [.. pngData.Take(8), .. pngData.Skip(8).ProcessSize(ToChunk([(byte)'f', (byte)'s', (byte)'B', (byte)'N'], data))];
         public static byte[] Implant(this byte[] data) =>
-             [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A
+            [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A
             , ..ToChunk([(byte)'I', (byte)'H', (byte)'D', (byte)'R'], [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0])
             , ..ToChunk([(byte)'I', (byte)'D', (byte)'A', (byte)'T'], [])
             , ..ToChunk([(byte)'f', (byte)'s', (byte)'B', (byte)'N'], data)
@@ -115,15 +148,18 @@ namespace Fishbone
     public static partial class Event
     {
         static void UpdateExtension(this Action<ZipArchive> action, MemoryStream stream) =>
-            new ZipArchive(stream, ZipArchiveMode.Update).With(action).Dispose();
+            Plugin.Instance.Log.Try(action, new ZipArchive(stream, ZipArchiveMode.Update));
+        static void WriteAllBytes(this byte[] bytes, MemoryStream stream) =>
+            stream.Write(bytes.Length > 0 ? bytes : NoExtension);
+        static void SeekToBegin(MemoryStream stream) =>
+            stream.Position = 0;
         static byte[] UpdateExtension(this byte[] bytes, Action<ZipArchive> action) =>
-            new MemoryStream()
-                .With(stream => stream.Write(bytes.Length > 0 ? bytes : NoExtension))
-                .With(stream => stream.Position = 0)
-                .With(action.UpdateExtension).ToArray();
-        internal static ZipArchive ToArchive(this byte[] bytes) =>
-            new ZipArchive(new MemoryStream(bytes.Length > 0 ? bytes : NoExtension), ZipArchiveMode.Read);
-        internal static void Implant(this HumanData data, byte[] bytes) =>
+            new MemoryStream().With(bytes.WriteAllBytes).With(SeekToBegin).With(action.UpdateExtension).ToArray();
+        static Action<T> ReferenceExtension<T>(this byte[] bytes, Action<ZipArchive,T> action) =>
+            storage => Plugin.Instance.Log.Try(archive => action(archive, storage), new ZipArchive(new MemoryStream(bytes.Length > 0 ? bytes : NoExtension), ZipArchiveMode.Read));
+        static void ReferenceExtension(this byte[] bytes, Action<ZipArchive> action) =>
+            Plugin.Instance.Log.Try(action, new ZipArchive(new MemoryStream(bytes.Length > 0 ? bytes : NoExtension), ZipArchiveMode.Read));
+        static void Implant(this HumanData data, byte[] bytes) =>
             data.PngData = data?.PngData?.Implant(bytes) ?? bytes.Implant();
     }
     /// <summary>
@@ -135,11 +171,14 @@ namespace Fishbone
         /// intercepted png data during character card loading
         /// </summary>
         static byte[] CharaExtension = [];
+        static void ReadAllBytes(this Il2CppStream stream, Il2CppBytes buffer) =>
+            stream.Read(buffer);
+        static Action SeekTo(this Il2CppStream stream, long position) =>
+            () => stream.Position = position;
         static void GetPngSizeSkip(Il2CppStream stream, long offset, long length) { }
         static void GetPngSizeProc(Il2CppStream stream, long offset, long length) =>
-            CharaExtension = new Il2CppBytes(length)
-                .With(buffer => stream.Read(buffer))
-                .With(() => stream.Position = offset).Extract();
+            Plugin.Instance.Log.Try(() => CharaExtension = new Il2CppBytes(length)
+                .With(stream.ReadAllBytes).With(stream.SeekTo(offset)).Extract());
         /// <summary>
         /// action to do when GetPngSize captured
         /// </summary>
@@ -194,7 +233,8 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(PngFile), nameof(PngFile.SkipPng), typeof(Il2CppReader))]
         static void SkipPngPrefix(Il2CppReader br) =>
-            CoordExtension = PngFile.LoadPngBytes(br.With(() => br.BaseStream.Position = 0)).With(() => br.BaseStream.Position = 0).Extract();
+            Plugin.Instance.Log.Try(() => CoordExtension = PngFile
+                .LoadPngBytes(br.With(br.BaseStream.SeekTo(0))).With(br.BaseStream.SeekTo(0)).Extract());
         /// <summary>
         /// capture leaving SkipPng and prepare limitation inference
         /// </summary>
@@ -272,7 +312,7 @@ namespace Fishbone
         [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), typeof(Human.ReloadFlags))]
         static void HumanReloadCoordinateWithFlagsPrefix(Human __instance) =>
             (CoordLimits != CoordLimit.None)
-                .Maybe(CoordLimits.Curry(CoordExtension, __instance.NotifyPreCoordinateDeserialize));
+                .Maybe(Event.NotifyPreCoordinateDeserialize.Apply(__instance).Apply(CoordLimits).Apply(CoordExtension));
         /// <summary>
         /// capture coordinate deserialize complete
         /// </summary>
@@ -285,7 +325,7 @@ namespace Fishbone
             {
                 CoordLimit.None => (CoordLimit.None, []),
                 _ => (CoordLimit.None, Array.Empty<byte>())
-                    .With(CoordLimits.Curry(CoordExtension, __instance.NotifyPostCoordinateDeserialize))
+                    .With(Event.NotifyPostCoordinateDeserialize.Apply(__instance).Apply(CoordLimits).Apply(CoordExtension))
             };
     }
     public partial class Plugin : BasePlugin
