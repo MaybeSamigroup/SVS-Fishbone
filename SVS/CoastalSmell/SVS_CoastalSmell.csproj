@@ -1,16 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>net6</TargetFramework>
-        <AssemblyName>DC_Fishbone</AssemblyName>
-        <Description>plugin api to serialize and deserialize character or coordinate bound extension data, for DigitalCraft</Description>
+        <AssemblyName>SVS_CoastalSmell</AssemblyName>
+        <Description>Syntax suggers for DigitalCraft BepinEx plugins</Description>
         <LangVersion>latest</LangVersion>
-        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<GameName>DigitalCraft</GameName>
+        <GameName>SamabakeScramble</GameName>
         <GamePath>$([MSBuild]::GetRegistryValue('HKEY_CURRENT_USER\Software\ILLGAMES\$(GameName)','INSTALLDIR'))</GamePath>
     </PropertyGroup>
 	<ItemGroup>
-		<Compile Include="..\Fishbone.cs">
-			<Link>Fishbone.cs</Link>
+		<Compile Include="..\..\CoastalSmell.cs">
+			<Link>CoastalSmell.cs</Link>
 		</Compile>
 		<Reference Include="0Harmony">
 			<HintPath>$(GamePath)\BepInEx\core\0Harmony.dll</HintPath>
@@ -36,6 +35,22 @@
 			<HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UnityEngine.CoreModule.dll</HintPath>
 			<Private>False</Private>
 		</Reference>
+		<Reference Include="UnityEngine.UIModule">
+			<HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UnityEngine.UIModule.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="UnityEngine.TextRenderingModule">
+			<HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UnityEngine.TextRenderingModule.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="UnityEngine.UI">
+			<HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UnityEngine.UI.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="Unity.TextMeshPro">
+			<HintPath>$(GamePath)\BepInEx\$(GameName)\interop\Unity.TextMeshPro.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
 		<Reference Include="UniRx">
 			<HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UniRx.dll</HintPath>
 			<Private>False</Private>
@@ -57,7 +72,6 @@
 		<Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="$(GamePath)\BepInEx\plugins\" />
 	</Target>
 	<Target Name="Release" AfterTargets="Build">
-		<Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="GameRoot\BepinEx\plugins"/>
-		<ZipDirectory SourceDirectory="GameRoot" Overwrite="true" DestinationFile="..\$(GameName).zip"/>
+		<Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="..\GameRoot\BepinEx\plugins"/>
 	</Target>
 </Project>

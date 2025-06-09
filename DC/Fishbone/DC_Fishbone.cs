@@ -9,6 +9,7 @@ using LoadFlags = Character.HumanData.LoadFileInfo.Flags;
 using CoordLimit = Character.HumanDataCoordinate.LoadLimited.Flags;
 using Il2CppReader = Il2CppSystem.IO.BinaryReader;
 using Il2CppWriter = Il2CppSystem.IO.BinaryWriter;
+using CoastalSmell;
 
 namespace Fishbone
 {
@@ -207,7 +208,7 @@ namespace Fishbone
         public const string Guid = $"{Process}.{Name}";
         private Harmony Patch;
         public override void Load() =>
-            Patch = Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks").With(() => Instance = this);
+            (Instance, Patch) = (this, Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks"));
         public override bool Unload() =>
             true.With(Patch.UnpatchSelf) && base.Unload();
     }
