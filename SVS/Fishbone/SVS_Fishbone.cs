@@ -257,7 +257,7 @@ namespace Fishbone
         /// <param name="limits"></param>
         /// <param name="bytes"></param>
         internal static Action<Human, CoordLimit, byte[]> NotifyPreCoordinateDeserialize =>
-            (human, limits, bytes) => bytes.ReferenceExtension(OnPreCoordinateDeserialize.Apply(human).Apply(human.coorde.nowCoordinate).Apply(limits));
+            (human, limits, bytes) => human.UpdateHuman(bytes.ReferenceExtension(OnPreCoordinateDeserialize.Apply(human).Apply(human.coorde.nowCoordinate).Apply(limits)));
         /// <summary>
         /// notify complete of coordinate deserialize to listeners
         /// </summary>
@@ -265,7 +265,7 @@ namespace Fishbone
         /// <param name="limits"></param>
         /// <param name="bytes"></param>
         internal static Action<Human, CoordLimit, byte[]> NotifyPostCoordinateDeserialize =>
-            (human, limits, bytes) => bytes.ReferenceExtension(OnPostCoordinateDeserialize.Apply(human).Apply(human.coorde.nowCoordinate).Apply(limits));
+            (human, limits, bytes) => human.UpdateHuman(bytes.ReferenceExtension(OnPostCoordinateDeserialize.Apply(human).Apply(human.coorde.nowCoordinate).Apply(limits)));
         /// <summary>
         /// notify begining of coordinate reload
         /// </summary>
@@ -278,18 +278,20 @@ namespace Fishbone
         /// param2: human data coordinate to applying
         /// param3: coordinate limits
         /// param4: readonly mode extension from loading coordinate card
+        /// param5: epdate mode extension from applying human
         /// </summary>
-        public static event Action<Human, HumanDataCoordinate, CoordLimit, ZipArchive> OnPreCoordinateDeserialize =
-            (human, _, limit, _) => Plugin.Instance.Log.LogDebug($"Pre Coordinate Deserialize: {human.name}, {limit}");
+        public static event Action<Human, HumanDataCoordinate, CoordLimit, ZipArchive, ZipArchive> OnPreCoordinateDeserialize =
+            (human, _, limit, _, _) => Plugin.Instance.Log.LogDebug($"Pre Coordinate Deserialize: {human.name}, {limit}");
         /// <summary>
         /// coordinate deserialize complete event
         /// param1: human to apply coordinate
         /// param2: human data coordinate to applying
         /// param3: coordinate limits
         /// param4: readonly mode extension from loaded coordinate card
+        /// param5: update mode extension from applying human
         /// </summary>
-        public static event Action<Human, HumanDataCoordinate, CoordLimit, ZipArchive> OnPostCoordinateDeserialize =
-            (human, _, limit, _) => Plugin.Instance.Log.LogDebug($"Post Coordinate Deserialize: {human.name}, {limit}");
+        public static event Action<Human, HumanDataCoordinate, CoordLimit, ZipArchive, ZipArchive> OnPostCoordinateDeserialize =
+            (human, _, limit, _, _) => Plugin.Instance.Log.LogDebug($"Post Coordinate Deserialize: {human.name}, {limit}");
         /// <summary>
         ///  coordinate reload begining event
         /// param1: human to apply coordinate
@@ -359,7 +361,8 @@ namespace Fishbone
         /// <returns>archive to load extension (readonly)</returns>
         public static void ReferenceExtension(this Human human, Action<ZipArchive> action) =>
             (human.ToActor(out var actor) ? actor.ToExtension() : CustomExtension).ReferenceExtension(action);
-        /// <summary>
+
+       /// <summary>
         /// do extension update operation and store back resulting extension.
         /// </summary>
         /// <param name="data">save data actor hich associated with extension</param>
@@ -368,6 +371,9 @@ namespace Fishbone
             actor.charFile.Implant(actor.UpdateActor(action, actor.ToExtension()));
         static byte[] UpdateActor(this SaveData.Actor actor, Action<ZipArchive> action, byte[] extension) =>
             ActorExtensions[actor.charasGameParam.Index] = extension.UpdateExtension(action);
+        static void UpdateHuman(this Human human, Action<ZipArchive> action) =>
+            human.ToActor(out var actor).Either(F.Apply(UpdateCustom, action), F.Apply(actor.UpdateActor, action));
+ 
     }
     static partial class Hooks
     {

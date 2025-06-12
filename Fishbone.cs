@@ -3,6 +3,8 @@ using BepInEx.Unity.IL2CPP;
 using System;
 using System.IO;
 using System.IO.Compression;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Collections.Generic;
 using System.Linq;
 using UniRx;
@@ -15,6 +17,7 @@ using Il2CppBytes = Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<
 using Il2CppReader = Il2CppSystem.IO.BinaryReader;
 using Il2CppStream = Il2CppSystem.IO.Stream;
 using CoastalSmell;
+using System.Reflection;
 
 namespace Fishbone
 {
@@ -240,8 +243,7 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), typeof(Human.ReloadFlags))]
         static void HumanReloadCoordinateWithFlagsPrefix(Human __instance) =>
-            (CoordLimits != CoordLimit.None)
-                .Maybe(Event.NotifyPreCoordinateDeserialize.Apply(__instance).Apply(CoordLimits).Apply(CoordExtension));
+            (CoordLimits is not CoordLimit.None).Maybe(Event.NotifyPreCoordinateDeserialize.Apply(__instance).Apply(CoordLimits).Apply(CoordExtension));
         /// <summary>
         /// capture coordinate deserialize complete
         /// </summary>
@@ -250,12 +252,42 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), typeof(Human.ReloadFlags))]
         static void HumanReloadCoordinateWithFlagsPostfix(Human __instance) =>
-            (CoordLimits, CoordExtension) = CoordLimits switch
-            {
-                CoordLimit.None => (CoordLimit.None, []),
-                _ => (CoordLimit.None, Array.Empty<byte>())
-                    .With(Event.NotifyPostCoordinateDeserialize.Apply(__instance).Apply(CoordLimits).Apply(CoordExtension))
-            };
+            (CoordLimits is not CoordLimit.None).Maybe(Event.NotifyPostCoordinateDeserialize.Apply(__instance).Apply(CoordLimits).Apply(CoordExtension));
+    }
+    [AttributeUsage(AttributeTargets.Class)]
+    public class BoneToStuckAttribute : Attribute
+    {
+        internal string[] Paths;
+        public BoneToStuckAttribute(params string[] paths) => Paths = paths;
+    }
+    public static class BoneToStuck<T>
+    {
+        static string Path;
+        static BoneToStuck() => Path = typeof(T)
+            .GetCustomAttribute(typeof(BoneToStuckAttribute)) is BoneToStuckAttribute bone
+                ? System.IO.Path.Combine(bone.Paths) : throw new InvalidDataException($"{typeof(T)} is not bone to stuck.");
+        static readonly JsonSerializerOptions JsonOpts = new()
+        {
+            NumberHandling =
+                JsonNumberHandling.WriteAsString |
+                JsonNumberHandling.AllowReadingFromString |
+                JsonNumberHandling.AllowNamedFloatingPointLiterals,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault
+        };
+        static bool TryGetEntry(ZipArchive archive, string path, out ZipArchiveEntry entry) =>
+            null != (entry = archive.GetEntry(path));
+        static Func<ZipArchive, Action> Cleanup =
+            (archive) => TryGetEntry(archive, Path, out var entry) ? entry.Delete : F.DoNothing;
+        static Func<Stream, T> FromJson =
+            (stream) => JsonSerializer.Deserialize<T>(stream, JsonOpts);
+        static Action<T, Stream> ToJson =
+            (data, stream) => JsonSerializer.Serialize(stream, data, JsonOpts);
+        public static bool Load(ZipArchive archive, out T value) =>
+            TryGetEntry(archive, Path, out var entry).With(F.Constant(value = default).Ignoring())
+                && FromJson.ApplyDisposable(entry.Open()).Try(Plugin.Instance.Log.LogError, out value);
+        public static Action<ZipArchive, T> Save =
+            (archive, data) => ToJson.With(Cleanup(archive)).Apply(data).
+                ApplyDisposable(archive.CreateEntry(Path).Open()).Try(Plugin.Instance.Log.LogError);
     }
     public partial class Plugin : BasePlugin
     {

@@ -8,6 +8,8 @@ using UniRx.Triggers;
 using Cysharp.Threading.Tasks;
 using ILLGames.Unity.Component;
 using TMPro;
+using ScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode;
+using ScreenMatchMode = UnityEngine.UI.CanvasScaler.ScreenMatchMode;
 
 namespace CoastalSmell
 {
@@ -24,15 +26,13 @@ namespace CoastalSmell
              SingletonInitializer<T>.WaitUntilSetup(Canceler.Token)
                 .ContinueWith(AwaitDestroy.Apply(onStartup).Apply(onDestroy));
     }
-    public delegate void Either(Action a, Action b);
     /// <summary>
     /// functional utilities for favor
     /// </summary>
     public static class F
     {
-        public static Either Either(this bool value) => value ? (_, a2) => a2() : (a1, _) => a1();
-        public static void Either(this bool value, Action a1, Action a2) => Either(value)(a1, a2);
-        public static void Maybe(this bool value, Action action) => Either(value)(() => { }, action);
+        public static void Either(this bool value, Action a1, Action a2) => (value ? a2 : a1)();
+        public static void Maybe(this bool value, Action action) => value.Either(DoNothing, action);
         public static Action Ignoring<O>(this Func<O> f) =>
             () => f();
         public static Action<I1> Ignoring<I1>(this Action action) =>
@@ -84,12 +84,12 @@ namespace CoastalSmell
         public static Func<I2, I3, I4, I5, O> Apply<I1, I2, I3, I4, I5, O>(this Func<I1, I2, I3, I4, I5, O> f, I1 i1) =>
             (i2, i3, i4, i5) => f(i1, i2, i3, i4, i5);
         public static Func<O> ApplyDisposable<I1, O>(this Func<I1, O> f, I1 i1) where I1 : IDisposable =>
-            () => { using(i1) { return f(i1); } };
+            () => { using (i1) { return f(i1); } };
         public static Func<I2, O> ApplyDisposable<I1, I2, O>(this Func<I1, I2, O> f, I1 i1) where I1 : IDisposable =>
-           (i2) => { using(i1) { return f(i1, i2); } };
+           (i2) => { using (i1) { return f(i1, i2); } };
         public static Func<I2, I3, O> ApplyDisposable<I1, I2, I3, O>(this Func<I1, I2, I3, O> f, I1 i1) where I1 : IDisposable =>
-            (i2, i3) => { using(i1) { return f(i1, i2, i3); } };
-        public static Func<I2, I3, I4, O> ApplyDisposable<I1, I2, I3, I4, O>(this Func<I1, I2, I3, I4, O> f, I1 i1) where I1: IDisposable =>
+            (i2, i3) => { using (i1) { return f(i1, i2, i3); } };
+        public static Func<I2, I3, I4, O> ApplyDisposable<I1, I2, I3, I4, O>(this Func<I1, I2, I3, I4, O> f, I1 i1) where I1 : IDisposable =>
             (i2, i3, i4) => { using (i1) { return f(i1, i2, i3, i4); } };
         public static Func<I2, I3, I4, I5, O> ApplyDisposable<I1, I2, I3, I4, I5, O>(this Func<I1, I2, I3, I4, I5, O> f, I1 i1) where I1 : IDisposable =>
             (i2, i3, i4, i5) => { using (i1) { return f(i1, i2, i3, i4, i5); } };
@@ -127,13 +127,14 @@ namespace CoastalSmell
             }
             return false;
         }
-        public static Action DoNoting = () => { };
+        public static Func<T> Constant<T>(T value) => () => value;
+        public static Action DoNothing = () => { };
         public static Func<Action, T, Action> Accumulate<T>(Action<T> action) =>
             (actions, value) => actions += action.Apply(value);
         public static IEnumerable<Tuple<int, T>> Index<T>(IEnumerable<T> values) =>
             values.Select<T, Tuple<int, T>>((v, i) => new(i, v));
         public static void ForEach<T>(this IEnumerable<T> values, Action<T> action) =>
-            values.Aggregate(DoNoting, Accumulate(action))();
+            values.Aggregate(DoNothing, Accumulate(action))();
     }
     public static class UGUI
     {
@@ -142,39 +143,60 @@ namespace CoastalSmell
         static Func<Transform, GameObject> GoAt = tf => tf.gameObject;
         public static Func<Action<GameObject>, Action<GameObject>> ModifyAt(params string[] paths) =>
             action => go => action(GoAt(TransformAt(paths)(go.transform)));
+        public static Func<Action<GameObject>, Action<GameObject>> AddChild(string name) =>
+            action => go => new GameObject(name).With(Go(parent: go.transform)).With(action);
         public static Action<GameObject> DestroyAt(params string[] paths) =>
             ModifyAt(paths)(UnityEngine.Object.Destroy);
         public static Action<GameObject> DestroyChildren =
             go => Enumerable.Range(0, go.transform.childCount).Select(go.transform.GetChild).Select(GoAt).ForEach(UnityEngine.Object.Destroy);
-        public static Action<GameObject> Go(Transform parent = null, string name = null, bool? active = null) =>
-            go => (go.transform.parent, go.name, go.active) = (parent ?? go.transform.parent, name ?? go.name, active ?? go.active);
+        public static Action<Transform> ParentAndScale(Transform parent = null, Vector2? scale = null) =>
+            transform => transform.With(F.Apply(transform.SetParent, parent ?? transform.parent)).localScale = scale ?? new (1, 1);
+        public static Action<GameObject> Go(Transform parent = null, string name = null, bool active = true) =>
+            go => ((go.name, go.active) = (name ?? go.name, active)).With(ParentAndScale(parent).Apply(go.transform));
+        public static Action<GameObject> Cmp<T>() where T : Component =>
+            go => ObservableTriggerExtensions.GetOrAddComponent<T>(go);
         public static Action<GameObject> Cmp<T>(this Action<T> action) where T : Component =>
             go => action(ObservableTriggerExtensions.GetOrAddComponent<T>(go));
         public static Action<T> Behavior<T>(bool? enabled) where T : Behaviour => ui => ui.enabled = enabled ?? ui.enabled;
+        public static Action<Canvas> Canvas(RenderMode? renderMode = RenderMode.ScreenSpaceOverlay) => ui =>
+            ui.renderMode = renderMode ?? ui.renderMode;
+        public static Action<CanvasScaler> CanvasScaler(
+            Vector2? referenceResolution = null,
+            ScaleMode? scaleMode = ScaleMode.ScaleWithScreenSize,
+            ScreenMatchMode? screenMatchMode = ScreenMatchMode.MatchWidthOrHeight
+        ) => ui => (
+            ui.referenceResolution,
+            ui.uiScaleMode,
+            ui.screenMatchMode
+        ) = (
+            referenceResolution ?? ui.referenceResolution,
+            scaleMode ?? ui.uiScaleMode,
+            screenMatchMode ?? ui.screenMatchMode
+        );
         public static Action<RectTransform> Rt(
             Vector2? anchorMin = null,
             Vector2? anchorMax = null,
-            Vector2? anchoredPosition = null,
-            Vector2? pivot = null,
             Vector2? offsetMin = null,
             Vector2? offsetMax = null,
-            Vector2? sizeDelta = null
+            Vector2? sizeDelta = null,
+            Vector2? anchoredPosition = null,
+            Vector2? pivot = null
         ) => ui => (
             ui.anchorMin,
             ui.anchorMax,
-            ui.anchoredPosition,
-            ui.pivot,
             ui.offsetMin,
             ui.offsetMax,
-            ui.sizeDelta
+            ui.sizeDelta,
+            ui.anchoredPosition,
+            ui.pivot
         ) = (
             anchorMin ?? ui.anchorMin,
             anchorMax ?? ui.anchorMax,
-            anchoredPosition ?? ui.anchoredPosition,
-            pivot ?? ui.pivot,
             offsetMin ?? ui.offsetMin,
             offsetMax ?? ui.offsetMax,
-            sizeDelta ?? ui.sizeDelta
+            sizeDelta ?? ui.sizeDelta,
+            anchoredPosition ?? ui.anchoredPosition,
+            pivot ?? ui.pivot
         );
         public static Action<T> LayoutGroup<T>(
             bool? childScaleWidth = null,
@@ -186,7 +208,7 @@ namespace CoastalSmell
             bool? reverseArrangement = null,
             float? spacing = null,
             RectOffset padding = null,
-            TextAnchor? childAlignmentt = null
+            TextAnchor? childAlignment = null
         ) where T : HorizontalOrVerticalLayoutGroup => ui => (
             ui.childScaleWidth,
             ui.childScaleHeight,
@@ -208,7 +230,7 @@ namespace CoastalSmell
             reverseArrangement ?? ui.reverseArrangement,
             spacing ?? ui.spacing,
             padding ?? ui.padding,
-            childAlignmentt ?? ui.childAlignment
+            childAlignment ?? ui.childAlignment
         );
         public static Action<LayoutElement> Layout(float? width = null, float? height = null) =>
             ui => (ui.preferredWidth, ui.preferredHeight) = (width ?? ui.preferredWidth, height ?? ui.preferredHeight);
@@ -237,11 +259,11 @@ namespace CoastalSmell
             text ?? ui.m_text
         );
         public static Action<TMP_InputField> Input(
-            bool? restoreOriginalTextOnEscape,
-            int? characterLimit,
-            int? lineLimit,
-            TMP_InputField.ContentType? contentType,
-            TMP_InputField.LineType? lineType
+            bool? restoreOriginalTextOnEscape = null,
+            int? characterLimit = null,
+            int? lineLimit = null,
+            TMP_InputField.ContentType? contentType = null,
+            TMP_InputField.LineType? lineType = null
         ) => ui => (
             ui.restoreOriginalTextOnEscape,
             ui.characterLimit,
@@ -257,9 +279,9 @@ namespace CoastalSmell
         );
         public static Action<ToggleGroup> ToggleGroup(bool? allowSwitchOff = null) => ui =>
             ui.allowSwitchOff = allowSwitchOff ?? ui.allowSwitchOff;
-        public static Action<Toggle> Toggle(ToggleGroup group) => ui =>
-            ui.group = group ?? ui.group;
-        public static Action<Selectable> Selectable(bool? interactable) => ui =>
+        public static Action<Toggle> Toggle(ToggleGroup group = null, bool? value = null) => ui =>
+            (ui.group, ui.isOn) = (group ?? ui.group, value ?? ui.isOn);
+        public static Action<T> Selectable<T>(bool? interactable) where T : Selectable => ui =>
             ui.interactable = interactable ?? ui.interactable;
         public static GameObject Test() =>
             new GameObject("go").With(Go())
