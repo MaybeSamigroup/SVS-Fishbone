@@ -1,4 +1,5 @@
 using HarmonyLib;
+using BepInEx;
 using BepInEx.Unity.IL2CPP;
 using System;
 using System.IO;
@@ -86,7 +87,7 @@ namespace Fishbone
         static Action<ZipArchive> ReferenceExtension(this byte[] bytes, Action<ZipArchive, ZipArchive> action) =>
             action.ApplyDisposable(new ZipArchive(new MemoryStream(bytes.Length > 0 ? bytes : NoExtension), ZipArchiveMode.Read));
         static void ReferenceExtension(this byte[] bytes, Action<ZipArchive> action) =>
-            action.ApplyDisposable(new ZipArchive(new MemoryStream(bytes.Length > 0 ? bytes : NoExtension), ZipArchiveMode.Read));
+            action.ApplyDisposable(new ZipArchive(new MemoryStream(bytes.Length > 0 ? bytes : NoExtension), ZipArchiveMode.Read)).Invoke();
         static void Implant(this HumanData data, byte[] bytes) =>
             data.PngData = data?.PngData?.Implant(bytes) ?? bytes.Implant();
     }
@@ -151,7 +152,7 @@ namespace Fishbone
         static Action<Il2CppReader> SkipPngProc = (reader) =>
         {
             reader.BaseStream.Seek(0, Il2CppSystem.IO.SeekOrigin.Begin);
-            CoordExtension = PngFile.LoadPngBytes(reader);
+            CoordExtension = PngFile.LoadPngBytes(reader).Extract();
             reader.BaseStream.Seek(0, Il2CppSystem.IO.SeekOrigin.Begin);
         };
         static Action<CoordLimit> CoordLimitsCheck;
@@ -243,7 +244,8 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), typeof(Human.ReloadFlags))]
         static void HumanReloadCoordinateWithFlagsPrefix(Human __instance) =>
-            (CoordLimits is not CoordLimit.None).Maybe(Event.NotifyPreCoordinateDeserialize.Apply(__instance).Apply(CoordLimits).Apply(CoordExtension));
+            (CoordLimits is not CoordLimit.None)
+                .Maybe(Event.NotifyPreCoordinateDeserialize.Apply(__instance).Apply(CoordLimits).Apply(CoordExtension));
         /// <summary>
         /// capture coordinate deserialize complete
         /// </summary>
@@ -252,19 +254,22 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), typeof(Human.ReloadFlags))]
         static void HumanReloadCoordinateWithFlagsPostfix(Human __instance) =>
-            (CoordLimits is not CoordLimit.None).Maybe(Event.NotifyPostCoordinateDeserialize.Apply(__instance).Apply(CoordLimits).Apply(CoordExtension));
+            (CoordLimits is not CoordLimit.None)
+                .Maybe(Event.NotifyPostCoordinateDeserialize.Apply(__instance).Apply(CoordLimits).Apply(CoordExtension));
+        static Action InitializeCoordLimits =
+            () => Event.OnPostCoordinateDeserialize += delegate { CoordLimits = CoordLimit.None; };
     }
     [AttributeUsage(AttributeTargets.Class)]
-    public class BoneToStuckAttribute : Attribute
+    public class BonesToStuckAttribute : Attribute
     {
         internal string[] Paths;
-        public BoneToStuckAttribute(params string[] paths) => Paths = paths;
+        public BonesToStuckAttribute(params string[] paths) => Paths = paths;
     }
-    public static class BoneToStuck<T>
+    public static class BonesToStuck<T>
     {
         static string Path;
-        static BoneToStuck() => Path = typeof(T)
-            .GetCustomAttribute(typeof(BoneToStuckAttribute)) is BoneToStuckAttribute bone
+        static BonesToStuck() => Path = typeof(T)
+            .GetCustomAttribute(typeof(BonesToStuckAttribute)) is BonesToStuckAttribute bone
                 ? System.IO.Path.Combine(bone.Paths) : throw new InvalidDataException($"{typeof(T)} is not bone to stuck.");
         static readonly JsonSerializerOptions JsonOpts = new()
         {
@@ -289,10 +294,19 @@ namespace Fishbone
             (archive, data) => ToJson.With(Cleanup(archive)).Apply(data).
                 ApplyDisposable(archive.CreateEntry(Path).Open()).Try(Plugin.Instance.Log.LogError);
     }
+    [BepInProcess(Process)]
+    [BepInPlugin(Guid, Name, Version)]
+    [BepInDependency(CoastalSmell.Plugin.Guid)]
     public partial class Plugin : BasePlugin
     {
+        public const string Guid = $"{Process}.{Name}";
         public const string Name = "Fishbone";
         public const string Version = "2.0.2";
         internal static Plugin Instance;
+        private Harmony Patch;
+        public override void Load() =>
+            ((Instance, Patch) = (this, Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks"))).With(Hooks.Initialize);
+        public override bool Unload() =>
+            true.With(Patch.UnpatchSelf) && base.Unload();
     }
 }

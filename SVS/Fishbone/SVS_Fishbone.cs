@@ -1,5 +1,4 @@
 using HarmonyLib;
-using BepInEx;
 using BepInEx.Unity.IL2CPP;
 using System;
 using System.IO;
@@ -189,8 +188,10 @@ namespace Fishbone
         /// <summary>
         /// switching human data copy actions
         /// </summary>
-        internal static void InitializeHookSwitch() =>
-            Util<HumanCustom>.Hook(SwitchToCustom, SwitchToSimulation);
+        internal static Action Initialize =>
+            InitializeCoordLimits + InitializeHookSwitch; 
+        static Action InitializeHookSwitch =
+            () => Util<HumanCustom>.Hook(SwitchToCustom, SwitchToSimulation);
     }
     public static partial class Event
     {
@@ -373,7 +374,6 @@ namespace Fishbone
             ActorExtensions[actor.charasGameParam.Index] = extension.UpdateExtension(action);
         static void UpdateHuman(this Human human, Action<ZipArchive> action) =>
             human.ToActor(out var actor).Either(F.Apply(UpdateCustom, action), F.Apply(actor.UpdateActor, action));
- 
     }
     static partial class Hooks
     {
@@ -470,7 +470,7 @@ namespace Fishbone
         [HarmonyPatch(typeof(SV.Talk.TalkTaskBase), nameof(SV.Talk.TalkTaskBase.LoadPlayerHighPoly))]
         [HarmonyPatch(typeof(SV.Talk.TalkTaskBase), nameof(SV.Talk.TalkTaskBase.LoadHighPoly))]
         static void SVTalkTalkTaskBaseLoadHighPolyPrefix(SV.Chara.AI _ai) =>
-            (_ai?.charaData?.charasGameParam?.Index == null).Maybe(NotifyPreActorHumanize.Apply(_ai._charaData));
+            (_ai?.charaData?.charasGameParam?.Index != null).Maybe(NotifyPreActorHumanize.Apply(_ai?._charaData));
         [HarmonyPrefix]
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(CoordeSelect), nameof(CoordeSelect.CreateHiPoly))]
@@ -564,16 +564,8 @@ namespace Fishbone
         public static event Action<Human, int, ZipArchive> OnPostCoordinateReload =
             (human, _, _) => Plugin.Instance.Log.LogDebug($"Post Coordinate Reload: {human.name}");
     }
-    [BepInProcess(Process)]
-    [BepInPlugin(Guid, Name, Version)]
     public partial class Plugin : BasePlugin
     {
         public const string Process = "SamabakeScramble";
-        public const string Guid = $"{Process}.{Name}";
-        private Harmony Patch;
-        public override void Load() =>
-            ((Instance, Patch) = (this, Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks"))).With(Hooks.InitializeHookSwitch);
-        public override bool Unload() =>
-            true.With(Patch.UnpatchSelf) && base.Unload();
     }
 }

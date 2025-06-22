@@ -1,5 +1,4 @@
 using HarmonyLib;
-using BepInEx;
 using BepInEx.Unity.IL2CPP;
 using System;
 using System.IO;
@@ -104,6 +103,7 @@ namespace Fishbone
         [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), [])]
         static void HumanReloadCoordinatePostfix(Human __instance) =>
             (LoadStack == 0).Maybe(Event.NotifyPostCoordinateReload.Apply(__instance));
+        internal static Action Initialize => InitializeCoordLimits; 
     }
     public static partial class Event
     {
@@ -200,16 +200,8 @@ namespace Fishbone
         public static event Action<Human, int, ZipArchive> OnPostCoordinateReload =
             (human, type, _) => Plugin.Instance.Log.LogDebug($"Post Coordinate Reload: {human.name}/{type}");
     }
-    [BepInProcess(Process)]
-    [BepInPlugin(Guid, Name, Version)]
     public partial class Plugin : BasePlugin
     {
         public const string Process = "DigitalCraft";
-        public const string Guid = $"{Process}.{Name}";
-        private Harmony Patch;
-        public override void Load() =>
-            (Instance, Patch) = (this, Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks"));
-        public override bool Unload() =>
-            true.With(Patch.UnpatchSelf) && base.Unload();
     }
 }

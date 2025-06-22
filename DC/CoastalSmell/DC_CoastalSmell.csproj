@@ -51,6 +51,10 @@
 			<HintPath>$(GamePath)\BepInEx\$(GameName)\interop\Unity.TextMeshPro.dll</HintPath>
 			<Private>False</Private>
 		</Reference>
+		<Reference Include="UnityEngine.ImageConversionModule">
+			<HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UnityEngine.ImageConversionModule.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
 		<Reference Include="UniRx">
 			<HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UniRx.dll</HintPath>
 			<Private>False</Private>
@@ -65,6 +69,10 @@
 		</Reference>
 		<Reference Include="IL">
 			<HintPath>$(GamePath)\BepInEx\$(GameName)\interop\IL.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="BepinEx.KeyboardShortcut">
+			<HintPath>$(GamePath)\BepInEx\plugins\ConfigurationManager\BepinEx.KeyboardShortcut.dll</HintPath>
 			<Private>False</Private>
 		</Reference>
 	</ItemGroup>
