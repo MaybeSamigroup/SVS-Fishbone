@@ -138,15 +138,21 @@ namespace CoastalSmell
             return false;
         }
         public static Func<T> Constant<T>(T value) => () => value;
-        public static Func<I,O> Constant<I, O>(this Action<I> f, O value) =>
+        public static Func<I, O> Constant<I, O>(this Action<I> f, O value) =>
             i => value.With(f.Apply(i));
         public static Action DoNothing = () => { };
         public static Func<Action, T, Action> Accumulate<T>(Action<T> action) =>
             (actions, value) => actions += action.Apply(value);
-        public static IEnumerable<Tuple<int, T>> Index<T>(IEnumerable<T> values) =>
-            values.Select<T, Tuple<int, T>>((v, i) => new(i, v));
+        public static IEnumerable<Tuple<T, int>> Index<T>(IEnumerable<T> values) =>
+            values.Select<T, Tuple<T, int>>((v, i) => new(v, i));
         public static void ForEach<T>(this IEnumerable<T> values, Action<T> action) =>
             values.Aggregate(DoNothing, Accumulate(action))();
+        public static void ForEachIndex<T>(this IEnumerable<T> values, Action<T, int> action) =>
+            Index(values).Aggregate(DoNothing, Accumulate<Tuple<T, int>>(tuple => action(tuple.Item1, tuple.Item2)))();
+        public static Dictionary<K, V> ToDictionary<K, V>(this IEnumerable<Tuple<K, V>> tuples) =>
+            tuples.ToDictionary(item => item.Item1, item => item.Item2);
+        public static Dictionary<K, V> ToDictionary<K, V>(this IEnumerable<KeyValuePair<K, V>> tuples) =>
+            tuples.ToDictionary(item => item.Key, item => item.Value);
     }
     public class WindowHandle
     {
@@ -447,7 +453,7 @@ namespace CoastalSmell
                                     Cmp(Image(color: new(1, 1, 1, 1), sprite: ColorBg)) + Cmp(RtFill) +
                                     Cmp<RectTransform, Scrollbar>((rt, ui) => ui.handleRect = rt)))))
                         .transform))
-                    .With(Cmp(Image(color: new(0.7f, 0.7f, 0.7f, 0.7f), sprite: ColorBg)))
+                    .With(Cmp(Image(color: new(0.5f, 0.5f, 0.5f, 0.7f), sprite: ColorBg)))
                     .With(Cmp(Rt(
                         sizeDelta: new(width - 16, height),
                         anchorMin: new(0, 1),

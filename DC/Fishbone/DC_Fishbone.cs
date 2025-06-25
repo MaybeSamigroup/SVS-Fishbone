@@ -62,7 +62,7 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(Human), nameof(Human.Create))]
         static void HumanCreatePostfix(Human __result) =>
-            LoadStack = (LoadStack - 1).With(Event.NotifyPostDeserialize.Apply(__result));
+            LoadStack = (LoadStack - 1).With(Util.DoNextFrame.Apply(Event.NotifyPostDeserialize.Apply(__result)));
         /// <summary>
         /// capture human reloading complete. (Before 2.1.0)
         /// only notified to listeners when human data updated.
@@ -103,7 +103,7 @@ namespace Fishbone
         [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), [])]
         static void HumanReloadCoordinatePostfix(Human __instance) =>
             (LoadStack == 0).Maybe(Event.NotifyPostCoordinateReload.Apply(__instance));
-        internal static Action Initialize => InitializeCoordLimits; 
+        internal static Action Initialize => InitializeCoordLimits;
     }
     public static partial class Event
     {

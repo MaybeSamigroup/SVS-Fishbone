@@ -189,7 +189,7 @@ namespace Fishbone
         /// switching human data copy actions
         /// </summary>
         internal static Action Initialize =>
-            InitializeCoordLimits + InitializeHookSwitch; 
+            InitializeCoordLimits + InitializeHookSwitch;
         static Action InitializeHookSwitch =
             () => Util<HumanCustom>.Hook(SwitchToCustom, SwitchToSimulation);
     }
@@ -258,7 +258,9 @@ namespace Fishbone
         /// <param name="limits"></param>
         /// <param name="bytes"></param>
         internal static Action<Human, CoordLimit, byte[]> NotifyPreCoordinateDeserialize =>
-            (human, limits, bytes) => human.UpdateHuman(bytes.ReferenceExtension(OnPreCoordinateDeserialize.Apply(human).Apply(human.coorde.nowCoordinate).Apply(limits)));
+            (human, limits, bytes) => human.UpdateHuman(bytes
+                .ReferenceExtension(OnPreCoordinateDeserialize.Apply(human)
+                .Apply(human.coorde.nowCoordinate).Apply(limits)));
         /// <summary>
         /// notify complete of coordinate deserialize to listeners
         /// </summary>
@@ -266,7 +268,9 @@ namespace Fishbone
         /// <param name="limits"></param>
         /// <param name="bytes"></param>
         internal static Action<Human, CoordLimit, byte[]> NotifyPostCoordinateDeserialize =>
-            (human, limits, bytes) => human.UpdateHuman(bytes.ReferenceExtension(OnPostCoordinateDeserialize.Apply(human).Apply(human.coorde.nowCoordinate).Apply(limits)));
+            (human, limits, bytes) => human.UpdateHuman(bytes
+                .ReferenceExtension(OnPostCoordinateDeserialize.Apply(human)
+                .Apply(human.coorde.nowCoordinate).Apply(limits)));
         /// <summary>
         /// notify begining of coordinate reload
         /// </summary>
@@ -363,7 +367,7 @@ namespace Fishbone
         public static void ReferenceExtension(this Human human, Action<ZipArchive> action) =>
             (human.ToActor(out var actor) ? actor.ToExtension() : CustomExtension).ReferenceExtension(action);
 
-       /// <summary>
+        /// <summary>
         /// do extension update operation and store back resulting extension.
         /// </summary>
         /// <param name="data">save data actor hich associated with extension</param>
@@ -478,7 +482,8 @@ namespace Fishbone
             NotifyPreActorHumanize(Game.Charas._entries.First(entry => entry.value.IsPC).value);
         static Action<SaveData.Actor, Human> NotifyPostActorHumanize =>
             (actor, human) => ((OnCoordinateTypeChange, OnHumanDataCopy) =
-                (OnCoordinateTypeChangeProc, HumanDataCopySkip)).With(Event.NotifyPostActorHumanize.Apply(actor).Apply(human));
+                (OnCoordinateTypeChangeProc, HumanDataCopySkip))
+                    .With(Event.NotifyPostActorHumanize.Apply(actor).Apply(human));
         [HarmonyPostfix]
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(CoordeSelect), nameof(CoordeSelect.CreateHiPoly))]
@@ -492,7 +497,8 @@ namespace Fishbone
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(SaveData.CharaData), nameof(SaveData.CharaData.SetRoot))]
         static void SaveDataCharaDataSetRootPostfix(SaveData.CharaData __instance) =>
-            (__instance.chaCtrl != null).Maybe(NotifyPostActorHumanize.Apply(Game.Charas[__instance.charasGameParam.Index]).Apply(__instance.chaCtrl));
+            (__instance.chaCtrl != null).Maybe(Util.DoNextFrame.Apply(NotifyPostActorHumanize
+                .Apply(Game.Charas[__instance.charasGameParam.Index]).Apply(__instance.chaCtrl)));
         /// <summary>
         /// capture coordinate reload begining
         /// </summary>

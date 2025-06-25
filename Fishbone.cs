@@ -76,7 +76,7 @@ namespace Fishbone
     }
     public static partial class Event
     {
-        static Func<Action<ZipArchive>,Action<MemoryStream>> ForUpdate =
+        static Func<Action<ZipArchive>, Action<MemoryStream>> ForUpdate =
             action => stream => action.ApplyDisposable(new ZipArchive(stream, ZipArchiveMode.Update)).Try(Plugin.Instance.Log.LogError);
         static Action<byte[], MemoryStream> WriteAllBytes =
             (bytes, stream) => stream.Write(bytes.Length > 0 ? bytes : NoExtension);
