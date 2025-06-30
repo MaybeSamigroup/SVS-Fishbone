@@ -8,8 +8,10 @@ namespace CoastalSmell
 {
     public static partial class Util
     {
+        static Func<bool> CustomHumanReady =
+            () => HumanCustom.Instance.Human != null;
         public static Action<Action> OnCustomHumanReady =
-            action => (HumanCustom.Instance.Human == null).Either(action, F.Apply(DoNextFrame, OnCustomHumanReady.Apply(action)));
+            action => DoOnCondition(CustomHumanReady, action);
     }
     public static partial class UGUI
     {
