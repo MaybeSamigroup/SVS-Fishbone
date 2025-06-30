@@ -1,6 +1,12 @@
 # SVS-Fishbone
 
+## Fishbone
+
 Plugin API to serialize and deserialize character or coordinate-bound extension data, for SamabakeScramble and DigitalCraft.
+
+## CoastalSmell
+
+Plugin API to generate UnityUI component in runtime and syntax suggers, for SamabakeScramble and DigitalCraft.
 
 ## Prerequisites (SVS)
 
