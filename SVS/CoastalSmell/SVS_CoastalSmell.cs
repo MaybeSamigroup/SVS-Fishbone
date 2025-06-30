@@ -1,6 +1,7 @@
 using BepInEx.Unity.IL2CPP;
 using System;
 using UnityEngine;
+using Cysharp.Threading.Tasks;
 using CharacterCreation;
 using ThumbnailColor = ILLGames.Unity.UI.ColorPicker.ThumbnailColor;
 
@@ -8,10 +9,12 @@ namespace CoastalSmell
 {
     public static partial class Util
     {
-        static Func<bool> CustomHumanReady =
-            () => HumanCustom.Instance.Human != null;
+        public static Action<Action> DoNextFrame =
+            action => UniTask.NextFrame().ContinueWith(action);
         public static Action<Action> OnCustomHumanReady =
             action => DoOnCondition(CustomHumanReady, action);
+        static Func<bool> CustomHumanReady =
+            () => HumanCustom.Instance.Human != null;
     }
     public static partial class UGUI
     {

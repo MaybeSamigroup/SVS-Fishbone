@@ -19,14 +19,14 @@ using ScreenMatchMode = UnityEngine.UI.CanvasScaler.ScreenMatchMode;
 
 namespace CoastalSmell
 {
+
     public static partial class Util
     {
-        public static Action<Action> DoNextFrame =
-            action => UniTask.NextFrame().ContinueWith(action);
-        public static Action<Func<bool>, Action> DoOnCondition =
+         public static Action<Func<bool>, Action> DoOnCondition =
             (predicate, action) => predicate()
                 .Either(DoNextFrame.Apply(DoOnCondition.Apply(predicate).Apply(action)), action);
     }
+
     public static class Util<T> where T : SingletonInitializer<T>
     {
         static readonly Il2CppSystem.Threading.CancellationTokenSource Canceler = new();

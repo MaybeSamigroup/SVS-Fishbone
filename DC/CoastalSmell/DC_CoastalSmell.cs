@@ -6,6 +6,12 @@ using UniRx;
 
 namespace CoastalSmell
 {
+    public static partial class Util
+    {
+        public static Action<Action> DoNextFrame =
+            action => Observable.NextFrame().Subscribe(action.Ignoring<Unit>());
+    }
+
     public static partial class UGUI
     {
         static Action<Unit> ColorPaletteSetup(string name, Func<Color> getColor, Action<Color> setColor, bool useAlpha, bool autoOpen) =>
