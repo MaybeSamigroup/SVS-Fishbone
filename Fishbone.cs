@@ -301,7 +301,7 @@ namespace Fishbone
     {
         public const string Guid = $"{Process}.{Name}";
         public const string Name = "Fishbone";
-        public const string Version = "2.0.2";
+        public const string Version = "2.1.0";
         internal static Plugin Instance;
         private Harmony Patch;
         public override void Load() =>
