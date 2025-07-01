@@ -210,6 +210,7 @@ namespace CoastalSmell
         ConfigEntry<KeyboardShortcut> Shortcut;
         ConfigEntry<bool> State;
         public TextMeshProUGUI Title;
+        public CompositeDisposable Disposables;
         public WindowHandle(BasePlugin plugin, string prefix, Vector2 anchor, KeyboardShortcut shortcut, bool visible = false) =>
             (AnchorX, AnchorY, Shortcut, State) = (
                 plugin.Config.Bind("UI", $"{prefix} window anchor X", anchor.x),
@@ -221,10 +222,16 @@ namespace CoastalSmell
             _ => Shortcut.Value.IsDown().Maybe(F.Apply(Toggle, go));
         Action<Unit> ToUpdate(RectTransform ui) =>
             _ => (AnchorX.Value, AnchorY.Value) = (ui.anchoredPosition.x, ui.anchoredPosition.y);
-        public void Apply(GameObject go) => go
+        void PrepareDisposable(GameObject go) =>
+            Disposables = new CompositeDisposable(Disposable.Create(F.Apply(UnityEngine.Object.Destroy, go)));
+        public void Apply(GameObject go) => go.With(PrepareDisposable)
             .With(UGUI.ModifyAt("Title", "Label")(UGUI.Cmp<TextMeshProUGUI>(ui => Title = ui)))
             .With(UGUI.Go(active: State.Value)).GetComponentInParent<ObservableUpdateTrigger>()
-                .UpdateAsObservable().Subscribe(ToUpdate(go) + ToUpdate(go.GetComponent<RectTransform>()));
+                .UpdateAsObservable().Subscribe(ToUpdate(go) + ToUpdate(go.GetComponent<RectTransform>()))
+                .With(Disposables.Add);
+        public void Dispose() =>
+            Disposables.With(Disposables.Dispose).Clear();
+
         public static implicit operator bool(WindowHandle handle) =>
             handle.State.Value;
         public static implicit operator Vector2(WindowHandle handle) =>
@@ -710,7 +717,7 @@ namespace CoastalSmell
         internal static BepInEx.Logging.ManualLogSource Logger;
         public const string Guid = $"{Process}.{Name}";
         public const string Name = "CoastalSmell";
-        public const string Version = "1.0.0";
+        public const string Version = "1.0.1";
         public override void Load() => (Logger = Log).With(Sprites.Initialize).With(UGUI.Initialize);
     }
 }
