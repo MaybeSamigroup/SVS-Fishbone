@@ -12,9 +12,7 @@ namespace CoastalSmell
         public static Action<Action> DoNextFrame =
             action => UniTask.NextFrame().ContinueWith(action);
         public static Action<Action> OnCustomHumanReady =
-            action => DoOnCondition(CustomHumanReady, action);
-        static Func<bool> CustomHumanReady =
-            () => HumanCustom.Instance.Human != null;
+            action => DoOnCondition(() => HumanCustom.Instance?.Human != null, action);
     }
     public static partial class UGUI
     {

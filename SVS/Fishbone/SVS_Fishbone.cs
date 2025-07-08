@@ -153,11 +153,21 @@ namespace Fishbone
         /// <param name="dst"></param>
         /// <param name="src"></param>
         /// <returns>action to do when reloading complete</returns>
-        static Action<Human> HumanDataCopyProc(HumanData dst, HumanData src) =>
+        static Func<HumanData, HumanData, Action<Human>> HumanDataCopyProc = (dst, src) =>
             src == HumanCustom.Instance?.DefaultData ? Event.NotifyCharacterInitialize(dst) :
             src == HumanCustom.Instance?.Received?.HumanData ? Event.NotifyActorDeserializeToCharacter(dst) :
             dst == HumanCustom.Instance?.EditHumanData ? DoNothing.With(Event.NotifyCharacterSerializeToActor.Apply(src)) : DoNothing;
         static Func<HumanData, HumanData, Action<Human>> OnHumanDataCopy = HumanDataCopySkip;
+        /// <summary>
+        /// capture character card loading caused by Character Creation scene loading or resetting.
+        /// </summary>
+        /// <param name="dst"></param>
+        /// <param name="src"></param>
+        [HarmonyPostfix]
+        [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanData), nameof(HumanData.Copy))]
+        static void HumanDataCopyPostfix(HumanData dst, HumanData src) =>
+            OnHumanReloading = OnHumanDataCopy(dst, src);
         /// <summary>
         /// capture character card loading caused by file selection.
         /// </summary>
@@ -169,22 +179,12 @@ namespace Fishbone
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.CopyLimited))]
         static void HumanDataCopyLimitedPrefix(HumanData dst, HumanData src, CharaLimit flags) =>
             OnHumanReloading = Event.NotifyCharacterDeserialize(dst, flags, src.Extract(CharaExtension));
-        /// <summary>
-        /// capture character card loading caused by Character Creation scene loading or resetting.
-        /// </summary>
-        /// <param name="dst"></param>
-        /// <param name="src"></param>
-        [HarmonyPostfix]
-        [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(HumanData), nameof(HumanData.Copy))]
-        static void HumanDataCopyPostfix(HumanData dst, HumanData src) =>
-            OnHumanReloading = OnHumanDataCopy(dst, src);
         static Action SwitchToCustom = () =>
             (OnHumanDataCopy, OnCoordinateTypeChange, OnCoordinateTypeChangeProc) =
-             (HumanDataCopyProc, OnCoordinateTypeChangeSkip, OnCoordinateTypeChangeSkip);
+            (HumanDataCopyProc, OnCoordinateTypeChangeSkip, OnCoordinateTypeChangeSkip);
         static Action SwitchToSimulation = () =>
             (OnHumanDataCopy, OnCoordinateTypeChange, OnCoordinateTypeChangeProc) =
-             (HumanDataCopySkip, Event.NotifyPreActorCoordinateReload, Event.NotifyPreActorCoordinateReload);
+            (HumanDataCopySkip, Event.NotifyPreActorCoordinateReload, Event.NotifyPreActorCoordinateReload);
         /// <summary>
         /// switching human data copy actions
         /// </summary>
@@ -195,6 +195,14 @@ namespace Fishbone
     }
     public static partial class Event
     {
+        public static void HumanCustomReload() =>
+            NotifyCharacterDeserialize(HumanCustom.Instance.Human.data, CharaLimit.All, CustomExtension)
+                .With(HumanCustom.Instance.Human.Load).With(ResetMotionIK).With(ResetAnimation)(HumanCustom.Instance.Human);
+        static void ResetMotionIK() =>
+            HumanCustom.Instance._motionIK = new ILLGames.Rigging
+                .MotionIK(HumanCustom.Instance.Human, HumanCustom.Instance._motionIK._data);
+        static void ResetAnimation() =>
+            HumanCustom.Instance.LoadPlayAnimation(HumanCustom.Instance.NowPose, new() { value = 0.0f }); 
         /// <summary>
         /// storage in game actor edited in Character Creation
         /// </summary>

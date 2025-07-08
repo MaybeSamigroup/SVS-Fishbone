@@ -5,6 +5,10 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
+using System.Text.Json;
+using System.Text.Unicode;
+using System.Text.Encodings.Web;
+using System.Text.Json.Serialization;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -19,24 +23,39 @@ using ScreenMatchMode = UnityEngine.UI.CanvasScaler.ScreenMatchMode;
 
 namespace CoastalSmell
 {
-
     public static partial class Util
     {
-         public static Action<Func<bool>, Action> DoOnCondition =
+        internal static readonly JsonSerializerOptions JsonOpts = new()
+        {
+            Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
+            NumberHandling =
+                JsonNumberHandling.WriteAsString |
+                JsonNumberHandling.AllowReadingFromString |
+                JsonNumberHandling.AllowNamedFloatingPointLiterals,
+            AllowTrailingCommas = true,
+            ReadCommentHandling = JsonCommentHandling.Skip,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
+        };
+        public static Action<Func<bool>, Action> DoOnCondition =
             (predicate, action) => predicate()
                 .Either(DoNextFrame.Apply(DoOnCondition.Apply(predicate).Apply(action)), action);
     }
-
+    public static class Json<T>
+    {
+        public static Func<Stream, T> Deserialize =
+            (stream) => JsonSerializer.Deserialize<T>(stream, Util.JsonOpts);
+        public static Action<T, Stream> Serialize =
+            (data, stream) => JsonSerializer.Serialize(stream, data, Util.JsonOpts);
+    }
     public static class Util<T> where T : SingletonInitializer<T>
     {
-        static readonly Il2CppSystem.Threading.CancellationTokenSource Canceler = new();
         static Action<Action, Action> AwaitStartup = (onStartup, onDestroy) =>
             Util.DoNextFrame.With(onDestroy)(Hook.Apply(onStartup).Apply(onDestroy));
         static Action<Action, Action> AwaitDestroy = (onStartup, onDestroy) =>
             SingletonInitializer<T>.Instance.With(onStartup).OnDestroyAsObservable()
                 .Subscribe(AwaitStartup.Apply(onStartup).Apply(onDestroy).Ignoring<Unit>());
         public static Action<Action, Action> Hook = (onStartup, onDestroy) =>
-             SingletonInitializer<T>.WaitUntilSetup(Canceler.Token)
+            SingletonInitializer<T>.WaitUntilSetup(Il2CppSystem.Threading.CancellationToken.None)
                 .ContinueWith(AwaitDestroy.Apply(onStartup).Apply(onDestroy));
     }
     /// <summary>
@@ -147,16 +166,27 @@ namespace CoastalSmell
         public static Action DoNothing = () => { };
         public static Func<Action, T, Action> Accumulate<T>(Action<T> action) =>
             (actions, value) => actions += action.Apply(value);
-        public static IEnumerable<Tuple<T, int>> Index<T>(IEnumerable<T> values) =>
+        public static IEnumerable<Tuple<T, int>> Index<T>(this IEnumerable<T> values) =>
             values.Select<T, Tuple<T, int>>((v, i) => new(v, i));
         public static void ForEach<T>(this IEnumerable<T> values, Action<T> action) =>
             values.Aggregate(DoNothing, Accumulate(action))();
+        public static void ForEach<K,V>(this IEnumerable<Tuple<K,V>> values, Action<K,V> action) =>
+            values.Aggregate(DoNothing, Accumulate<Tuple<K,V>>(entry => action(entry.Item1, entry.Item2)))();
+        public static void ForEach<K,V>(this IEnumerable<KeyValuePair<K,V>> values, Action<K,V> action) =>
+            values.Aggregate(DoNothing, Accumulate<KeyValuePair<K,V>>(entry => action(entry.Key, entry.Value)))();
         public static void ForEachIndex<T>(this IEnumerable<T> values, Action<T, int> action) =>
             Index(values).Aggregate(DoNothing, Accumulate<Tuple<T, int>>(tuple => action(tuple.Item1, tuple.Item2)))();
         public static Dictionary<K, V> ToDictionary<K, V>(this IEnumerable<Tuple<K, V>> tuples) =>
             tuples.ToDictionary(item => item.Item1, item => item.Item2);
         public static Dictionary<K, V> ToDictionary<K, V>(this IEnumerable<KeyValuePair<K, V>> tuples) =>
             tuples.ToDictionary(item => item.Key, item => item.Value);
+        public static IEnumerable<Tuple<K, V>> Yield<K, V>(this Il2CppSystem.Collections.Generic.Dictionary<K, V> items)
+        {
+            foreach (var (k, v) in items)
+            {
+                yield return new(k, v);
+            }
+        }
     }
     enum SimpleSprites
     {
@@ -242,22 +272,28 @@ namespace CoastalSmell
         GameObject View;
         Toggle State;
         TextMeshProUGUI Text;
+        public string[] Options { get; init; }
         public ChoiceList(float width, float height, string name, params string[] values) =>
             View = UGUI.ScrollView(width, height * Math.Min(8, values.Length), name, UGUI.RootCanvas.gameObject)
                 .With(UGUI.Cmp(UGUI.LayoutGroup<VerticalLayoutGroup>()))
                 .With(UGUI.Cmp(UGUI.ToggleGroup(allowSwitchOff: false)))
                 .With(UGUI.Cmp(UGUI.Fitter()))
-                .With(PopulateList(width, height, values))
+                .With(PopulateList(width, height, Options = values))
                 .transform.parent.parent.gameObject
                 .With(UGUI.Cmp<LayoutElement>(UnityEngine.Object.Destroy))
+                .With(UGUI.Cmp<ObservablePointerExitTrigger>(ObserveCancel))
                 .With(UGUI.Cmp(UGUI.Rt(sizeDelta: new(width, height * Math.Min(8, values.Length)))))
                 .With(UGUI.Go(active: false));
-        Action<GameObject> PopulateList(float width, float height, string[] values) =>
+        Action <GameObject> PopulateList(float width, float height, string[] values) =>
             parent => values.ForEach(value =>
                 UGUI.Toggle(width, height, value, parent)
                     .With(UGUI.Cmp<Toggle, ToggleGroup>((ui, group) => ui.group = group))
                     .GetComponent<Toggle>().OnPointerClickAsObservable()
                     .Subscribe(OnComplete(value)));
+        void ObserveCancel(ObservablePointerExitTrigger trigger) =>
+            trigger.OnPointerExitAsObservable().Subscribe(OnCancel);
+        Action<UnityEngine.EventSystems.PointerEventData> OnCancel => _ =>
+            (State != null && Text != null).Maybe(Cancel);
         Action<UnityEngine.EventSystems.PointerEventData> OnComplete(string value) =>
             state => (state.button == 0).Maybe(F.Apply(Complete, value));
         void Complete(string value) =>
@@ -270,11 +306,8 @@ namespace CoastalSmell
                 .With(F.Apply(View.SetActive, false))
                 .With(F.Apply(State.Set, false, false))();
         public void Assign(GameObject go) =>
-            go.With(UGUI.Cmp<ObservableEnableTrigger>(ui => ui.OnDisableAsObservable().Subscribe(OnCancel)))
-                .GetComponent<Toggle>().OnValueChangedAsObservable().Subscribe(OnValueChanged(go));
-        Action<Unit> OnCancel => _ =>
-            (State != null && Text != null).Maybe(Cancel);
-        Action<bool> OnValueChanged(GameObject go) =>
+            go.GetComponent<Toggle>().OnValueChangedAsObservable().Subscribe(OnOpenChoce(go));
+        Action<bool> OnOpenChoce(GameObject go) =>
             value => value.Maybe(F.Apply(OpenChoice, go));
         void OpenChoice(GameObject go) =>
             Relocate(View.With(UGUI.Go(active: true)).GetComponent<RectTransform>(),
@@ -282,9 +315,12 @@ namespace CoastalSmell
                     (UGUI.Cmp<TextMeshProUGUI, Toggle>(Targets))).GetComponent<RectTransform>());
         Action CloseChoice =>
             () => (State, Text) = (null, null);
-        void Relocate(RectTransform view, RectTransform ui) =>
-            view.position = ui.position + new Vector3(
-                (view.rect.width - ui.rect.width) / 2, -view.rect.height / 2 - ui.rect.height * 2, 0);
+        void Relocate(RectTransform view, RectTransform item) =>
+            view.position = item.position + Relocate(
+                view.TransformVector(new Vector3(view.rect.width, view.rect.height, 0)),
+                item.TransformVector(new Vector3(item.rect.width, item.rect.height, 0)));
+        Vector3 Relocate(Vector3 view, Vector3 item) =>
+            new((view.x - item.x) / 2, - (view.y + item.y) / 2, 0);
         void Targets(TextMeshProUGUI text, Toggle toggle) =>
             (State, Text) = (toggle, text.With(Initialize));
         void Initialize(TextMeshProUGUI text) =>
@@ -327,7 +363,7 @@ namespace CoastalSmell
             go => action(go.GetComponent<U>(), go.GetComponentInParent<T>(true));
         public static Action<T> Behavior<T>(bool? enabled) where T : Behaviour => ui => ui.enabled = enabled ?? ui.enabled;
         public static Action<Canvas> Canvas(RenderMode? renderMode = RenderMode.ScreenSpaceOverlay) => ui =>
-            ui.renderMode = renderMode ?? ui.renderMode;
+            (ui.renderMode, ui.sortingOrder) = (renderMode ?? ui.renderMode, 1);
         public static Action<CanvasScaler> CanvasScaler(
             Vector2? referenceResolution = null,
             ScaleMode? scaleMode = ScaleMode.ScaleWithScreenSize,
@@ -426,7 +462,8 @@ namespace CoastalSmell
             childAlignment ?? ui.childAlignment
         );
         public static Action<LayoutElement> Layout(float? width = null, float? height = null) =>
-            ui => (ui.preferredWidth, ui.preferredHeight) = (width ?? ui.preferredWidth, height ?? ui.preferredHeight);
+            ui => (ui.preferredWidth, ui.preferredHeight) =
+                (ui.minWidth = width ?? ui.preferredWidth, ui.minHeight = height ?? ui.preferredHeight);
         public static Action<ContentSizeFitter> Fitter(
             ContentSizeFitter.FitMode horizontal = ContentSizeFitter.FitMode.PreferredSize,
             ContentSizeFitter.FitMode vertical = ContentSizeFitter.FitMode.PreferredSize) =>
