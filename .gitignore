@@ -1,4 +1,4 @@
-*/GameRoot/BepinEx/plugins/
+**/*.dll
 obj/
 bin/
 *.sln

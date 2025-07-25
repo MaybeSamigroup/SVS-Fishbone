@@ -1,14 +1,7 @@
-using BepInEx;
-using BepInEx.Unity.IL2CPP;
-using BepInEx.Configuration;
 using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
-using System.Text.Json;
-using System.Text.Unicode;
-using System.Text.Encodings.Web;
-using System.Text.Json.Serialization;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -16,178 +9,13 @@ using UniRx;
 using UniRx.Triggers;
 using Cysharp.Threading.Tasks;
 using ILLGames.Unity.UI;
-using ILLGames.Unity.Component;
 using ILLGames.Unity.UI.ColorPicker;
 using ScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode;
 using ScreenMatchMode = UnityEngine.UI.CanvasScaler.ScreenMatchMode;
+using BepInEx;
 
 namespace CoastalSmell
 {
-    public static partial class Util
-    {
-        internal static readonly JsonSerializerOptions JsonOpts = new()
-        {
-            Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
-            NumberHandling =
-                JsonNumberHandling.WriteAsString |
-                JsonNumberHandling.AllowReadingFromString |
-                JsonNumberHandling.AllowNamedFloatingPointLiterals,
-            AllowTrailingCommas = true,
-            ReadCommentHandling = JsonCommentHandling.Skip,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
-        };
-        public static Action<Func<bool>, Action> DoOnCondition =
-            (predicate, action) => predicate()
-                .Either(DoNextFrame.Apply(DoOnCondition.Apply(predicate).Apply(action)), action);
-    }
-    public static class Json<T>
-    {
-        public static Func<Stream, T> Deserialize =
-            (stream) => JsonSerializer.Deserialize<T>(stream, Util.JsonOpts);
-        public static Action<T, Stream> Serialize =
-            (data, stream) => JsonSerializer.Serialize(stream, data, Util.JsonOpts);
-    }
-    public static class Util<T> where T : SingletonInitializer<T>
-    {
-        static Action<Action, Action> AwaitStartup = (onStartup, onDestroy) =>
-            Util.DoNextFrame.With(onDestroy)(Hook.Apply(onStartup).Apply(onDestroy));
-        static Action<Action, Action> AwaitDestroy = (onStartup, onDestroy) =>
-            SingletonInitializer<T>.Instance.With(onStartup).OnDestroyAsObservable()
-                .Subscribe(AwaitStartup.Apply(onStartup).Apply(onDestroy).Ignoring<Unit>());
-        public static Action<Action, Action> Hook = (onStartup, onDestroy) =>
-            SingletonInitializer<T>.WaitUntilSetup(Il2CppSystem.Threading.CancellationToken.None)
-                .ContinueWith(AwaitDestroy.Apply(onStartup).Apply(onDestroy));
-    }
-    /// <summary>
-    /// functional utilities for favor
-    /// </summary>
-    public static class F
-    {
-        public static void Either(this bool value, Action a1, Action a2) => (value ? a2 : a1)();
-        public static void Maybe(this bool value, Action action) => value.Either(DoNothing, action);
-        public static Action Ignoring<O>(this Func<O> f) =>
-            () => f();
-        public static Action<I1> Ignoring<I1>(this Action action) =>
-            _ => action();
-        public static Action Apply<I1>(this Action<I1> action, I1 i1) =>
-            () => action(i1);
-        public static Action Apply<I1, I2>(this Action<I1, I2> action, I1 i1, I2 i2) =>
-            () => action(i1, i2);
-        public static Action Apply<I1, I2, I3>(this Action<I1, I2, I3> action, I1 i1, I2 i2, I3 i3) =>
-            () => action(i1, i2, i3);
-        public static Action Apply<I1, I2, I3, I4>(this Action<I1, I2, I3, I4> action, I1 i1, I2 i2, I3 i3, I4 i4) =>
-            () => action(i1, i2, i3, i4);
-        public static Action Apply<I1, I2, I3, I4, I5>(this Action<I1, I2, I3, I4, I5> action, I1 i1, I2 i2, I3 i3, I4 i4, I5 i5) =>
-            () => action(i1, i2, i3, i4, i5);
-        public static Action<I2> Apply<I1, I2>(this Action<I1, I2> action, I1 i1) =>
-            (i2) => action(i1, i2);
-        public static Action<I2, I3> Apply<I1, I2, I3>(this Action<I1, I2, I3> action, I1 i1) =>
-            (i2, i3) => action(i1, i2, i3);
-        public static Action<I2, I3, I4> Apply<I1, I2, I3, I4>(this Action<I1, I2, I3, I4> action, I1 i1) =>
-            (i2, i3, i4) => action(i1, i2, i3, i4);
-        public static Action<I2, I3, I4, I5> Apply<I1, I2, I3, I4, I5>(this Action<I1, I2, I3, I4, I5> action, I1 i1) =>
-            (i2, i3, i4, i5) => action(i1, i2, i3, i4, i5);
-        public static Action ApplyDisposable<I1>(this Action<I1> action, I1 i1) where I1 : IDisposable =>
-            () => { using (i1) { action(i1); } };
-        public static Action<I2> ApplyDisposable<I1, I2>(this Action<I1, I2> action, I1 i1) where I1 : IDisposable =>
-            (i2) => { using (i1) { action(i1, i2); } };
-        public static Action<I2, I3> ApplyDisposable<I1, I2, I3>(this Action<I1, I2, I3> action, I1 i1) where I1 : IDisposable =>
-            (i2, i3) => { using (i1) { action(i1, i2, i3); } };
-        public static Action<I2, I3, I4> ApplyDisposable<I1, I2, I3, I4>(this Action<I1, I2, I3, I4> action, I1 i1) where I1 : IDisposable =>
-            (i2, i3, i4) => { using (i1) { action(i1, i2, i3, i4); } };
-        public static Action<I2, I3, I4, I5> ApplyDisposable<I1, I2, I3, I4, I5>(this Action<I1, I2, I3, I4, I5> action, I1 i1) where I1 : IDisposable =>
-            (i2, i3, i4, i5) => { using (i1) { action(i1, i2, i3, i4, i5); } };
-        public static Func<O> Apply<I1, O>(this Func<I1, O> f, I1 i1) =>
-            () => f(i1);
-        public static Func<O> Apply<I1, I2, O>(this Func<I1, I2, O> f, I1 i1, I2 i2) =>
-            () => f(i1, i2);
-        public static Func<O> Apply<I1, I2, I3, O>(this Func<I1, I2, I3, O> f, I1 i1, I2 i2, I3 i3) =>
-            () => f(i1, i2, i3);
-        public static Func<O> Apply<I1, I2, I3, I4, O>(this Func<I1, I2, I3, I4, O> f, I1 i1, I2 i2, I3 i3, I4 i4) =>
-            () => f(i1, i2, i3, i4);
-        public static Func<O> Apply<I1, I2, I3, I4, I5, O>(this Func<I1, I2, I3, I4, I5, O> f, I1 i1, I2 i2, I3 i3, I4 i4, I5 i5) =>
-            () => f(i1, i2, i3, i4, i5);
-        public static Func<I2, O> Apply<I1, I2, O>(this Func<I1, I2, O> f, I1 i1) =>
-            (i2) => f(i1, i2);
-        public static Func<I2, I3, O> Apply<I1, I2, I3, O>(this Func<I1, I2, I3, O> f, I1 i1) =>
-            (i2, i3) => f(i1, i2, i3);
-        public static Func<I2, I3, I4, O> Apply<I1, I2, I3, I4, O>(this Func<I1, I2, I3, I4, O> f, I1 i1) =>
-            (i2, i3, i4) => f(i1, i2, i3, i4);
-        public static Func<I2, I3, I4, I5, O> Apply<I1, I2, I3, I4, I5, O>(this Func<I1, I2, I3, I4, I5, O> f, I1 i1) =>
-            (i2, i3, i4, i5) => f(i1, i2, i3, i4, i5);
-        public static Func<O> ApplyDisposable<I1, O>(this Func<I1, O> f, I1 i1) where I1 : IDisposable =>
-            () => { using (i1) { return f(i1); } };
-        public static Func<I2, O> ApplyDisposable<I1, I2, O>(this Func<I1, I2, O> f, I1 i1) where I1 : IDisposable =>
-           (i2) => { using (i1) { return f(i1, i2); } };
-        public static Func<I2, I3, O> ApplyDisposable<I1, I2, I3, O>(this Func<I1, I2, I3, O> f, I1 i1) where I1 : IDisposable =>
-            (i2, i3) => { using (i1) { return f(i1, i2, i3); } };
-        public static Func<I2, I3, I4, O> ApplyDisposable<I1, I2, I3, I4, O>(this Func<I1, I2, I3, I4, O> f, I1 i1) where I1 : IDisposable =>
-            (i2, i3, i4) => { using (i1) { return f(i1, i2, i3, i4); } };
-        public static Func<I2, I3, I4, I5, O> ApplyDisposable<I1, I2, I3, I4, I5, O>(this Func<I1, I2, I3, I4, I5, O> f, I1 i1) where I1 : IDisposable =>
-            (i2, i3, i4, i5) => { using (i1) { return f(i1, i2, i3, i4, i5); } };
-        public static T With<T>(this T value, Action<T> action) => value.With(action.Apply(value));
-        public static T With<T, U>(this T value, Func<T, U> f) => value.With(f.Apply(value).Ignoring());
-        public static T With<T>(this T value, Action action)
-        {
-            action();
-            return value;
-        }
-        public static void Try(this Action action, Action<string> log)
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception e)
-            {
-                log(e.Message);
-                log(e.StackTrace);
-            }
-        }
-        public static bool Try<T>(this Func<T> f, Action<string> log, out T value)
-        {
-            try
-            {
-                value = f();
-                return true;
-            }
-            catch (Exception e)
-            {
-                log(e.Message);
-                log(e.StackTrace);
-                value = default;
-            }
-            return false;
-        }
-        public static Action Compose<T>(Func<T> get, Action<T> set) => () => set(get());
-        public static Func<T> Constant<T>(T value) => () => value;
-        public static Func<I, O> Constant<I, O>(this Action<I> f, O value) =>
-            i => value.With(f.Apply(i));
-        public static Action DoNothing = () => { };
-        public static Func<Action, T, Action> Accumulate<T>(Action<T> action) =>
-            (actions, value) => actions += action.Apply(value);
-        public static IEnumerable<Tuple<T, int>> Index<T>(this IEnumerable<T> values) =>
-            values.Select<T, Tuple<T, int>>((v, i) => new(v, i));
-        public static void ForEach<T>(this IEnumerable<T> values, Action<T> action) =>
-            values.Aggregate(DoNothing, Accumulate(action))();
-        public static void ForEach<K,V>(this IEnumerable<Tuple<K,V>> values, Action<K,V> action) =>
-            values.Aggregate(DoNothing, Accumulate<Tuple<K,V>>(entry => action(entry.Item1, entry.Item2)))();
-        public static void ForEach<K,V>(this IEnumerable<KeyValuePair<K,V>> values, Action<K,V> action) =>
-            values.Aggregate(DoNothing, Accumulate<KeyValuePair<K,V>>(entry => action(entry.Key, entry.Value)))();
-        public static void ForEachIndex<T>(this IEnumerable<T> values, Action<T, int> action) =>
-            Index(values).Aggregate(DoNothing, Accumulate<Tuple<T, int>>(tuple => action(tuple.Item1, tuple.Item2)))();
-        public static Dictionary<K, V> ToDictionary<K, V>(this IEnumerable<Tuple<K, V>> tuples) =>
-            tuples.ToDictionary(item => item.Item1, item => item.Item2);
-        public static Dictionary<K, V> ToDictionary<K, V>(this IEnumerable<KeyValuePair<K, V>> tuples) =>
-            tuples.ToDictionary(item => item.Key, item => item.Value);
-        public static IEnumerable<Tuple<K, V>> Yield<K, V>(this Il2CppSystem.Collections.Generic.Dictionary<K, V> items)
-        {
-            foreach (var (k, v) in items)
-            {
-                yield return new(k, v);
-            }
-        }
-    }
     enum SimpleSprites
     {
         ToggleBg,
@@ -233,100 +61,6 @@ namespace CoastalSmell
         internal static void Initialize() =>
             Util.DoOnCondition(Ready, Setup);
     }
-    public class WindowHandle
-    {
-        ConfigEntry<float> AnchorX;
-        ConfigEntry<float> AnchorY;
-        ConfigEntry<KeyboardShortcut> Shortcut;
-        ConfigEntry<bool> State;
-        public TextMeshProUGUI Title;
-        public CompositeDisposable Disposables;
-        public WindowHandle(BasePlugin plugin, string prefix, Vector2 anchor, KeyboardShortcut shortcut, bool visible = false) =>
-            (AnchorX, AnchorY, Shortcut, State) = (
-                plugin.Config.Bind("UI", $"{prefix} window anchor X", anchor.x),
-                plugin.Config.Bind("UI", $"{prefix} window anchor Y", anchor.y),
-                plugin.Config.Bind("UI", $"{prefix} window toggle key", shortcut),
-                plugin.Config.Bind("UI", $"{prefix} window visibility", visible));
-        void Toggle(GameObject go) => go.With(UGUI.Go(active: State.Value = !State.Value));
-        Action<Unit> ToUpdate(GameObject go) =>
-            _ => Shortcut.Value.IsDown().Maybe(F.Apply(Toggle, go));
-        Action<Unit> ToUpdate(RectTransform ui) =>
-            _ => (AnchorX.Value, AnchorY.Value) = (ui.anchoredPosition.x, ui.anchoredPosition.y);
-        void PrepareDisposable(GameObject go) =>
-            Disposables = new CompositeDisposable(Disposable.Create(F.Apply(UnityEngine.Object.Destroy, go)));
-        public void Apply(GameObject go) => go.With(PrepareDisposable)
-            .With(UGUI.ModifyAt("Title", "Label")(UGUI.Cmp<TextMeshProUGUI>(ui => Title = ui)))
-            .With(UGUI.Go(active: State.Value)).GetComponentInParent<ObservableUpdateTrigger>()
-                .UpdateAsObservable().Subscribe(ToUpdate(go) + ToUpdate(go.GetComponent<RectTransform>()))
-                .With(Disposables.Add);
-        public void Dispose() =>
-            Disposables.With(Disposables.Dispose).Clear();
-
-        public static implicit operator bool(WindowHandle handle) =>
-            handle.State.Value;
-        public static implicit operator Vector2(WindowHandle handle) =>
-            new(handle.AnchorX.Value, handle.AnchorY.Value);
-    }
-    public class ChoiceList
-    {
-        GameObject View;
-        Toggle State;
-        TextMeshProUGUI Text;
-        public string[] Options { get; init; }
-        public ChoiceList(float width, float height, string name, params string[] values) =>
-            View = UGUI.ScrollView(width, height * Math.Min(8, values.Length), name, UGUI.RootCanvas.gameObject)
-                .With(UGUI.Cmp(UGUI.LayoutGroup<VerticalLayoutGroup>()))
-                .With(UGUI.Cmp(UGUI.ToggleGroup(allowSwitchOff: false)))
-                .With(UGUI.Cmp(UGUI.Fitter()))
-                .With(PopulateList(width, height, Options = values))
-                .transform.parent.parent.gameObject
-                .With(UGUI.Cmp<LayoutElement>(UnityEngine.Object.Destroy))
-                .With(UGUI.Cmp<ObservablePointerExitTrigger>(ObserveCancel))
-                .With(UGUI.Cmp(UGUI.Rt(sizeDelta: new(width, height * Math.Min(8, values.Length)))))
-                .With(UGUI.Go(active: false));
-        Action <GameObject> PopulateList(float width, float height, string[] values) =>
-            parent => values.ForEach(value =>
-                UGUI.Toggle(width, height, value, parent)
-                    .With(UGUI.Cmp<Toggle, ToggleGroup>((ui, group) => ui.group = group))
-                    .GetComponent<Toggle>().OnPointerClickAsObservable()
-                    .Subscribe(OnComplete(value)));
-        void ObserveCancel(ObservablePointerExitTrigger trigger) =>
-            trigger.OnPointerExitAsObservable().Subscribe(OnCancel);
-        Action<UnityEngine.EventSystems.PointerEventData> OnCancel => _ =>
-            (State != null && Text != null).Maybe(Cancel);
-        Action<UnityEngine.EventSystems.PointerEventData> OnComplete(string value) =>
-            state => (state.button == 0).Maybe(F.Apply(Complete, value));
-        void Complete(string value) =>
-            CloseChoice
-                .With(F.Apply(View.SetActive, false))
-                .With(F.Apply(Text.SetText, value, true))
-                .With(F.Apply(State.Set, false, true))();
-        void Cancel() =>
-            CloseChoice
-                .With(F.Apply(View.SetActive, false))
-                .With(F.Apply(State.Set, false, false))();
-        public void Assign(GameObject go) =>
-            go.GetComponent<Toggle>().OnValueChangedAsObservable().Subscribe(OnOpenChoce(go));
-        Action<bool> OnOpenChoce(GameObject go) =>
-            value => value.Maybe(F.Apply(OpenChoice, go));
-        void OpenChoice(GameObject go) =>
-            Relocate(View.With(UGUI.Go(active: true)).GetComponent<RectTransform>(),
-                go.With(UGUI.ModifyAt($"{go.name}.State", $"{go.name}.Label")
-                    (UGUI.Cmp<TextMeshProUGUI, Toggle>(Targets))).GetComponent<RectTransform>());
-        Action CloseChoice =>
-            () => (State, Text) = (null, null);
-        void Relocate(RectTransform view, RectTransform item) =>
-            view.position = item.position + Relocate(
-                view.TransformVector(new Vector3(view.rect.width, view.rect.height, 0)),
-                item.TransformVector(new Vector3(item.rect.width, item.rect.height, 0)));
-        Vector3 Relocate(Vector3 view, Vector3 item) =>
-            new((view.x - item.x) / 2, - (view.y + item.y) / 2, 0);
-        void Targets(TextMeshProUGUI text, Toggle toggle) =>
-            (State, Text) = (toggle, text.With(Initialize));
-        void Initialize(TextMeshProUGUI text) =>
-            View.GetComponentsInChildren<Toggle>()
-                .Where(toggle => toggle.gameObject.name == text.text).First().Set(true, false);
-    }
 
     public static partial class UGUI
     {
@@ -360,7 +94,7 @@ namespace CoastalSmell
         public static Action<GameObject> Cmp<T>(this Action<T> action) where T : Component =>
             go => action(ObservableTriggerExtensions.GetOrAddComponent<T>(go));
         public static Action<GameObject> Cmp<U, T>(Action<U, T> action) where T : Component where U : Component =>
-            go => action(go.GetComponent<U>(), go.GetComponentInParent<T>(true));
+            go => action(ObservableTriggerExtensions.GetOrAddComponent<U>(go), go.GetComponentInParent<T>(true));
         public static Action<T> Behavior<T>(bool? enabled) where T : Behaviour => ui => ui.enabled = enabled ?? ui.enabled;
         public static Action<Canvas> Canvas(RenderMode? renderMode = RenderMode.ScreenSpaceOverlay) => ui =>
             (ui.renderMode, ui.sortingOrder) = (renderMode ?? ui.renderMode, 1);
@@ -568,8 +302,8 @@ namespace CoastalSmell
                         .With(handle.Apply)
                         .transform))
                     .With(Cmp(Layout(width: width, height: height)));
-        public static Func<float, float, string, GameObject, GameObject> Panel =>
-            (width, height, name, parent) => new GameObject(name)
+        public static Func<string, GameObject, GameObject> Panel =>
+            (name, parent) => new GameObject(name)
                 .With(Go(parent: parent.transform, active: false))
                 .With(Cmp(Image(color: new(0.5f, 0.5f, 0.5f, 0.7f), sprite: BorderSprites.ColorBg.Get())));
         public static Func<float, float, string, GameObject, GameObject> ScrollView =>
@@ -579,16 +313,13 @@ namespace CoastalSmell
                         .With(Go(parent: parent.transform))
                         .With(Cmp(Image(color: new(0, 0, 0, 0))))
                         .With(Cmp(Layout(width: width, height: height)))
+                        .With(Cmp(LayoutGroup<HorizontalLayoutGroup>(
+                            reverseArrangement: true,
+                            childForceExpandHeight: true)))
                         .With(Cmp<ScrollRect>(ui => (ui.horizontal, ui.vertical, ui.scrollSensitivity) = (false, true, Math.Min(200, height / 2))))
                         .With(Content($"Scrollbar.{name}")(
                             Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get())) +
-                            Cmp(Rt(
-                                sizeDelta: new(16, height),
-                                anchorMin: new(1, 1),
-                                anchorMax: new(1, 1),
-                                offsetMin: new(0, 0),
-                                offsetMax: new(0, 0),
-                                pivot: new(1, 1))) +
+                            Cmp(Layout(width: 16, height: height)) +
                             Cmp<Scrollbar>(ui => ui.direction = Scrollbar.Direction.BottomToTop) +
                             Cmp<Scrollbar, ScrollRect>((scroll, ui) => ui.verticalScrollbar = scroll) +
                             Content($"Slider.{name}")(
@@ -598,13 +329,7 @@ namespace CoastalSmell
                                     Cmp<RectTransform, Scrollbar>((rt, ui) => ui.handleRect = rt)))))
                         .transform))
                     .With(Cmp(Image(color: new(0.5f, 0.5f, 0.5f, 0.7f), sprite: BorderSprites.ColorBg.Get())))
-                    .With(Cmp(Rt(
-                        sizeDelta: new(width - 16, height),
-                        anchorMin: new(0, 1),
-                        anchorMax: new(0, 1),
-                        offsetMin: new(0, 0),
-                        offsetMax: new(0, 0),
-                        pivot: new(0, 1))))
+                    .With(Cmp(Layout(width: width - 16, height: height)))
                     .With(Cmp<RectMask2D>())
                     .With(Cmp<RectTransform, ScrollRect>((rt, ui) => ui.viewport = rt))
                     .transform))
@@ -746,15 +471,5 @@ namespace CoastalSmell
                 && Localize.Translate.Manager.Initialized;
         static internal void Initialize() =>
             Util.DoOnCondition(Ready, Setup);
-    }
-    [BepInProcess(Process)]
-    [BepInPlugin(Guid, Name, Version)]
-    public partial class Plugin : BasePlugin
-    {
-        internal static BepInEx.Logging.ManualLogSource Logger;
-        public const string Guid = $"{Process}.{Name}";
-        public const string Name = "CoastalSmell";
-        public const string Version = "1.0.2";
-        public override void Load() => (Logger = Log).With(Sprites.Initialize).With(UGUI.Initialize);
     }
 }
