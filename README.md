@@ -8,6 +8,12 @@ Plugin API to serialize and deserialize character or coordinate-bound extension 
 
 Plugin API to generate UnityUI component in runtime and syntax suggers, for SamabakeScramble and DigitalCraft.
 
+## Extractor
+
+Extension data extractor from Drag & Dropped Chracacter and Coordinate cards.
+
+Extension data will extracted as same name zip file in same folder of source file.
+
 ## Prerequisites (SVS)
 
 - [HF Patch for Summer Vacation Scramble](https://github.com/ManlyMarco/SVS-HF_Patch)
