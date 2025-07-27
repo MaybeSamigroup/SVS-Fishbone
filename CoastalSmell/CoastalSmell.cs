@@ -54,6 +54,7 @@ namespace CoastalSmell
 
         public static Action Ignoring<O>(this Func<O> f) => () => f();
         public static Action<I1> Ignoring<I1>(this Action action) => _ => action();
+        public static Action Ignoring<I1>(I1 _) => DoNothing;
 
         #endregion
 
@@ -151,8 +152,6 @@ namespace CoastalSmell
 
         #region Misc
 
-        public static Action Compose<T>(Func<T> get, Action<T> set) => () => set(get());
-        public static Func<T> Constant<T>(T value) => () => value;
         public static Func<I, O> Constant<I, O>(this Action<I> f, O value) => i => value.With(f.Apply(i));
         public static Action DoNothing = () => { };
 
@@ -202,7 +201,7 @@ namespace CoastalSmell
         internal static BepInEx.Logging.ManualLogSource Logger;
         public const string Guid = $"{Process}.{Name}";
         public const string Name = "CoastalSmell";
-        public const string Version = "1.0.3";
+        public const string Version = "1.0.4";
 
         public override void Load() =>
             (Logger = Log).With(Sprites.Initialize).With(UGUI.Initialize);

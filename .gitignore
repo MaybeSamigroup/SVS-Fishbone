@@ -1,4 +1,6 @@
 **/*.dll
+**/*.exe
+**/*.runtimeconfig.json
 obj/
 bin/
 *.sln

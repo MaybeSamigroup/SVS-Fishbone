@@ -12,41 +12,6 @@ using System.Reflection;
 
 namespace Fishbone
 {
-    /// <summary>
-    /// Purpose-specific portable network graphics encoder.
-    /// </summary>
-    public static partial class Encode
-    {
-        public static uint CRC32(this IEnumerable<byte> values) =>
-            values.Aggregate(0xFFFFFFFFU, (crc32, value) => TABLE[(crc32 ^ value) & 0xff] ^ (crc32 >> 8)) ^ 0xFFFFFFFFU;
-
-        public static uint FromNetworkOrderBytes(this IEnumerable<byte> values) =>
-            ((uint)values.ElementAt(0) << 24) | ((uint)values.ElementAt(1) << 16) | ((uint)values.ElementAt(2) << 8) | values.ElementAt(3);
-
-        public static byte[] ToNetworkOrderBytes(this uint value) =>
-            [(byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value];
-
-        public static byte[] Implant(this IEnumerable<byte> pngData, byte[] data) =>
-            [..pngData.Take(8), ..pngData.Skip(8).ProcessSize(ToChunk([(byte)'f', (byte)'s', (byte)'B', (byte)'N'], data))];
-
-        public static byte[] Implant(this byte[] data) =>
-            [
-                0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
-                ..ToChunk([(byte)'I', (byte)'H', (byte)'D', (byte)'R'], [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]),
-                ..ToChunk([(byte)'I', (byte)'D', (byte)'A', (byte)'T'], []),
-                ..ToChunk([(byte)'f', (byte)'s', (byte)'B', (byte)'N'], data),
-                ..ToChunk([(byte)'I', (byte)'E', (byte)'N', (byte)'D'], [])
-            ];
-    }
-
-    /// <summary>
-    /// Purpose-specific portable network graphics decoder.
-    /// </summary>
-    public static partial class Decode
-    {
-        public static byte[] Extract(this IEnumerable<byte> values) =>
-            values?.Skip(8)?.ProcessSize()?.ToArray() ?? [];
-    }
 
     [AttributeUsage(AttributeTargets.Class)]
     public class BonesToStuckAttribute : Attribute
@@ -74,8 +39,9 @@ namespace Fishbone
 
         public static bool Load(ZipArchive archive, out T value) =>
             TryGetEntry(archive, Path, out var entry)
-                .With(F.Constant(value = default).Ignoring())
-                && Json<T>.Deserialize.ApplyDisposable(entry.Open()).Try(Plugin.Instance.Log.LogError, out value);
+                .With(F.Ignoring(value = default))
+                && Json<T>.Deserialize.ApplyDisposable(entry.Open())
+                    .Try(Plugin.Instance.Log.LogError, out value);
 
         public static Action<ZipArchive, T> Save = (archive, data) =>
             Json<T>.Serialize.With(Cleanup(archive)).Apply(data)
@@ -90,7 +56,7 @@ namespace Fishbone
     {
         public const string Guid = $"{Process}.{Name}";
         public const string Name = "Fishbone";
-        public const string Version = "2.1.1";
+        public const string Version = "2.1.2";
         internal static Plugin Instance;
         private Harmony Patch;
 
