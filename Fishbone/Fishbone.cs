@@ -4,9 +4,6 @@ using BepInEx.Unity.IL2CPP;
 using System;
 using System.IO;
 using System.IO.Compression;
-using System.Collections.Generic;
-using System.Linq;
-using UniRx;
 using CoastalSmell;
 using System.Reflection;
 
@@ -56,7 +53,7 @@ namespace Fishbone
     {
         public const string Guid = $"{Process}.{Name}";
         public const string Name = "Fishbone";
-        public const string Version = "2.1.2";
+        public const string Version = "2.2.2";
         internal static Plugin Instance;
         private Harmony Patch;
 

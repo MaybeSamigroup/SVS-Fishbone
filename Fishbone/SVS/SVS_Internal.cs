@@ -94,6 +94,11 @@ namespace Fishbone
         static void HumanDataCopyPostfix(HumanData dst, HumanData src) =>
             OnHumanReloading = OnHumanDataCopy(dst, src);
 
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanData), nameof(HumanData.CopyLimited))]
+        static void HumanDataCopyLimitedPrefix(HumanData src, CharaLimit flags) =>
+            Event.NotifyPreCharacterValidate.Invoke(src, flags, src.Extract(CharaExtension));
+
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.CopyLimited))]
         static void HumanDataCopyLimitedPostfix(HumanData dst, HumanData src, CharaLimit flags) =>
@@ -135,6 +140,10 @@ namespace Fishbone
 
         internal static Func<HumanData, Action<Human>> NotifyActorDeserializeToCharacter =>
             (data) => NotifyCharacterDeserialize(data, CharaLimit.All, GetHumanCustomTarget.Extract());
+
+        internal static Action<HumanData, CharaLimit, byte[]> NotifyPreCharacterValidate =
+            (data, limits, bytes) =>
+                UpdateCustom(bytes.ReferenceExtension(OnPreCharacterValidate.Apply(data).Apply(limits)));
 
         static Action<HumanData, CharaLimit, byte[]> NotifyPreCharacterDeserialize =
             (data, limits, bytes) =>

@@ -65,7 +65,7 @@ namespace Fishbone
 
         [HarmonyPostfix]
         [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(Human), nameof(Human.Reload), new Type[0])]
+        [HarmonyPatch(typeof(Human), nameof(Human.Reload), [])]
         static void HumanReloadPostfix(Human __instance) =>
             LoadStack = (LoadStack == 0 || __instance.isReloading)
                 ? LoadStack
@@ -94,7 +94,7 @@ namespace Fishbone
 
         [HarmonyPostfix]
         [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), new Type[0])]
+        [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), [])]
         static void HumanReloadCoordinatePostfix(Human __instance) =>
             (LoadStack == 0)
                 .Maybe(Event.NotifyPostCoordinateReload.Apply(__instance));

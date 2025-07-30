@@ -48,6 +48,16 @@ namespace Fishbone
 
         /// <summary>
         /// Character deserialize beginning event.
+        /// param1: Human data being validated.
+        /// param2: Character limits.
+        /// param3: Readonly extension from loading character card.
+        /// param4: Update mode extension from Character Creation storage.
+        /// </summary>
+        public static event Action<HumanData, CharaLimit, ZipArchive, ZipArchive> OnPreCharacterValidate =
+            (_, limit, _, _) => Plugin.Instance.Log.LogDebug($"Pre Character Validate: {limit}");
+
+        /// <summary>
+        /// Character deserialize beginning event.
         /// param1: Human data being applied.
         /// param2: Character limits.
         /// param3: Readonly extension from loading character card.

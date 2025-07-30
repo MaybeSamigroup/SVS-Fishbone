@@ -188,7 +188,13 @@ namespace CoastalSmell
             foreach (var (k, v) in items)
                 yield return new Tuple<K, V>(k, v);
         }
-
+        public static IEnumerable<T> Yield<T>(this Il2CppSystem.Collections.Generic.IReadOnlyList<T> items) =>
+            Yield(items, new Il2CppSystem.Collections.Generic.ICollection<T>(items.Pointer).Count);
+        static IEnumerable<T> Yield<T>(this Il2CppSystem.Collections.Generic.IReadOnlyList<T> items, int count)
+        {
+            for (var index = 0; index < count; index++)
+                yield return items[index];
+        }
         #endregion
     }
 
@@ -201,7 +207,7 @@ namespace CoastalSmell
         internal static BepInEx.Logging.ManualLogSource Logger;
         public const string Guid = $"{Process}.{Name}";
         public const string Name = "CoastalSmell";
-        public const string Version = "1.0.4";
+        public const string Version = "1.0.5";
 
         public override void Load() =>
             (Logger = Log).With(Sprites.Initialize).With(UGUI.Initialize);
