@@ -1,154 +1,145 @@
 using BepInEx.Unity.IL2CPP;
 using System;
 using System.IO.Compression;
+using System.Collections.Generic;
 using Character;
 using CharacterCreation;
-using CharaLimit = Character.HumanData.LoadLimited.Flags;
-using CoordLimit = Character.HumanDataCoordinate.LoadLimited.Flags;
 using CoastalSmell;
 
 namespace Fishbone
 {
-    public static partial class Event
+    public static partial class Extension
     {
-        public static void HumanCustomReload() =>
-            NotifyCharacterDeserialize(HumanCustom.Instance.Human.data, CharaLimit.All, CustomExtension)
-                .With(HumanCustom.Instance.Human.Load)
-                .With(ResetMotionIK)
-                .With(ResetAnimation)(HumanCustom.Instance.Human);
+        public static bool ToActor(this Human human, out SaveData.Actor actor) =>
+            (actor = ToActor(human)) is not null;
 
-        /// <summary>
-        /// Actor to extension conversion for listeners.
-        /// </summary>
-        public static void ReferenceExtension(this SaveData.Actor actor, Action<ZipArchive> action) =>
-            actor.ToExtension().ReferenceExtension(action);
+        public static T Chara<T, U>(Human human)
+            where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+            where U : CoordinateExtension<U>, new() =>
+            ToActor(human, out var actor)
+                ? ActorExtension<T, U>.Chara(actor)
+                : HumanExtension<T, U>.Chara;
 
-        /// <summary>
-        /// Human to extension conversion for listeners.
-        /// </summary>
-        public static void ReferenceExtension(this Human human, Action<ZipArchive> action) =>
-            (human.ToActor(out var actor) ? actor.ToExtension() : CustomExtension).ReferenceExtension(action);
+        public static U Coord<T, U>(Human human)
+            where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+            where U : CoordinateExtension<U>, new() =>
+            ToActor(human, out var actor)
+                ? ActorExtension<T, U>.Coord(actor)
+                : HumanExtension<T, U>.Coord;
 
-        /// <summary>
-        /// Coordinate serialize event.
-        /// param1: Serializing coordinate.
-        /// param2: Readonly extension from Character Creation storage.
-        /// param3: Update mode empty archive.
-        /// </summary>
-        public static event Action<HumanDataCoordinate, ZipArchive> OnCoordinateSerialize =
-            (data, _) => Plugin.Instance.Log.LogDebug($"Coordinate Serialize: {data.CoordinateName}");
+        public static T Chara<T>(Human human)
+            where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
+            ToActor(human, out var actor)
+                ? ActorExtension<T>.Chara(actor)
+                : HumanExtension<T>.Chara;
+        public static void HumanCustomReload()
+        {
+            var custom = HumanCustom.Instance;
+            custom.Human.Load();
+            custom._motionIK = new ILLGames.Rigging.MotionIK(custom.Human, custom._motionIK._data);
+            custom.LoadPlayAnimation(custom.NowPose, new() { value = 0.0f });
+            custom.Human.Reload();
+        }
+        public static event Action PrepareSaveChara =
+            F.Apply(Plugin.Instance.Log.LogDebug, "Custom character save.");
+        public static event Action PrepareSaveCoord =
+            F.Apply(Plugin.Instance.Log.LogDebug, "Custom coordinate save.");
+        public static event Action<SaveData.Actor> PrepareSaveActor =
+            actor => Plugin.Instance.Log.LogDebug($"Simulation actor{actor.charasGameParam.Index} save.");
+        public static event Action<ZipArchive> OnSaveChara = PrepareSaveChara.Ignoring<ZipArchive>();
+        public static event Action<ZipArchive> OnSaveCoord = PrepareSaveCoord.Ignoring<ZipArchive>();
+        public static event Action<SaveData.Actor, ZipArchive> OnSaveActor = (actor, _) => PrepareSaveActor(actor); 
+        public static event Action<Human> OnReloadCustomChara = delegate { };
+        public static event Action<Human> OnReloadCustomCoord = delegate { };
+        public static event Action<SaveData.Actor, Human> OnReloadActorChara = delegate { };
+        public static event Action<SaveData.Actor, Human> OnReloadActorCoord = delegate { };
 
-        /// <summary>
-        /// Character serialize event.
-        /// param1: Serializing human data.
-        /// param2: Update mode extension from Character Creation storage.
-        /// </summary>
-        public static event Action<HumanData, ZipArchive> OnCharacterSerialize =
-            (data, _) => Plugin.Instance.Log.LogDebug($"Character Serialize: {data.CharaFileName}");
+        static Extension()
+        {
+            PreReloadChara += ForkReloadChara;
+            PreReloadCoord += ForkReloadCoord;
+        }
 
-        /// <summary>
-        /// Character deserialize beginning event.
-        /// param1: Human data being validated.
-        /// param2: Character limits.
-        /// param3: Readonly extension from loading character card.
-        /// param4: Update mode extension from Character Creation storage.
-        /// </summary>
-        public static event Action<HumanData, CharaLimit, ZipArchive, ZipArchive> OnPreCharacterValidate =
-            (_, limit, _, _) => Plugin.Instance.Log.LogDebug($"Pre Character Validate: {limit}");
+        public static void Register<T, U>()
+            where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+            where U : CoordinateExtension<U>, new()
+        {
+            RegisterInternal<T, U>();
+            OnSaveChara += HumanExtension<T, U>.SaveChara;
+            OnSaveCoord += HumanExtension<T, U>.SaveCoord;
+            OnSaveActor += ActorExtension<T, U>.Save;
+            PreReloadCustomChara += HumanExtension<T, U>.LoadChara;
+            PreReloadCustomCoord += HumanExtension<T, U>.LoadCoord;
+            PreReloadActorChara += ActorExtension<T, U>.LoadChara;
+            PreReloadActorCoord += ActorExtension<T, U>.LoadCoord;
+            OnCopyCustomToActor += ActorExtension<T, U>.OnCopy;
+            OnCopyActorToCustom += HumanExtension<T, U>.OnCopy;
+            OnChangeActorCoord += ActorExtension<T, U>.CoordinateChange;
+        }
 
-        /// <summary>
-        /// Character deserialize beginning event.
-        /// param1: Human data being applied.
-        /// param2: Character limits.
-        /// param3: Readonly extension from loading character card.
-        /// param4: Update mode extension from Character Creation storage.
-        /// </summary>
-        public static event Action<HumanData, CharaLimit, ZipArchive, ZipArchive> OnPreCharacterDeserialize =
-            (_, limit, _, _) => Plugin.Instance.Log.LogDebug($"Pre Character Deserialize: {limit}");
+        public static void Register<T>()
+            where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
+        {
+            RegisterInternal<T>();
+            OnSaveChara += HumanExtension<T>.SaveChara;
+            OnSaveActor += ActorExtension<T>.Save;
+            PreReloadCustomChara += HumanExtension<T>.LoadChara;
+            PreReloadActorChara += ActorExtension<T>.LoadChara;
+            OnCopyCustomToActor += ActorExtension<T>.OnCopy;
+            OnCopyActorToCustom += HumanExtension<T>.OnCopy;
+        }
+    }
 
-        /// <summary>
-        /// Character deserialize complete event.
-        /// param1: Human data applied to human.
-        /// param2: Character limits.
-        /// param3: Readonly extension from loaded character card.
-        /// param4: Update mode extension from Character Creation storage.
-        /// </summary>
-        public static event Action<Human, CharaLimit, ZipArchive, ZipArchive> OnPostCharacterDeserialize =
-            (_, limit, _, _) => Plugin.Instance.Log.LogDebug($"Post Character Deserialize: {limit}");
+    public partial class HumanExtension<T, U>
+        where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+        where U : CoordinateExtension<U>, new()
+    {
+        static T Current = new();
 
-        /// <summary>
-        /// Coordinate deserialize beginning event.
-        /// param1: Human to apply coordinate.
-        /// param2: HumanDataCoordinate being applied.
-        /// param3: Coordinate limits.
-        /// param4: Readonly extension from loading coordinate card.
-        /// param5: Update mode extension from applying human.
-        /// </summary>
-        public static event Action<Human, HumanDataCoordinate, CoordLimit, ZipArchive, ZipArchive> OnPreCoordinateDeserialize =
-            (human, _, limit, _, _) => Plugin.Instance.Log.LogDebug($"Pre Coordinate Deserialize: {human.name}, {limit}");
+        public static T Chara => Current;
 
-        /// <summary>
-        /// Coordinate deserialize complete event.
-        /// param1: Human to apply coordinate.
-        /// param2: HumanDataCoordinate being applied.
-        /// param3: Coordinate limits.
-        /// param4: Readonly extension from loaded coordinate card.
-        /// param5: Update mode extension from applying human.
-        /// </summary>
-        public static event Action<Human, HumanDataCoordinate, CoordLimit, ZipArchive, ZipArchive> OnPostCoordinateDeserialize =
-            (human, _, limit, _, _) => Plugin.Instance.Log.LogDebug($"Post Coordinate Deserialize: {human.name}, {limit}");
+        public static U Coord =>
+            Current.Get(HumanCustom.Instance?.Human?.data?.Status.coordinateType ?? 0) ?? new ();
+    }
 
-        /// <summary>
-        /// Coordinate reload beginning event.
-        /// param1: Human to apply coordinate.
-        /// param2: Changed to coordinate index.
-        /// param3: (In Character Creation) update mode extension from Character Creation storage,
-        ///         (In Other Scenes) readonly extension of reloading Actor.
-        /// </summary>
-        public static event Action<Human, int, ZipArchive> OnPreCoordinateReload =
-            (human, _, _) => Plugin.Instance.Log.LogDebug($"Pre Coordinate Reload: {human.name}");
+    public partial class HumanExtension<T>
+        where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
+    {
+        static T Current = new();
 
-        /// <summary>
-        /// Coordinate reload complete event.
-        /// param1: Human with applied coordinate.
-        /// param2: Changed to coordinate index.
-        /// param3: Readonly extension of reloaded human.
-        /// </summary>
-        public static event Action<Human, int, ZipArchive> OnPostCoordinateReload =
-            (human, _, _) => Plugin.Instance.Log.LogDebug($"Post Coordinate Reload: {human.name}");
+        public static T Chara => Current;
+    }
 
-        /// <summary>
-        /// Actor deserialize event.
-        /// param1: Actor to deserialize.
-        /// param2: Archive to load extension (readonly mode).
-        /// </summary>
-        public static event Action<SaveData.Actor, ZipArchive> OnActorDeserialize =
-            (actor, _) => Plugin.Instance.Log.LogDebug($"Actor Deserialize: {actor.charasGameParam.Index}");
+    public partial class ActorExtension<T, U>
+        where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+        where U : CoordinateExtension<U>, new()
+    {
+        static readonly Dictionary<int, T> Charas = new();
+        static readonly Dictionary<int, U> Coords = new();
 
-        /// <summary>
-        /// Actor serialize event.
-        /// param1: Actor to serialize.
-        /// param2: Archive to save extension (update mode).
-        /// </summary>
-        public static event Action<SaveData.Actor, ZipArchive> OnActorSerialize =
-            (actor, _) => Plugin.Instance.Log.LogDebug($"Actor Serialize: {actor.charasGameParam.Index}");
+        public static T Chara(SaveData.Actor actor) =>
+            Chara(actor.charasGameParam.Index);
 
-        /// <summary>
-        /// Actor binding to human event (pre).
-        /// param1: Binding actor.
-        /// param2: Archive to load extension.
-        /// </summary>
-        public static event Action<SaveData.Actor, HumanData, ZipArchive> OnPreActorHumanize =
-            (actor, _, _) => Plugin.Instance.Log.LogDebug($"Pre Actor Humanized: {actor.charasGameParam.Index}");
+        public static U Coord(SaveData.Actor actor) =>
+            Coord(actor.charasGameParam.Index);
 
-        /// <summary>
-        /// Actor binding to human event (post).
-        /// param1: Binding actor.
-        /// param2: Bound human.
-        /// param3: Archive to load extension.
-        /// </summary>
-        public static event Action<SaveData.Actor, Human, ZipArchive> OnPostActorHumanize =
-            (actor, human, _) => Plugin.Instance.Log.LogDebug($"Post Actor Humanized: {actor.charasGameParam.Index}, {human.name}");
+        public static T Chara(int index) =>
+            Charas.GetValueOrDefault(index, new());
+
+        public static U Coord(int index) =>
+            Coords.GetValueOrDefault(index, new());
+    }
+
+    public partial class ActorExtension<T>
+        where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
+    {
+        static readonly Dictionary<int, T> Charas = new();
+
+        public static T Chara(SaveData.Actor actor) =>
+            Chara(actor.charasGameParam.Index);
+
+        public static T Chara(int index) =>
+            Charas.GetValueOrDefault(index, new());
     }
 
     public partial class Plugin : BasePlugin

@@ -8,20 +8,6 @@ using UnityEngine;
 
 namespace CoastalSmell
 {
-    public static partial class Util
-    {
-        internal static readonly JsonSerializerOptions JsonOpts = new()
-        {
-            Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
-            NumberHandling =
-                JsonNumberHandling.WriteAsString |
-                JsonNumberHandling.AllowReadingFromString |
-                JsonNumberHandling.AllowNamedFloatingPointLiterals,
-            AllowTrailingCommas = true,
-            ReadCommentHandling = JsonCommentHandling.Skip,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
-        };
-    }
     public struct Float2 : IEquatable<Float2>
     {
         public float x { get; set; }
@@ -62,12 +48,36 @@ namespace CoastalSmell
         public bool Equals(Float4 s) =>
           (x, y, z, w) == (s.x, s.y, s.z, s.w);
     }
-    public static class Json<T>
+    public static class Json<T> where T : new()
     {
-        public static Func<Stream, T> Deserialize =
-            (stream) => JsonSerializer.Deserialize<T>(stream, Util.JsonOpts);
-        public static Action<T, Stream> Serialize =
-            (data, stream) => JsonSerializer.Serialize(stream, data, Util.JsonOpts);
+        static Action<Stream, T> Serialize =
+            (stream, data) => JsonSerializer.Serialize(stream, data, Util.JsonOpts);
+        public static Action<Action<string>, Stream, T> Save =
+            (logger, stream, value) =>
+                Serialize.ApplyDisposable(stream)
+                    .Apply(value).Try(logger);
+        static Func<Stream, T> Deserialize =>
+            stream => JsonSerializer.Deserialize<T>(stream, Util.JsonOpts);
+        public static Func<Action<string>, Stream, T> Load =
+            (logger, stream) =>
+                Deserialize.ApplyDisposable(stream)
+                    .Try(logger, out var value) ? value : new();
+    }
+    public static partial class Util
+    {
+        public static string ToJson<T>(T value) =>
+            JsonSerializer.Serialize(value, JsonOpts);
+        internal static readonly JsonSerializerOptions JsonOpts = new()
+        {
+            Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
+            NumberHandling =
+                JsonNumberHandling.WriteAsString |
+                JsonNumberHandling.AllowReadingFromString |
+                JsonNumberHandling.AllowNamedFloatingPointLiterals,
+            AllowTrailingCommas = true,
+            ReadCommentHandling = JsonCommentHandling.Skip,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
+        };
     }
 
 }

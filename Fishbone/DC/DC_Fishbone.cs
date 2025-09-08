@@ -1,74 +1,68 @@
 using BepInEx.Unity.IL2CPP;
 using System;
 using System.IO.Compression;
+using System.Collections.Generic;
 using Character;
-using CoordLimit = Character.HumanDataCoordinate.LoadLimited.Flags;
 
 namespace Fishbone
 {
-    public static partial class Event
+    public static partial class Extension
     {
-        /// <summary>
-        /// Provides readonly access to a human's extension archive.
-        /// </summary>
-        public static void ReferenceExtension(this Human human, Action<ZipArchive> action) =>
-            human.ToExtension().ReferenceExtension(action);
+        public static event Action<Human, ZipArchive> OnSaveChara = delegate { };
 
-        /// <summary>
-        /// Raised before character deserialization.
-        /// param1: HumanData being applied
-        /// param2: Readonly extension from loading character card
-        /// </summary>
-        public static event Action<HumanData, ZipArchive> OnPreCharacterDeserialize =
-            (data, _) => Plugin.Instance.Log.LogDebug($"Pre Character Deserialize: {data?.PngData?.Length ?? 0}");
+        public static T Chara<T, U>(Human human)
+            where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+            where U : CoordinateExtension<U>, new() =>
+            HumanExtension<T, U>.Chara(human);
 
-        /// <summary>
-        /// Raised after character deserialization.
-        /// param1: Human instance
-        /// param2: Readonly extension from loaded character card
-        /// </summary>
-        public static event Action<Human, ZipArchive> OnPostCharacterDeserialize =
-            (human, _) => Plugin.Instance.Log.LogDebug($"Post Character Deserialize: {human.name}, {human.data?.PngData?.Length ?? 0}");
+        public static U Coord<T, U>(Human human)
+            where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+            where U : CoordinateExtension<U>, new() =>
+            HumanExtension<T, U>.Coord(human);
 
-        /// <summary>
-        /// Raised before coordinate deserialization.
-        /// param1: Human to apply coordinate
-        /// param2: HumanDataCoordinate being applied
-        /// param3: Coordinate limits
-        /// param4: Readonly extension from loading coordinate card
-        /// param5: Update extension from applying human
-        /// </summary>
-        public static event Action<Human, HumanDataCoordinate, CoordLimit, ZipArchive, ZipArchive> OnPreCoordinateDeserialize =
-            (human, _, limit, _, _) => Plugin.Instance.Log.LogDebug($"Pre Coordinate Deserialize: {human.name}, {limit}");
+        public static void Register<T, U>()
+            where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+            where U : CoordinateExtension<U>, new()
+        {
+            RegisterInternal<T, U>();
+            OnSaveChara += HumanExtension<T, U>.SaveChara;
+            PreReloadChara += HumanExtension<T, U>.LoadChara;
+            PreReloadCoord += HumanExtension<T, U>.LoadCoord;
+        }
 
-        /// <summary>
-        /// Raised after coordinate deserialization.
-        /// param1: Human to apply coordinate
-        /// param2: HumanDataCoordinate being applied
-        /// param3: Coordinate limits
-        /// param4: Readonly extension from loaded coordinate card
-        /// param5: Update extension from applying human
-        /// </summary>
-        public static event Action<Human, HumanDataCoordinate, CoordLimit, ZipArchive, ZipArchive> OnPostCoordinateDeserialize =
-            (human, _, limit, _, _) => Plugin.Instance.Log.LogDebug($"Post Coordinate Deserialize: {human.name}, {limit}");
+        public static T Chara<T>(Human human)
+            where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
+            HumanExtension<T>.Chara(human);
 
-        /// <summary>
-        /// Raised before coordinate reload.
-        /// param1: Human to apply coordinate
-        /// param2: Changed to coordinate index
-        /// param3: Readonly extension of reloading human
-        /// </summary>
-        public static event Action<Human, int, ZipArchive> OnPreCoordinateReload =
-            (human, type, _) => Plugin.Instance.Log.LogDebug($"Pre Coordinate Reload: {human.name}/{type}");
+        public static void Register<T>()
+            where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
+        {
+            RegisterInternal<T>();
+            OnSaveChara += HumanExtension<T>.SaveChara;
+            PreReloadChara += HumanExtension<T>.LoadChara;
+        }
+    }
 
-        /// <summary>
-        /// Raised after coordinate reload.
-        /// param1: Human with applied coordinate
-        /// param2: Changed to coordinate index
-        /// param3: Readonly extension of reloaded human
-        /// </summary>
-        public static event Action<Human, int, ZipArchive> OnPostCoordinateReload =
-            (human, type, _) => Plugin.Instance.Log.LogDebug($"Post Coordinate Reload: {human.name}/{type}");
+    public partial class HumanExtension<T, U>
+        where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+        where U : CoordinateExtension<U>, new()
+    {
+        static readonly Dictionary<Human, T> Characters = new();
+
+        public static T Chara(Human human) =>
+            Characters.GetValueOrDefault(human, new());
+
+        public static U Coord(Human human) =>
+            Characters.GetValueOrDefault(human, new T()).Get(human.data.Status.coordinateType);
+    }
+
+    public partial class HumanExtension<T>
+        where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
+    {
+        static readonly Dictionary<Human, T> Characters = new();
+
+        public static T Chara(Human human) =>
+            Characters.GetValueOrDefault(human, new());
     }
 
     public partial class Plugin : BasePlugin

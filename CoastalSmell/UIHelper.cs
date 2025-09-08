@@ -41,7 +41,7 @@ namespace CoastalSmell
         static Dictionary<SimpleSprites, Sprite> Simples = new();
         static Dictionary<BorderSprites, Sprite> Borders = new();
         static string ToPath<T>(T item) =>
-            Path.Combine(Paths.GameRootPath, "UserData", "plugins", Plugin.Guid, $"{item}.png");
+            Path.Combine(Paths.GameRootPath, "UserData", "plugins", Plugin.Name, $"{item}.png");
         static void RegisterSprite(this GameObject go, Sprite item) =>
             go.With(UGUI.Cmp(UGUI.Image(sprite: item)));
         internal static Sprite Get(this SimpleSprites item) => Simples[item];

@@ -1,10 +1,13 @@
 using HarmonyLib;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Reflection;
 using Character;
 using ILLGames.IO;
 using LoadFlags = Character.HumanData.LoadFileInfo.Flags;
+using CharaLimit = Character.HumanData.LoadLimited.Flags;
 using CoordLimit = Character.HumanDataCoordinate.LoadLimited.Flags;
 using Il2CppBytes = Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<byte>;
 using Il2CppReader = Il2CppSystem.IO.BinaryReader;
@@ -13,154 +16,333 @@ using CoastalSmell;
 
 namespace Fishbone
 {
-    #region Event Extension Methods
-    public static partial class Event
+    #region Common Definitions
+
+    public static partial class Extension
     {
-        static Func<Action<ZipArchive>, Action<MemoryStream>> ForUpdate =
-            action => stream => action.ApplyDisposable(new ZipArchive(stream, ZipArchiveMode.Update)).Try(Plugin.Instance.Log.LogError);
+        static readonly byte[] NoExtension = new MemoryStream()
+            .With(stream => new ZipArchive(stream, ZipArchiveMode.Create).Dispose()).ToArray();
 
-        static Action<byte[], MemoryStream> WriteAllBytes =
-            (bytes, stream) => stream.Write(bytes.Length > 0 ? bytes : NoExtension);
+        static void Implant(HumanData data, byte[] bytes) =>
+            data.PngData = data.PngData != null ? Encode.Implant(data.PngData, bytes) : Encode.Implant(bytes);
 
-        static Action<MemoryStream> SeekToBegin = stream => stream.Position = 0;
-
-        static byte[] UpdateExtension(this byte[] bytes, Action<ZipArchive> action) =>
-            new MemoryStream()
-                .With(WriteAllBytes.Apply(bytes))
-                .With(SeekToBegin)
-                .With(ForUpdate(action))
-                .ToArray();
-
-        static Action<ZipArchive> ReferenceExtension(this byte[] bytes, Action<ZipArchive, ZipArchive> action) =>
-            action.ApplyDisposable(new ZipArchive(new MemoryStream(bytes.Length > 0 ? bytes : NoExtension), ZipArchiveMode.Read));
-
-        static void ReferenceExtension(this byte[] bytes, Action<ZipArchive> action) =>
-            action.ApplyDisposable(new ZipArchive(new MemoryStream(bytes.Length > 0 ? bytes : NoExtension), ZipArchiveMode.Read)).Invoke();
-
-        static void Implant(this HumanData data, byte[] bytes) =>
-            data.PngData = data?.PngData?.Implant(bytes) ?? bytes.Implant();
+        static ZipArchive ToExtension(byte[] bytes) =>
+            new ZipArchive(new MemoryStream(bytes.Length == 0 ? NoExtension : bytes));
     }
+
+    public static partial class Extension<T, U>
+        where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+        where U : CoordinateExtension<U>, new()
+    {
+        static readonly string Path;
+
+        static Extension()
+        {
+            Path = typeof(T)
+                .GetCustomAttribute(typeof(ExtensionAttribute<T, U>))
+                    is ExtensionAttribute<T, U> extension ? extension.Path :
+                    throw new InvalidDataException($"{typeof(T)} is not bones to stuck.");
+        }
+
+        static bool TryGetEntry(ZipArchive archive, string path, out ZipArchiveEntry entry) =>
+            null != (entry = archive.GetEntry(path));
+
+        internal static void SaveChara(ZipArchive archive, T value) =>
+            SerializeChara(archive.CreateEntry(Path).Open(), value);
+
+        internal static void SaveCoord(ZipArchive archive, U value) =>
+            SerializeCoord(archive.CreateEntry(Path).Open(), value);
+
+        internal static T LoadChara(ZipArchive archive) =>
+            TryGetEntry(archive, Path, out var entry)
+                ? DeserializeChara(entry.Open()) : new();
+
+        internal static U LoadCoord(ZipArchive archive) =>
+            TryGetEntry(archive, Path, out var entry)
+                ? DeserializeCoord(entry.Open()) : new();
+    }
+
+    public static partial class Extension<T>
+        where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
+    {
+        static readonly string Path;
+
+        static Extension()
+        {
+            Path = typeof(T)
+                .GetCustomAttribute(typeof(ExtensionAttribute<T>))
+                    is ExtensionAttribute<T> extension ? extension.Path :
+                    throw new InvalidDataException($"{typeof(T)} does not have valid extension attribute.");
+        }
+
+        static bool TryGetEntry(ZipArchive archive, string path, out ZipArchiveEntry entry) =>
+            null != (entry = archive.GetEntry(path));
+
+        static void Cleanup(ZipArchive archive) =>
+            TryGetEntry(archive, Path, out var entry).Maybe(entry.Delete);
+
+        internal static void SaveChara(ZipArchive archive, T value) =>
+            SerializeChara(archive.With(Cleanup).CreateEntry(Path).Open(), value);
+
+        internal static T LoadChara(ZipArchive archive) =>
+            TryGetEntry(archive, Path, out var entry)
+                ? DeserializeChara(entry.Open()) : new();
+    }
+
     #endregion
 
-    #region Hooks
+    #region Character Definitions
+
+    delegate (Action<Il2CppStream, long, long>, Action<HumanData>) HumanDataLoadActions(HumanData data, LoadFlags flags);
+
     static partial class Hooks
     {
-        // PNG extension capture for character card loading
-        static byte[] CharaExtension = [];
+        static CharaLimit CharaLimits = CharaLimit.All;
         static Action<Il2CppStream, long, long> GetPngSizeSkip = (stream, offset, length) => { };
-        static Action<Il2CppStream, long, long> GetPngSizeProc = (stream, offset, length) =>
-        {
-            var buffer = new Il2CppBytes(length);
-            stream.Read(buffer);
-            stream.Seek(offset, Il2CppSystem.IO.SeekOrigin.Begin);
-            CharaExtension = buffer.Extract();
-        };
-        static Action<Il2CppStream, long, long> OnGetPngSize = GetPngSizeProc;
+        static Action<Il2CppStream, long, long> GetPngSizeProc(HumanData data) =>
+            (stream, offset, length) =>
+            {
+                var buffer = new Il2CppBytes(length);
+                stream.Read(buffer);
+                stream.Seek(offset, Il2CppSystem.IO.SeekOrigin.Begin);
+                data.PngData = Encode.Implant(Decode.Extract(buffer));
+            };
+        static Action<Il2CppStream, long, long> OnGetPngSize = GetPngSizeSkip;
+        static Action<HumanData> HumanDataLoadFileSkip = _ => { };
+        static Action<HumanData> OnHumanDataLoadFile = HumanDataLoadFileSkip;
+        static HumanDataLoadActions HumanDataLoadActions;
 
-        [HarmonyPrefix]
-        [HarmonyWrapSafe]
+        [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.LoadFile), typeof(Il2CppReader), typeof(LoadFlags))]
-        static void SetGetPngBytesHook(LoadFlags flags) =>
-            OnGetPngSize = (flags & LoadFlags.Png) == LoadFlags.None ? GetPngSizeProc : GetPngSizeSkip;
+        static void HumanDataLoadFilePrefix(HumanData __instance, LoadFlags flags) =>
+            ((OnGetPngSize, OnHumanDataLoadFile), CharaLimits, NowReloading) =
+                (HumanDataLoadActions(__instance, flags), CharaLimit.All, null);
 
-        [HarmonyPostfix]
-        [HarmonyWrapSafe]
+        [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.LoadFile), typeof(Il2CppReader), typeof(LoadFlags))]
-        static void ResetGetPngBytesHook() =>
-            OnGetPngSize = GetPngSizeSkip;
+        static void HumanDataLoadFilePostfix(HumanData __instance) =>
+            (OnGetPngSize, OnHumanDataLoadFile, CharaLimits) =
+                (GetPngSizeSkip, HumanDataLoadFileSkip, CharaLimit.All).With(OnHumanDataLoadFile.Apply(__instance));
 
-        [HarmonyPostfix]
-        [HarmonyWrapSafe]
+        [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(PngFile), nameof(PngFile.GetPngSize), typeof(Il2CppStream))]
         static void GetPngSizePostfix(Il2CppStream st, long __result) =>
             OnGetPngSize.Apply(st).Apply(st.Position).Apply(__result).Try(Plugin.Instance.Log.LogError);
 
-        // Coordinate load limitation inference
+        [HarmonyPrefix, HarmonyPostfix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanData), nameof(HumanData.Copy))]
+        static void HumanDataCopyHook(HumanData dst, HumanData src) =>
+            (CoordLimitsCheck, CharaLimits) = (CoordLimitsCheckSkip, CharaLimit.All).With(F.Apply(Extension.Copy, src, dst));
+
+        [HarmonyPrefix, HarmonyPostfix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanData), nameof(HumanData.CopyLimited))]
+        static void HumanDataCopyLimitedHook(HumanData dst, HumanData src, CharaLimit flags) =>
+            (CoordLimitsCheck, CharaLimits) = (CoordLimitsCheckSkip, flags).With(F.Apply(Extension.Copy, src, dst));
+
+        static Human NowReloading = null;
+        static Action OnCharacterReload(Human human) =>
+            F.Apply(Extension.LoadChara, NowReloading = human, CharaLimits);
+
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanBody), nameof(HumanBody.OnUpdateShader), [])]
+        static void HumanReloadPrefix(HumanBody __instance) =>
+            (NowReloading is null).Maybe(OnCharacterReload(__instance.human));
+
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanFace), nameof(HumanFace.LoadGagMaterial), [])]
+        [HarmonyPatch(typeof(HumanFace), nameof(HumanFace.OnUpdateShader), [])]
+        [HarmonyPatch(typeof(HumanFace), nameof(HumanFace.ChangeHead), typeof(int), typeof(bool))]
+        static void HumanReloadPrefix(HumanFace __instance) =>
+            (NowReloading is null).Maybe(OnCharacterReload(__instance.human));
+
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(Human), nameof(Human.Create), typeof(HumanData))]
+        [HarmonyPatch(typeof(Human), nameof(Human.StatusNormalize), typeof(HumanData))]
+        static void HumanCreateAndStatusNormalizePrefix() =>
+            NowReloading = null;
+    }
+
+    public static partial class Extension
+    {
+        internal static event Action<HumanData, HumanData> OnCopy =
+            (src, dst) => Plugin.Instance.Log.LogDebug($"Character copied from {src.Pointer} to {dst.Pointer}");
+
+        internal static event Action<Human, CharaLimit> PreReloadChara =
+            (human, limit) => Plugin.Instance.Log.LogDebug($"Character reload: {human.data.Pointer}, {limit}");
+
+        internal static void Preprocess(HumanData data) =>
+            OnPreprocessChara.Apply(data)
+                .Apply(ToExtension(Decode.Extract(data.PngData)))
+                .Try(Plugin.Instance.Log.LogError);
+
+        internal static void LoadChara(Human human, CharaLimit limit) =>
+            (PreReloadChara.Apply(human).Apply(limit) + OnReloadChara.Apply(human)).Try(Plugin.Instance.Log.LogError);
+
+        internal static void Copy(HumanData src, HumanData dst) =>
+            OnCopy(src, dst);
+    }
+
+    public static partial class Extension<T, U>
+        where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+        where U : CoordinateExtension<U>, new()
+    {
+        internal static Dictionary<HumanData, T> LoadingCharas = new();
+
+        internal static void Preprocess(HumanData data, ZipArchive archive) =>
+            OnPreprocessChara(data, LoadingCharas[data] = LoadChara(archive));
+
+        internal static void Copy(HumanData src, HumanData dst) =>
+            (LoadingCharas.TryGetValue(src, out var value) && LoadingCharas.Remove(src))
+                .Maybe(F.Apply(Copy, dst, value));
+
+        static void Copy(HumanData data, T value) =>
+            LoadingCharas[data] = value;
+
+        internal static T Resolve(HumanData data, T current) =>
+            LoadingCharas.TryGetValue(data, out var value) && LoadingCharas.Remove(data) ? value : current;
+    }
+
+    public static partial class Extension<T>
+        where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
+    {
+        internal static Dictionary<HumanData, T> LoadingCharas = new();
+
+        internal static void Preprocess(HumanData data, ZipArchive archive) =>
+            OnPreprocessChara(data, LoadingCharas[data] = LoadChara(archive));
+
+        internal static void Copy(HumanData src, HumanData dst) =>
+            (LoadingCharas.TryGetValue(src, out var value) && LoadingCharas.Remove(src))
+                .Maybe(F.Apply(Copy, dst, value));
+
+        static void Copy(HumanData data, T value) =>
+            LoadingCharas[data] = value;
+
+        internal static T Resolve(HumanData data, T current) =>
+            LoadingCharas.TryGetValue(data, out var value) && LoadingCharas.Remove(data) ? value : current;
+    }
+
+    #endregion
+
+    #region Coordinate Definitions
+
+    static partial class Hooks
+    {
         static CoordLimit CoordLimits = CoordLimit.None;
-        static byte[] CoordExtension = [];
-        static Action<Il2CppReader> SkipPngProc = (reader) =>
+        static Action<Il2CppReader> SkipPngSkip = _ => { };
+        static Action<Il2CppReader> SkipPngProc = reader =>
         {
             reader.BaseStream.Seek(0, Il2CppSystem.IO.SeekOrigin.Begin);
-            CoordExtension = PngFile.LoadPngBytes(reader).Extract();
+            var bytes = Decode.Extract(PngFile.LoadPngBytes(reader));
             reader.BaseStream.Seek(0, Il2CppSystem.IO.SeekOrigin.Begin);
+            OnLoadBytes = data =>
+            {
+                Extension.Preprocess(data, bytes);
+                (CoordLimits, OnLoadBytes, CoordLimitsCheck) = (CoordLimit.None, LoadBytesSkip, CoordLimitsCheckProc);
+            };
         };
-
-        static Action<CoordLimit> CoordLimitsCheck;
+        static Action<HumanDataCoordinate> LoadBytesSkip = _ => { };
         static Action<CoordLimit> CoordLimitsCheckSkip => _ => { };
-        static Action<CoordLimit> CoordLimitsCheckProc => limit => CoordLimits |= limit;
+        static Action<CoordLimit> CoordLimitsCheckProc =>
+            limit => CoordLimits |= limit;
+        static Action<Il2CppReader> OnSkipPng = SkipPngProc;
+        static Action<HumanDataCoordinate> OnLoadBytes = LoadBytesSkip;
+        static Action<CoordLimit> CoordLimitsCheck = CoordLimitsCheckSkip;
 
-        [HarmonyPrefix]
-        [HarmonyWrapSafe]
+        [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(PngFile), nameof(PngFile.SkipPng), typeof(Il2CppReader))]
         static void SkipPngPrefix(Il2CppReader br) =>
-            SkipPngProc.Apply(br).Try(Plugin.Instance.Log.LogError);
+            OnSkipPng.Apply(br).Try(Plugin.Instance.Log.LogError);
 
-        [HarmonyPostfix]
-        [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(PngFile), nameof(PngFile.SkipPng), typeof(Il2CppReader))]
-        static void SkipPngPostfix() =>
-            CoordLimits = CoordLimit.None;
-
-        [HarmonyPrefix]
-        [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(HumanData), nameof(HumanData.CopyLimited))]
+        [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.LoadBytes), typeof(Il2CppBytes), typeof(Il2CppSystem.Version))]
-        static void DisableCoordinateLimitCheck() =>
-            CoordLimitsCheck = CoordLimitsCheckSkip;
+        static void HumanDataCoordinateLoadBytesPostfix(HumanDataCoordinate __instance) =>
+            OnLoadBytes(__instance);
 
-        [HarmonyPostfix]
-        [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(HumanData), nameof(HumanData.CopyLimited))]
-        [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.LoadBytes), typeof(Il2CppBytes), typeof(Il2CppSystem.Version))]
-        static void EnableCoordinateLimitCheck() =>
-            CoordLimitsCheck = CoordLimitsCheckProc;
-
-        [HarmonyPostfix]
-        [HarmonyWrapSafe]
+        [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanDataClothes), nameof(HumanDataClothes.CopyBase))]
         static void HumanDataClothesCopyPostfix() =>
             CoordLimitsCheck(CoordLimit.Clothes);
 
-        [HarmonyPostfix]
-        [HarmonyWrapSafe]
+        [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanDataAccessory), nameof(HumanDataAccessory.Copy))]
         static void HumanDataAccessoryCopyPostfix() =>
             CoordLimitsCheck(CoordLimit.Accessory);
 
-        [HarmonyPostfix]
-        [HarmonyWrapSafe]
+        [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanDataHair), nameof(HumanDataHair.Copy))]
         static void HumanDataHairCopyPostfix() =>
             CoordLimitsCheck(CoordLimit.Hair);
 
-        [HarmonyPostfix]
-        [HarmonyWrapSafe]
+        [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanDataFaceMakeup), nameof(HumanDataFaceMakeup.Copy))]
         static void HumanDataFaceMakeupCopyPostfix() =>
             CoordLimitsCheck(CoordLimit.FaceMakeup);
 
-        [HarmonyPostfix]
-        [HarmonyWrapSafe]
+        [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanDataBodyMakeup), nameof(HumanDataBodyMakeup.Copy))]
         static void HumanDataBodyMakeupCopyPostfix() =>
             CoordLimitsCheck(CoordLimit.BodyMakeup);
 
-        [HarmonyPrefix]
-        [HarmonyWrapSafe]
+        [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), typeof(Human.ReloadFlags))]
         static void HumanReloadCoordinateWithFlagsPrefix(Human __instance) =>
-            (CoordLimits is not CoordLimit.None)
-                .Maybe(Event.NotifyPreCoordinateDeserialize.Apply(__instance).Apply(CoordLimits).Apply(CoordExtension));
+            CoordLimits = CoordLimit.None.With(OnCoordinateReload(__instance, CoordLimits));
 
-        [HarmonyPostfix]
-        [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), typeof(Human.ReloadFlags))]
-        static void HumanReloadCoordinateWithFlagsPostfix(Human __instance) =>
-            (CoordLimits is not CoordLimit.None)
-                .Maybe(Event.NotifyPostCoordinateDeserialize.Apply(__instance).Apply(CoordLimits).Apply(CoordExtension));
+        static Action OnCoordinateReload(Human human, CoordLimit flags) =>
+            (flags, human.isReloading) switch
+            {
+                (CoordLimit.None, true) => OnCharacterReload(human),
+                (CoordLimit.None, false) => F.DoNothing,
+                (_, _) => F.Apply(Extension.LoadCoord, human, CoordLimits)
+            };
+    }
 
-        static Action InitializeCoordLimits =
-            () => Event.OnPostCoordinateDeserialize += delegate { CoordLimits = CoordLimit.None; };
+    public static partial class Extension
+    {
+        internal static event Action<Human, CoordLimit> PreReloadCoord =
+            (human, limit) => Plugin.Instance.Log.LogDebug($"Coordinate reload: {human.data.Pointer}, {limit}");
+
+        internal static void Preprocess(HumanDataCoordinate data, byte[] bytes) =>
+            OnPreprocessCoord.Apply(data).Apply(ToExtension(bytes)).Try(Plugin.Instance.Log.LogError);
+
+        internal static void LoadCoord(Human human, CoordLimit limit) =>
+            (PreReloadCoord.Apply(human).Apply(limit) + OnReloadCoord.Apply(human)).Try(Plugin.Instance.Log.LogError);
+    }
+
+    public static partial class Extension<T, U>
+        where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+        where U : CoordinateExtension<U>, new()
+    {
+        static U LoadingCoordinate = new();
+        static Func<U, U> ResolveProc = value =>
+            ((OnResolve,  _) = (ResolveSkip, LoadingCoordinate)).Item2;
+        static Func<U, U> ResolveSkip = value => value;
+        static Func<U, U> OnResolve = ResolveSkip;
+
+        internal static void Preprocess(HumanDataCoordinate data, ZipArchive archive) =>
+            OnPreprocessCoord(data, ((OnResolve, LoadingCoordinate) = (ResolveProc, LoadCoord(archive))).Item2);
+
+        internal static U Resolve(U current) =>
+            OnResolve(current);
+    }
+
+    public static partial class Extension
+    {
+        internal static void RegisterInternal<T, U>()
+            where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+            where U : CoordinateExtension<U>, new()
+        {
+            OnPreprocessChara += Extension<T, U>.Preprocess;
+            OnPreprocessCoord += Extension<T, U>.Preprocess;
+            OnCopy += Extension<T, U>.Copy;
+        }
+
+        internal static void RegisterInternal<T>()
+            where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
+        {
+            OnPreprocessChara += Extension<T>.Preprocess;
+            OnCopy += Extension<T>.Copy;
+        }
     }
     #endregion
 }

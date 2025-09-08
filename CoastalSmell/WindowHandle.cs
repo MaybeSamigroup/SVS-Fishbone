@@ -1,10 +1,10 @@
-using BepInEx.Unity.IL2CPP;
-using BepInEx.Configuration;
 using System;
 using UnityEngine;
 using TMPro;
 using UniRx;
 using UniRx.Triggers;
+using BepInEx.Unity.IL2CPP;
+using BepInEx.Configuration;
 
 namespace CoastalSmell
 {

@@ -1,5 +1,3 @@
-using BepInEx;
-using BepInEx.Unity.IL2CPP;
 using System;
 using System.Linq;
 using System.Collections.Generic;
@@ -7,6 +5,8 @@ using UniRx;
 using UniRx.Triggers;
 using Cysharp.Threading.Tasks;
 using ILLGames.Unity.Component;
+using BepInEx;
+using BepInEx.Unity.IL2CPP;
 
 namespace CoastalSmell
 {
@@ -207,7 +207,7 @@ namespace CoastalSmell
         internal static BepInEx.Logging.ManualLogSource Logger;
         public const string Guid = $"{Process}.{Name}";
         public const string Name = "CoastalSmell";
-        public const string Version = "1.0.5";
+        public const string Version = "1.0.6";
 
         public override void Load() =>
             (Logger = Log).With(Sprites.Initialize).With(UGUI.Initialize);
