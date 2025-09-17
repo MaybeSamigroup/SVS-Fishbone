@@ -1,14 +1,15 @@
-using HarmonyLib;
 using BepInEx;
 using BepInEx.Unity.IL2CPP;
 using System;
 using System.IO;
+using System.Linq;
 using System.IO.Compression;
+using System.Collections.Generic;
 using Character;
+using HarmonyLib;
 using CoastalSmell;
 using CharaLimit = Character.HumanData.LoadLimited.Flags;
 using CoordLimit = Character.HumanDataCoordinate.LoadLimited.Flags;
-using System.Collections.Generic;
 
 namespace Fishbone
 {
@@ -21,9 +22,14 @@ namespace Fishbone
         public static event Action<HumanDataCoordinate, ZipArchive> OnPreprocessCoord =
             (data, archive) => Plugin.Instance.Log.LogDebug($"Coordinate preprocess:{data.Pointer},{archive.Entries.Count}");
 
-        public static event Action<Human> OnReloadChara = delegate { };
+        public static event Action<Human> OnLoadChara = delegate { };
 
-        public static event Action<Human> OnReloadCoord = delegate { };
+        public static event Action<Human> OnLoadCoord = delegate { };
+
+        public static Dictionary<K, V> Merge<K, V>(this Dictionary<K, V> mods, K index, V mod) where K : IEquatable<K> =>
+            mods.Where(entry => !index.Equals(entry.Key))
+                .Select(entry => new Tuple<K, V>(entry.Key, entry.Value))
+                .Append(new Tuple<K, V>(index, mod)).ToDictionary();
     }
 
     // Extension interfaces
@@ -103,8 +109,7 @@ namespace Fishbone
         where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
         public static event Action<HumanData, T> OnPreprocessChara = delegate { };
-        public static T LoadingData(HumanData data) =>
-            LoadingCharas.GetValueOrDefault(data, new());
+
         public static Action<Stream, T> SerializeChara =
             Json<T>.Save.Apply(Plugin.Instance.Log.LogError);
         public static Func<Stream, T> DeserializeChara =
@@ -123,9 +128,6 @@ namespace Fishbone
 
         internal static Plugin Instance;
         private Harmony Patch;
-
-        public override void Load() =>
-            (Instance, Patch) = (this, Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks"));
 
         public override bool Unload() =>
             true.With(Patch.UnpatchSelf) && base.Unload();

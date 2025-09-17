@@ -1,31 +1,21 @@
-using HarmonyLib;
 using System;
 using System.IO;
 using System.IO.Compression;
 using System.Collections.Generic;
+using UniRx;
+using UniRx.Triggers;
 using Character;
-using LoadFlags = Character.HumanData.LoadFileInfo.Flags;
+using HarmonyLib;
+using CoastalSmell;
 using CharaLimit = Character.HumanData.LoadLimited.Flags;
 using CoordLimit = Character.HumanDataCoordinate.LoadLimited.Flags;
 using Il2CppReader = Il2CppSystem.IO.BinaryReader;
 using Il2CppWriter = Il2CppSystem.IO.BinaryWriter;
-using CoastalSmell;
-using UniRx;
-using UniRx.Triggers;
 
 namespace Fishbone
 {
     static partial class Hooks
     {
-        static Hooks()
-        {
-            HumanDataLoadActions = (data, flags) =>
-                flags is (LoadFlags.Custom | LoadFlags.Coorde | LoadFlags.Parameter | LoadFlags.Graphic | LoadFlags.About)
-                    or (LoadFlags.Custom | LoadFlags.Coorde | LoadFlags.Parameter | LoadFlags.Graphic | LoadFlags.About | LoadFlags.Status)
-                ? (GetPngSizeProc(data), Extension.Preprocess)
-                : (GetPngSizeSkip, HumanDataLoadFileSkip);
-        }
-
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.SaveFile), typeof(Il2CppWriter), typeof(bool))]
         static void HumanDataSaveFilePrefix(HumanData __instance, Il2CppWriter bw) =>
@@ -81,7 +71,8 @@ namespace Fishbone
                 current.Merge(limit, Extension<T, U>.Resolve(human.data, current)) : Extension<T, U>.Resolve(human.data, new());
 
         internal static void LoadCoord(Human human, CoordLimit limit) =>
-            Characters[human] = Characters[human].Merge(human.data.Status.coordinateType,  limit, Extension<T, U>.Resolve(Coord(human)));
+            Characters[human] = Characters.GetValueOrDefault(human, new())
+                .Merge(human.data.Status.coordinateType,  limit, Extension<T, U>.Resolve(Coord(human)));
     }
 
     public partial class HumanExtension<T>

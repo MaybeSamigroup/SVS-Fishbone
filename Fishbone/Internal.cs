@@ -1,4 +1,3 @@
-using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -6,13 +5,14 @@ using System.IO.Compression;
 using System.Reflection;
 using Character;
 using ILLGames.IO;
+using HarmonyLib;
+using CoastalSmell;
 using LoadFlags = Character.HumanData.LoadFileInfo.Flags;
 using CharaLimit = Character.HumanData.LoadLimited.Flags;
 using CoordLimit = Character.HumanDataCoordinate.LoadLimited.Flags;
 using Il2CppBytes = Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<byte>;
 using Il2CppReader = Il2CppSystem.IO.BinaryReader;
 using Il2CppStream = Il2CppSystem.IO.Stream;
-using CoastalSmell;
 
 namespace Fishbone
 {
@@ -34,15 +34,10 @@ namespace Fishbone
         where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
         where U : CoordinateExtension<U>, new()
     {
-        static readonly string Path;
-
-        static Extension()
-        {
-            Path = typeof(T)
-                .GetCustomAttribute(typeof(ExtensionAttribute<T, U>))
-                    is ExtensionAttribute<T, U> extension ? extension.Path :
-                    throw new InvalidDataException($"{typeof(T)} is not bones to stuck.");
-        }
+        static readonly string Path =
+            typeof(T).GetCustomAttribute(typeof(ExtensionAttribute<T, U>))
+                is ExtensionAttribute<T, U> extension ? extension.Path :
+                throw new InvalidDataException($"{typeof(T)} is not bones to stuck.");
 
         static bool TryGetEntry(ZipArchive archive, string path, out ZipArchiveEntry entry) =>
             null != (entry = archive.GetEntry(path));
@@ -65,15 +60,10 @@ namespace Fishbone
     public static partial class Extension<T>
         where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
-        static readonly string Path;
-
-        static Extension()
-        {
-            Path = typeof(T)
-                .GetCustomAttribute(typeof(ExtensionAttribute<T>))
-                    is ExtensionAttribute<T> extension ? extension.Path :
-                    throw new InvalidDataException($"{typeof(T)} does not have valid extension attribute.");
-        }
+        static readonly string Path =
+            typeof(T).GetCustomAttribute(typeof(ExtensionAttribute<T>))
+                is ExtensionAttribute<T> extension ? extension.Path :
+                throw new InvalidDataException($"{typeof(T)} does not have valid extension attribute.");
 
         static bool TryGetEntry(ZipArchive archive, string path, out ZipArchiveEntry entry) =>
             null != (entry = archive.GetEntry(path));
@@ -110,12 +100,16 @@ namespace Fishbone
         static Action<Il2CppStream, long, long> OnGetPngSize = GetPngSizeSkip;
         static Action<HumanData> HumanDataLoadFileSkip = _ => { };
         static Action<HumanData> OnHumanDataLoadFile = HumanDataLoadFileSkip;
-        static HumanDataLoadActions HumanDataLoadActions;
+        static HumanDataLoadActions HumanDataLoadActions = (data, flags) =>
+                flags is (LoadFlags.Custom | LoadFlags.Coorde | LoadFlags.Parameter | LoadFlags.Graphic | LoadFlags.About)
+                    or (LoadFlags.Custom | LoadFlags.Coorde | LoadFlags.Parameter | LoadFlags.Graphic | LoadFlags.About | LoadFlags.Status)
+                ? (GetPngSizeProc(data), Extension.Preprocess)
+                : (GetPngSizeSkip, HumanDataLoadFileSkip);
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.LoadFile), typeof(Il2CppReader), typeof(LoadFlags))]
         static void HumanDataLoadFilePrefix(HumanData __instance, LoadFlags flags) =>
-            ((OnGetPngSize, OnHumanDataLoadFile), CharaLimits, NowReloading) =
+            ((OnGetPngSize, OnHumanDataLoadFile), CharaLimits, NowLoading) =
                 (HumanDataLoadActions(__instance, flags), CharaLimit.All, null);
 
         [HarmonyPostfix, HarmonyWrapSafe]
@@ -139,27 +133,27 @@ namespace Fishbone
         static void HumanDataCopyLimitedHook(HumanData dst, HumanData src, CharaLimit flags) =>
             (CoordLimitsCheck, CharaLimits) = (CoordLimitsCheckSkip, flags).With(F.Apply(Extension.Copy, src, dst));
 
-        static Human NowReloading = null;
-        static Action OnCharacterReload(Human human) =>
-            F.Apply(Extension.LoadChara, NowReloading = human, CharaLimits);
+        static Human NowLoading = null;
+        static Action OnCharacterLoad(Human human) =>
+            F.Apply(Extension.LoadChara, NowLoading = human, CharaLimits);
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanBody), nameof(HumanBody.OnUpdateShader), [])]
-        static void HumanReloadPrefix(HumanBody __instance) =>
-            (NowReloading is null).Maybe(OnCharacterReload(__instance.human));
+        static void HumanLoadPrefix(HumanBody __instance) =>
+            (NowLoading is null).Maybe(OnCharacterLoad(__instance.human));
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanFace), nameof(HumanFace.LoadGagMaterial), [])]
         [HarmonyPatch(typeof(HumanFace), nameof(HumanFace.OnUpdateShader), [])]
         [HarmonyPatch(typeof(HumanFace), nameof(HumanFace.ChangeHead), typeof(int), typeof(bool))]
-        static void HumanReloadPrefix(HumanFace __instance) =>
-            (NowReloading is null).Maybe(OnCharacterReload(__instance.human));
+        static void HumanLoadPrefix(HumanFace __instance) =>
+            (NowLoading is null).Maybe(OnCharacterLoad(__instance.human));
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(Human), nameof(Human.Create), typeof(HumanData))]
         [HarmonyPatch(typeof(Human), nameof(Human.StatusNormalize), typeof(HumanData))]
         static void HumanCreateAndStatusNormalizePrefix() =>
-            NowReloading = null;
+            NowLoading = null;
     }
 
     public static partial class Extension
@@ -167,8 +161,8 @@ namespace Fishbone
         internal static event Action<HumanData, HumanData> OnCopy =
             (src, dst) => Plugin.Instance.Log.LogDebug($"Character copied from {src.Pointer} to {dst.Pointer}");
 
-        internal static event Action<Human, CharaLimit> PreReloadChara =
-            (human, limit) => Plugin.Instance.Log.LogDebug($"Character reload: {human.data.Pointer}, {limit}");
+        internal static event Action<Human, CharaLimit> PreLoadChara =
+            (human, limit) => Plugin.Instance.Log.LogDebug($"Character loaded: {human.data.Pointer}, {limit}");
 
         internal static void Preprocess(HumanData data) =>
             OnPreprocessChara.Apply(data)
@@ -176,7 +170,7 @@ namespace Fishbone
                 .Try(Plugin.Instance.Log.LogError);
 
         internal static void LoadChara(Human human, CharaLimit limit) =>
-            (PreReloadChara.Apply(human).Apply(limit) + OnReloadChara.Apply(human)).Try(Plugin.Instance.Log.LogError);
+            (PreLoadChara.Apply(human).Apply(limit) + OnLoadChara.Apply(human)).Try(Plugin.Instance.Log.LogError);
 
         internal static void Copy(HumanData src, HumanData dst) =>
             OnCopy(src, dst);
@@ -192,8 +186,7 @@ namespace Fishbone
             OnPreprocessChara(data, LoadingCharas[data] = LoadChara(archive));
 
         internal static void Copy(HumanData src, HumanData dst) =>
-            (LoadingCharas.TryGetValue(src, out var value) && LoadingCharas.Remove(src))
-                .Maybe(F.Apply(Copy, dst, value));
+            (LoadingCharas.TryGetValue(src, out var value) && LoadingCharas.Remove(src)).Maybe(F.Apply(Copy, dst, value));
 
         static void Copy(HumanData data, T value) =>
             LoadingCharas[data] = value;
@@ -291,7 +284,7 @@ namespace Fishbone
         static Action OnCoordinateReload(Human human, CoordLimit flags) =>
             (flags, human.isReloading) switch
             {
-                (CoordLimit.None, true) => OnCharacterReload(human),
+                (CoordLimit.None, true) => F.Apply(Extension.LoadCoord, human, CoordLimit.All),
                 (CoordLimit.None, false) => F.DoNothing,
                 (_, _) => F.Apply(Extension.LoadCoord, human, CoordLimits)
             };
@@ -299,14 +292,14 @@ namespace Fishbone
 
     public static partial class Extension
     {
-        internal static event Action<Human, CoordLimit> PreReloadCoord =
-            (human, limit) => Plugin.Instance.Log.LogDebug($"Coordinate reload: {human.data.Pointer}, {limit}");
+        internal static event Action<Human, CoordLimit> PreLoadCoord =
+            (human, limit) => Plugin.Instance.Log.LogDebug($"Coordinate loaded: {human.data.Pointer}, {limit}");
 
         internal static void Preprocess(HumanDataCoordinate data, byte[] bytes) =>
             OnPreprocessCoord.Apply(data).Apply(ToExtension(bytes)).Try(Plugin.Instance.Log.LogError);
 
         internal static void LoadCoord(Human human, CoordLimit limit) =>
-            (PreReloadCoord.Apply(human).Apply(limit) + OnReloadCoord.Apply(human)).Try(Plugin.Instance.Log.LogError);
+            (PreLoadCoord.Apply(human).Apply(limit) + OnLoadCoord.Apply(human)).Try(Plugin.Instance.Log.LogError);
     }
 
     public static partial class Extension<T, U>
@@ -315,13 +308,11 @@ namespace Fishbone
     {
         static U LoadingCoordinate = new();
         static Func<U, U> ResolveProc = value =>
-            ((OnResolve,  _) = (ResolveSkip, LoadingCoordinate)).Item2;
+            ((OnResolve, LoadingCoordinate, _) = (ResolveSkip, new(), LoadingCoordinate)).Item3;
         static Func<U, U> ResolveSkip = value => value;
         static Func<U, U> OnResolve = ResolveSkip;
-
         internal static void Preprocess(HumanDataCoordinate data, ZipArchive archive) =>
             OnPreprocessCoord(data, ((OnResolve, LoadingCoordinate) = (ResolveProc, LoadCoord(archive))).Item2);
-
         internal static U Resolve(U current) =>
             OnResolve(current);
     }

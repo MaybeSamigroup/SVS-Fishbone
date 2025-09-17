@@ -1,64 +1,48 @@
-using BepInEx.Unity.IL2CPP;
 using System;
 using System.IO.Compression;
 using System.Collections.Generic;
 using Character;
 using CharacterCreation;
+using HarmonyLib;
+using BepInEx.Unity.IL2CPP;
 using CoastalSmell;
 
 namespace Fishbone
 {
     public static partial class Extension
     {
-        public static bool ToActor(this Human human, out SaveData.Actor actor) =>
-            (actor = ToActor(human)) is not null;
+        public static event Action PrepareSaveChara =
+            F.Apply(Plugin.Instance.Log.LogDebug, "Custom character save.");
+        public static event Action<ZipArchive> OnSaveChara = PrepareSaveChara.Ignoring<ZipArchive>();
+
+        public static event Action PrepareSaveCoord =
+            F.Apply(Plugin.Instance.Log.LogDebug, "Custom coordinate save.");
+        public static event Action<ZipArchive> OnSaveCoord = PrepareSaveCoord.Ignoring<ZipArchive>();
+
+        public static event Action<SaveData.Actor> PrepareSaveActor = actor =>
+            Plugin.Instance.Log.LogDebug($"Simulation actor{actor.charasGameParam.Index} save.");
+        public static event Action<SaveData.Actor, ZipArchive> OnSaveActor = (actor, _) => PrepareSaveActor(actor); 
+
+        public static event Action<Human> OnLoadCustomChara = delegate { };
+        public static event Action<Human> OnLoadCustomCoord = delegate { };
+
+        public static event Action<SaveData.Actor> OnLoadActor = actor => PreLoadActor(actor); 
+        public static event Action<SaveData.Actor, Human> OnLoadActorChara = delegate { };
+        public static event Action<SaveData.Actor, Human> OnLoadActorCoord = delegate { };
 
         public static T Chara<T, U>(Human human)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
-            ToActor(human, out var actor)
-                ? ActorExtension<T, U>.Chara(actor)
+            HumanActors.TryGetValue(human, out var index)
+                ? ActorExtension<T, U>.Chara(index)
                 : HumanExtension<T, U>.Chara;
 
         public static U Coord<T, U>(Human human)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
-            ToActor(human, out var actor)
-                ? ActorExtension<T, U>.Coord(actor)
+            HumanActors.TryGetValue(human, out var index)
+                ? ActorExtension<T, U>.Coord(index)
                 : HumanExtension<T, U>.Coord;
-
-        public static T Chara<T>(Human human)
-            where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
-            ToActor(human, out var actor)
-                ? ActorExtension<T>.Chara(actor)
-                : HumanExtension<T>.Chara;
-        public static void HumanCustomReload()
-        {
-            var custom = HumanCustom.Instance;
-            custom.Human.Load();
-            custom._motionIK = new ILLGames.Rigging.MotionIK(custom.Human, custom._motionIK._data);
-            custom.LoadPlayAnimation(custom.NowPose, new() { value = 0.0f });
-            custom.Human.Reload();
-        }
-        public static event Action PrepareSaveChara =
-            F.Apply(Plugin.Instance.Log.LogDebug, "Custom character save.");
-        public static event Action PrepareSaveCoord =
-            F.Apply(Plugin.Instance.Log.LogDebug, "Custom coordinate save.");
-        public static event Action<SaveData.Actor> PrepareSaveActor =
-            actor => Plugin.Instance.Log.LogDebug($"Simulation actor{actor.charasGameParam.Index} save.");
-        public static event Action<ZipArchive> OnSaveChara = PrepareSaveChara.Ignoring<ZipArchive>();
-        public static event Action<ZipArchive> OnSaveCoord = PrepareSaveCoord.Ignoring<ZipArchive>();
-        public static event Action<SaveData.Actor, ZipArchive> OnSaveActor = (actor, _) => PrepareSaveActor(actor); 
-        public static event Action<Human> OnReloadCustomChara = delegate { };
-        public static event Action<Human> OnReloadCustomCoord = delegate { };
-        public static event Action<SaveData.Actor, Human> OnReloadActorChara = delegate { };
-        public static event Action<SaveData.Actor, Human> OnReloadActorCoord = delegate { };
-
-        static Extension()
-        {
-            PreReloadChara += ForkReloadChara;
-            PreReloadCoord += ForkReloadCoord;
-        }
 
         public static void Register<T, U>()
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
@@ -68,14 +52,24 @@ namespace Fishbone
             OnSaveChara += HumanExtension<T, U>.SaveChara;
             OnSaveCoord += HumanExtension<T, U>.SaveCoord;
             OnSaveActor += ActorExtension<T, U>.Save;
-            PreReloadCustomChara += HumanExtension<T, U>.LoadChara;
-            PreReloadCustomCoord += HumanExtension<T, U>.LoadCoord;
-            PreReloadActorChara += ActorExtension<T, U>.LoadChara;
-            PreReloadActorCoord += ActorExtension<T, U>.LoadCoord;
+            PreLoadCustomChara += HumanExtension<T, U>.LoadChara;
+            PreLoadCustomCoord += HumanExtension<T, U>.LoadCoord;
+            PreLoadActor += ActorExtension<T, U>.LoadActor;
+            PreLoadActorChara += ActorExtension<T, U>.LoadChara;
+            PreLoadActorCoord += ActorExtension<T, U>.LoadCoord;
             OnCopyCustomToActor += ActorExtension<T, U>.OnCopy;
             OnCopyActorToCustom += HumanExtension<T, U>.OnCopy;
-            OnChangeActorCoord += ActorExtension<T, U>.CoordinateChange;
+            OnActorCoordChange += ActorExtension<T, U>.CoordinateChange;
+            OnEnterCustom += HumanExtension<T, U>.Initialize;
+            OnCustomInitialize += HumanExtension<T, U>.Initialize;
+            Plugin.Instance.Log.LogDebug($"ComplexExtension<{typeof(T)},{typeof(U)}> regiistered.");
         }
+
+        public static T Chara<T>(Human human)
+            where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
+            HumanActors.TryGetValue(human, out var index)
+                ? ActorExtension<T>.Chara(index)
+                : HumanExtension<T>.Chara;
 
         public static void Register<T>()
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
@@ -83,10 +77,21 @@ namespace Fishbone
             RegisterInternal<T>();
             OnSaveChara += HumanExtension<T>.SaveChara;
             OnSaveActor += ActorExtension<T>.Save;
-            PreReloadCustomChara += HumanExtension<T>.LoadChara;
-            PreReloadActorChara += ActorExtension<T>.LoadChara;
+            PreLoadCustomChara += HumanExtension<T>.LoadChara;
+            PreLoadActor += ActorExtension<T>.LoadActor;
+            PreLoadActorChara += ActorExtension<T>.LoadChara;
             OnCopyCustomToActor += ActorExtension<T>.OnCopy;
             OnCopyActorToCustom += HumanExtension<T>.OnCopy;
+            OnEnterCustom += HumanExtension<T>.Initialize;
+            OnCustomInitialize += HumanExtension<T>.Initialize;
+            Plugin.Instance.Log.LogDebug($"SimpleExtension<{typeof(T)}> regiistered.");
+        }
+        public static void HumanCustomReload()
+        {
+            var custom = HumanCustom.Instance;
+            custom.Human.Load();
+            custom._motionIK = new ILLGames.Rigging.MotionIK(custom.Human, custom._motionIK._data);
+            custom.LoadPlayAnimation(custom.NowPose, new() { value = 0.0f });
         }
     }
 
@@ -145,5 +150,11 @@ namespace Fishbone
     public partial class Plugin : BasePlugin
     {
         public const string Process = "SamabakeScramble";
+        public override void Load()
+        {
+            Instance = this;
+            Patch = Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks");
+            Extension.Initialize();
+        }
     }
 }

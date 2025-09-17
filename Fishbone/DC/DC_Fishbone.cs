@@ -1,8 +1,9 @@
-using BepInEx.Unity.IL2CPP;
 using System;
 using System.IO.Compression;
 using System.Collections.Generic;
 using Character;
+using HarmonyLib;
+using BepInEx.Unity.IL2CPP;
 
 namespace Fishbone
 {
@@ -26,8 +27,9 @@ namespace Fishbone
         {
             RegisterInternal<T, U>();
             OnSaveChara += HumanExtension<T, U>.SaveChara;
-            PreReloadChara += HumanExtension<T, U>.LoadChara;
-            PreReloadCoord += HumanExtension<T, U>.LoadCoord;
+            PreLoadChara += HumanExtension<T, U>.LoadChara;
+            PreLoadCoord += HumanExtension<T, U>.LoadCoord;
+            Plugin.Instance.Log.LogDebug($"ComplexExtension<{typeof(T)},{typeof(U)}> regiistered.");
         }
 
         public static T Chara<T>(Human human)
@@ -35,11 +37,12 @@ namespace Fishbone
             HumanExtension<T>.Chara(human);
 
         public static void Register<T>()
-            where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
+            where T : SimpleExtension<T>, ComplexExtension<T,T>, CharacterExtension<T>, CoordinateExtension<T>, new()
         {
             RegisterInternal<T>();
             OnSaveChara += HumanExtension<T>.SaveChara;
-            PreReloadChara += HumanExtension<T>.LoadChara;
+            PreLoadChara += HumanExtension<T>.LoadChara;
+            Plugin.Instance.Log.LogDebug($"SimpleExtension<{typeof(T)}> regiistered.");
         }
     }
 
@@ -68,5 +71,10 @@ namespace Fishbone
     public partial class Plugin : BasePlugin
     {
         public const string Process = "DigitalCraft";
+        public override void Load()
+        {
+            Instance = this;
+            Patch = Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks");
+        }
     }
 }
