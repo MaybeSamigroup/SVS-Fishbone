@@ -26,7 +26,7 @@ namespace Fishbone
 
         public static event Action<Human> OnLoadCoord = delegate { };
 
-        public static Dictionary<K, V> Merge<K, V>(this Dictionary<K, V> mods, K index, V mod) where K : IEquatable<K> =>
+        public static Dictionary<K, V> Merge<K, V>(this Dictionary<K, V> mods, K index, V mod) =>
             mods.Where(entry => !index.Equals(entry.Key))
                 .Select(entry => new Tuple<K, V>(entry.Key, entry.Value))
                 .Append(new Tuple<K, V>(index, mod)).ToDictionary();
