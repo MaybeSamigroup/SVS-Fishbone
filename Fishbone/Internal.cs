@@ -26,8 +26,14 @@ namespace Fishbone
         static void Implant(HumanData data, byte[] bytes) =>
             data.PngData = data.PngData != null ? Encode.Implant(data.PngData, bytes) : Encode.Implant(bytes);
 
-        static ZipArchive ToExtension(byte[] bytes) =>
+        static ZipArchive ToArchive(byte[] bytes) =>
             new ZipArchive(new MemoryStream(bytes.Length == 0 ? NoExtension : bytes));
+
+        static Action<MemoryStream> Save(Action<ZipArchive> actions) =>
+            stream => actions.Apply(new ZipArchive(stream, ZipArchiveMode.Create)).Try(Plugin.Instance.Log.LogError);
+
+        static byte[] ToBinary(Action<ZipArchive> actions) =>
+            new MemoryStream().With(Save(actions)).ToArray();
     }
 
     public static partial class Extension<T, U>
@@ -126,12 +132,12 @@ namespace Fishbone
         [HarmonyPrefix, HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.Copy))]
         static void HumanDataCopyHook(HumanData dst, HumanData src) =>
-            (CoordLimitsCheck, CharaLimits) = (CoordLimitsCheckSkip, CharaLimit.All).With(F.Apply(Extension.Copy, src, dst));
+            (CharaLimits = CharaLimit.All).With(F.Apply(Extension.Copy, src, dst));
 
         [HarmonyPrefix, HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.CopyLimited))]
         static void HumanDataCopyLimitedHook(HumanData dst, HumanData src, CharaLimit flags) =>
-            (CoordLimitsCheck, CharaLimits) = (CoordLimitsCheckSkip, flags).With(F.Apply(Extension.Copy, src, dst));
+            (CharaLimits = flags).With(F.Apply(Extension.Copy, src, dst));
 
         static Human NowLoading = null;
         static Action OnCharacterLoad(Human human) =>
@@ -166,14 +172,14 @@ namespace Fishbone
 
         internal static void Preprocess(HumanData data) =>
             OnPreprocessChara.Apply(data)
-                .Apply(ToExtension(Decode.Extract(data.PngData)))
+                .Apply(ToArchive(Decode.Extract(data.PngData)))
                 .Try(Plugin.Instance.Log.LogError);
 
         internal static void LoadChara(Human human, CharaLimit limit) =>
             (PreLoadChara.Apply(human).Apply(limit) + OnLoadChara.Apply(human)).Try(Plugin.Instance.Log.LogError);
 
         internal static void Copy(HumanData src, HumanData dst) =>
-            OnCopy(src, dst);
+            OnCopy.Apply(src).Apply(dst).Try(Plugin.Instance.Log.LogError);
     }
 
     public static partial class Extension<T, U>
@@ -182,8 +188,10 @@ namespace Fishbone
     {
         internal static Dictionary<HumanData, T> LoadingCharas = new();
 
+        internal static void Initialize() => LoadingCharas.Clear();
+
         internal static void Preprocess(HumanData data, ZipArchive archive) =>
-            OnPreprocessChara(data, LoadingCharas[data] = LoadChara(archive));
+            OnPreprocessChara.Apply(data).Apply(LoadingCharas[data] = LoadChara(archive)).Try(Plugin.Instance.Log.LogError);
 
         internal static void Copy(HumanData src, HumanData dst) =>
             (LoadingCharas.TryGetValue(src, out var value) && LoadingCharas.Remove(src)).Maybe(F.Apply(Copy, dst, value));
@@ -200,8 +208,10 @@ namespace Fishbone
     {
         internal static Dictionary<HumanData, T> LoadingCharas = new();
 
+        internal static void Initialize() => LoadingCharas.Clear();
+
         internal static void Preprocess(HumanData data, ZipArchive archive) =>
-            OnPreprocessChara(data, LoadingCharas[data] = LoadChara(archive));
+            OnPreprocessChara.Apply(data).Apply(LoadingCharas[data] = LoadChara(archive)).Try(Plugin.Instance.Log.LogError);
 
         internal static void Copy(HumanData src, HumanData dst) =>
             (LoadingCharas.TryGetValue(src, out var value) && LoadingCharas.Remove(src))
@@ -230,7 +240,8 @@ namespace Fishbone
             OnLoadBytes = data =>
             {
                 Extension.Preprocess(data, bytes);
-                (CoordLimits, OnLoadBytes, CoordLimitsCheck) = (CoordLimit.None, LoadBytesSkip, CoordLimitsCheckProc);
+                (CoordLimits, OnLoadBytes, CoordLimitsCheck) =
+                    (CoordLimit.None, LoadBytesSkip, CoordLimitsCheckProc);
             };
         };
         static Action<HumanDataCoordinate> LoadBytesSkip = _ => { };
@@ -245,6 +256,11 @@ namespace Fishbone
         [HarmonyPatch(typeof(PngFile), nameof(PngFile.SkipPng), typeof(Il2CppReader))]
         static void SkipPngPrefix(Il2CppReader br) =>
             OnSkipPng.Apply(br).Try(Plugin.Instance.Log.LogError);
+
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.LoadBytes), typeof(Il2CppBytes), typeof(Il2CppSystem.Version))]
+        static void HumanDataCoordinateLoadBytesPrefix() =>
+            CoordLimitsCheck = CoordLimitsCheckSkip;
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.LoadBytes), typeof(Il2CppBytes), typeof(Il2CppSystem.Version))]
@@ -277,17 +293,39 @@ namespace Fishbone
             CoordLimitsCheck(CoordLimit.BodyMakeup);
 
         [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanBody), nameof(HumanBody.OnUpdateCoordinate))]
+        static void HumanBodyOnUpdateCoordinatePrefix(HumanBody __instance) =>
+            CoordLimits = CoordLimit.None.With(OnCoordinateReload(__instance.human, CoordLimits));
+
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanFace), nameof(HumanFace.OnUpdateCoordinate))]
+        static void HumanFaceOnUpdateCoordinatePrefix(HumanFace __instance) =>
+            CoordLimits = CoordLimit.None.With(OnCoordinateReload(__instance.human, CoordLimits));
+
+        [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), typeof(Human.ReloadFlags))]
         static void HumanReloadCoordinateWithFlagsPrefix(Human __instance) =>
             CoordLimits = CoordLimit.None.With(OnCoordinateReload(__instance, CoordLimits));
-
         static Action OnCoordinateReload(Human human, CoordLimit flags) =>
-            (flags, human.isReloading) switch
-            {
-                (CoordLimit.None, true) => F.Apply(Extension.LoadCoord, human, CoordLimit.All),
-                (CoordLimit.None, false) => F.DoNothing,
-                (_, _) => F.Apply(Extension.LoadCoord, human, CoordLimits)
-            };
+            flags is not CoordLimit.None ? F.Apply(Extension.LoadCoord, human, CoordLimits) : F.DoNothing;
+
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanCoordinate), nameof(HumanCoordinate.ChangeCoordinateType), typeof(ChaFileDefine.CoordinateType), typeof(bool))]
+        static void HumanCoordinateChangeCoordinateTypePrefix(HumanCoordinate __instance, ChaFileDefine.CoordinateType type, bool changeBackCoordinateType) =>
+            (changeBackCoordinateType || __instance.human.data.Status.coordinateType != (int)type).Maybe(PreCoordinateChange(__instance.human, (int)type));
+
+        [HarmonyPostfix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanCoordinate), nameof(HumanCoordinate.ChangeCoordinateType), typeof(ChaFileDefine.CoordinateType), typeof(bool))]
+        static void HumanCoordinateChangeCoordinateTypePostfix(HumanCoordinate __instance) =>
+            OnCoordinateChange(__instance.human);
+
+        static Action PreCoordinateChange(Human human, int coordinateType) =>
+            ((OnCoordinateChange, _) = (OnCoordinateChangeProc, F.Apply(Extension.ChangeCoord, human, coordinateType))).Item2;
+
+        static Action<Human> OnCoordinateChange;
+        static Action<Human> OnCoordinateChangeSkip = _ => { };
+        static Action<Human> OnCoordinateChangeProc = human =>
+            (OnCoordinateChange = OnCoordinateChangeSkip).With(F.Apply(Extension.LoadCoord, human));
     }
 
     public static partial class Extension
@@ -295,11 +333,20 @@ namespace Fishbone
         internal static event Action<Human, CoordLimit> PreLoadCoord =
             (human, limit) => Plugin.Instance.Log.LogDebug($"Coordinate loaded: {human.data.Pointer}, {limit}");
 
+        internal static event Action<Human, int> PreChangeCoord =
+            (human, coordinateType) => Plugin.Instance.Log.LogDebug($"Coordinate changed: {human.data.Pointer}, {coordinateType}");
+
         internal static void Preprocess(HumanDataCoordinate data, byte[] bytes) =>
-            OnPreprocessCoord.Apply(data).Apply(ToExtension(bytes)).Try(Plugin.Instance.Log.LogError);
+            OnPreprocessCoord.Apply(data).Apply(ToArchive(bytes)).Try(Plugin.Instance.Log.LogError);
 
         internal static void LoadCoord(Human human, CoordLimit limit) =>
             (PreLoadCoord.Apply(human).Apply(limit) + OnLoadCoord.Apply(human)).Try(Plugin.Instance.Log.LogError);
+
+        internal static void LoadCoord(Human human) =>
+            OnLoadCoord.Apply(human).Try(Plugin.Instance.Log.LogError);
+
+        internal static void ChangeCoord(Human human, int coordinateType) =>
+            PreChangeCoord.Apply(human).Apply(coordinateType).Try(Plugin.Instance.Log.LogError);
     }
 
     public static partial class Extension<T, U>
@@ -307,12 +354,14 @@ namespace Fishbone
         where U : CoordinateExtension<U>, new()
     {
         static U LoadingCoordinate = new();
+        static Func<U, U> ResolveSkip = value => value;
+        static Func<U, U> ResolveInit = value =>
+            ((OnResolve, LoadingCoordinate) = (ResolveProc, value)).Item2;
         static Func<U, U> ResolveProc = value =>
             ((OnResolve, LoadingCoordinate, _) = (ResolveSkip, new(), LoadingCoordinate)).Item3;
-        static Func<U, U> ResolveSkip = value => value;
         static Func<U, U> OnResolve = ResolveSkip;
         internal static void Preprocess(HumanDataCoordinate data, ZipArchive archive) =>
-            OnPreprocessCoord(data, ((OnResolve, LoadingCoordinate) = (ResolveProc, LoadCoord(archive))).Item2);
+            OnPreprocessCoord.Apply(data).Apply(ResolveInit(LoadCoord(archive))).Try(Plugin.Instance.Log.LogError);
         internal static U Resolve(U current) =>
             OnResolve(current);
     }

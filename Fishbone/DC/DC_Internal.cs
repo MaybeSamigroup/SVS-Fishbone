@@ -1,5 +1,3 @@
-using System;
-using System.IO;
 using System.IO.Compression;
 using System.Collections.Generic;
 using UniRx;
@@ -48,11 +46,8 @@ namespace Fishbone
 
     public static partial class Extension
     {
-        static Action<MemoryStream> Save(Action<ZipArchive> actions) =>
-            stream => actions(new ZipArchive(stream, ZipArchiveMode.Create));
-
         internal static void Save(Human human) =>
-            Implant(human.data, new MemoryStream().With(Save(OnSaveChara.Apply(human))).ToArray());
+            Implant(human.data, ToBinary(OnSaveChara.Apply(human)));
     }
 
     public partial class HumanExtension<T, U>

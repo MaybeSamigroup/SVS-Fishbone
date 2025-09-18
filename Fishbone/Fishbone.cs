@@ -82,8 +82,6 @@ namespace Fishbone
     {
         public static event Action<HumanData, T> OnPreprocessChara = delegate { };
         public static event Action<HumanDataCoordinate, U> OnPreprocessCoord = delegate { };
-        public static T LoadingData(HumanData data) =>
-            LoadingCharas.GetValueOrDefault(data, new());
         public static Action<Stream, T> SerializeChara =
             Json<T>.Save.Apply(Plugin.Instance.Log.LogError);
         public static Action<Stream, U> SerializeCoord =

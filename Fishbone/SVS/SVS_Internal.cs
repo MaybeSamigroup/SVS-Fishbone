@@ -9,6 +9,7 @@ using UniRx.Triggers;
 using Manager;
 using Character;
 using CharacterCreation;
+using ILLGames.Rigging;
 using ILLGames.Extensions;
 using HarmonyLib;
 using CoastalSmell;
@@ -42,18 +43,15 @@ namespace Fishbone
 
     public static partial class Extension
     {
-        static byte[] Save(MemoryStream stream, Action<ZipArchive> actions) =>
-            stream.With(actions.ApplyDisposable(new ZipArchive(stream, ZipArchiveMode.Create))).ToArray();
-
         static void Save(string path, Action<ZipArchive> actions) =>
-            File.WriteAllBytes(path, Encode.Implant(File.ReadAllBytes(path), Save(new MemoryStream(), actions)));
+            File.WriteAllBytes(path, Encode.Implant(File.ReadAllBytes(path), ToBinary(actions)));
 
         internal static void SaveChara(string path) => Save(path, OnSaveChara);
 
         internal static void SaveCoord(string path) => Save(path, OnSaveCoord);
 
         internal static void SaveActor(SaveData.Actor actor) =>
-            Implant(actor.charFile, Save(new MemoryStream(), OnSaveActor.Apply(actor)));
+            Implant(actor.charFile, ToBinary(OnSaveActor.Apply(actor)));
     }
 
     public partial class HumanExtension<T, U>
@@ -173,28 +171,43 @@ namespace Fishbone
         internal static event Action<Human, CharaLimit> PreLoadCustomChara = (human, _) =>
             Plugin.Instance.Log.LogDebug($"Custom chara loaded: {human.data.Pointer}");
         internal static void LoadCustomChara(Human human, CharaLimit limit) =>
-            (PreLoadCustomChara.Apply(human).Apply(limit) + OnLoadCustomChara.Apply(human)).Invoke();
+            (PreLoadCustomChara.Apply(human).Apply(limit) + OnLoadCustomChara.Apply(human)).Try(Plugin.Instance.Log.LogError);
 
         internal static event Action<Human, CoordLimit> PreLoadCustomCoord = (human, _) =>
             Plugin.Instance.Log.LogDebug($"Custom coord loaded: {human.data.Pointer}");
         internal static void LoadCustomCoord(Human human, CoordLimit limit) =>
-            (PreLoadCustomCoord.Apply(human).Apply(limit) + OnLoadCustomCoord.Apply(human)).Invoke();
+            (PreLoadCustomCoord.Apply(human).Apply(limit) + OnLoadCustomCoord.Apply(human)).Try(Plugin.Instance.Log.LogError);
 
-        internal static void LoadActor(SaveData.Actor actor) => OnLoadActor(actor);
+        internal static void LoadActor(SaveData.Actor actor) => OnLoadActor.Apply(actor).Try(Plugin.Instance.Log.LogError);
         internal static event Action<SaveData.Actor> PreLoadActor = actor =>
             Plugin.Instance.Log.LogDebug($"Simulation actor{actor.charasGameParam.Index} loaded: {actor.charFile.Pointer}");
 
         internal static event Action<SaveData.Actor, CharaLimit> PreLoadActorChara = (actor, _) =>
             Plugin.Instance.Log.LogDebug($"Simulation actor{actor.charasGameParam.Index} loaded: {actor.charFile.Pointer}");
         internal static void LoadActorChara(Human human, CharaLimit limit) =>
-            Resolve(human, out var actor)
-                .Maybe(PreLoadActorChara.Apply(actor).Apply(limit) + OnLoadActorChara.Apply(actor).Apply(human));
+            Resolve(human, out var actor).Maybe(F.Apply(LoadActorChara, actor, human, limit));
+        static void LoadActorChara(SaveData.Actor actor, Human human, CharaLimit limit) =>
+            (PreLoadActorChara.Apply(actor).Apply(limit) + OnLoadActorChara.Apply(actor).Apply(human)).Try(Plugin.Instance.Log.LogError);
 
         internal static event Action<SaveData.Actor, CoordLimit> PreLoadActorCoord = (actor, _) =>
             Plugin.Instance.Log.LogDebug($"Simulation coord{actor.charasGameParam.Index} loaded: {actor.charFile.Pointer}");
         internal static void LoadActorCoord(Human human, CoordLimit limit) =>
-            Resolve(human, out var actor)
-                .Maybe(PreLoadActorCoord.Apply(actor).Apply(limit) + OnLoadActorCoord.Apply(actor).Apply(human));
+            Resolve(human, out var actor).Maybe(F.Apply(LoadActorCoord, actor, human, limit));
+        static void LoadActorCoord(SaveData.Actor actor, Human human, CoordLimit limit) =>
+            (PreLoadActorCoord.Apply(actor).Apply(limit) + OnLoadActorCoord.Apply(actor).Apply(human)).Try(Plugin.Instance.Log.LogError);
+
+        static void HumanCustomReload(HumanCustom custom) =>
+            (custom?.Human is not null)
+                .Maybe(F.Apply(HumanCustomReload, custom, custom.Human));
+        static void HumanCustomReload(HumanCustom custom, Human human) =>
+            (custom?._motionIK is not null).With(human.Load)
+                .Maybe(F.Apply(HumanCustomReload, custom, human, custom._motionIK));
+
+        static void HumanCustomReload(HumanCustom custom, Human human, MotionIK motionIK)
+        {
+            custom._motionIK = new MotionIK(human, custom._motionIK._data);
+            custom.LoadPlayAnimation(custom.NowPose, new() { value = 0.0f });
+        }
 
         internal static event Action OnEnterCustom = delegate
         {
@@ -203,8 +216,8 @@ namespace Fishbone
             PreLoadChara += LoadCustomChara;
             PreLoadCoord -= LoadActorCoord;
             PreLoadCoord += LoadCustomCoord;
-            OnChangeCoord -= ActorChangeCoord;
-            OnChangeCoord += CustomChangeCoord;
+            PreChangeCoord -= ActorChangeCoord;
+            PreChangeCoord += CustomChangeCoord;
         };
         internal static event Action OnLeaveCustom = delegate
         {
@@ -212,8 +225,8 @@ namespace Fishbone
             PreLoadChara += LoadActorChara;
             PreLoadCoord -= LoadCustomCoord;
             PreLoadCoord += LoadActorCoord;
-            OnChangeCoord -= CustomChangeCoord;
-            OnChangeCoord += ActorChangeCoord;
+            PreChangeCoord -= CustomChangeCoord;
+            PreChangeCoord += ActorChangeCoord;
         };
     }
 
@@ -331,8 +344,8 @@ namespace Fishbone
             OnLeaveCustom += TrackActors.Clear;
             OnEnterCustom += HumanActors.Clear;
             OnLeaveCustom += HumanActors.Clear;
+            Util<HumanCustom>.Hook(() => OnEnterCustom(), () => OnLeaveCustom());
             OnLeaveCustom();
-            Util<HumanCustom>.Hook(OnEnterCustom, OnLeaveCustom);
         }
     }
 
@@ -367,13 +380,13 @@ namespace Fishbone
             F.Apply(Plugin.Instance.Log.LogDebug, "Custom initialized.");
 
         internal static void CustomInitialize() =>
-            CustomChangeCoordAction = InitializeCustomCoord;
+            ChangeCustomCoord = PrepareInitialize;
 
         internal static void CopyActorToCustom() =>
-            OnCopyActorToCustom(GetHumanCustomTarget);
+            OnCopyActorToCustom.Apply(GetHumanCustomTarget).Try(Plugin.Instance.Log.LogError);
 
         internal static void CopyCustomToActor() =>
-            OnCopyCustomToActor(GetHumanCustomTarget);
+            OnCopyCustomToActor.Apply(GetHumanCustomTarget).Try(Plugin.Instance.Log.LogError);
     }
 
     public partial class HumanExtension<T, U>
@@ -410,26 +423,19 @@ namespace Fishbone
 
     #region Actor Coordinate Change
 
-    static partial class Hooks
-    {
-        [HarmonyPrefix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(HumanCoordinate), nameof(HumanCoordinate.ChangeCoordinateType), typeof(ChaFileDefine.CoordinateType), typeof(bool))]
-        static void HumanCoordinateChangeCoordinateTypePrefix(HumanCoordinate __instance, ChaFileDefine.CoordinateType type, bool changeBackCoordinateType) =>
-            (changeBackCoordinateType || __instance.human.data.Status.coordinateType != (int)type)
-                .Maybe(F.Apply(Extension.ChangeCoordinate, __instance.human, (int)type));
-    }
-
     static partial class Extension
     {
-        internal static void ChangeCoordinate(Human human, int coordinateType) => OnChangeCoord(human, coordinateType);
-        internal static event Action<Human, int> OnChangeCoord = delegate { };
         internal static event Action<int, int> OnActorCoordChange = delegate { };
-        internal static Action CustomChangeCoordAction = PrepareSaveCoord;
-        internal static void InitializeCustomCoord() =>
-            (CustomChangeCoordAction = PrepareSaveCoord).With(OnCustomInitialize);
-        internal static void CustomChangeCoord(Human human, int coordinateType) => CustomChangeCoordAction();
+        internal static Action ChangeCustomCoord = PrepareSaveCoord;
+        internal static void PrepareInitialize() =>
+            (ChangeCustomCoord = PrepareSaveCoord).With(NotifyInitialize);
+        static void NotifyInitialize() =>
+            OnCustomInitialize.Try(Plugin.Instance.Log.LogError);
+        internal static void CustomChangeCoord(Human human, int coordinateType) => ChangeCustomCoord();
         internal static void ActorChangeCoord(Human human, int coordinateType) =>
-            HumanActors.TryGetValue(human, out var actor).Maybe(OnActorCoordChange.Apply(actor).Apply(coordinateType));
+            HumanActors.TryGetValue(human, out var actor).Maybe(F.Apply(ActorChangeCoord, actor, coordinateType));
+        static void ActorChangeCoord(int actor, int coordinateType) =>
+            OnActorCoordChange.Apply(actor).Apply(coordinateType).Try(Plugin.Instance.Log.LogError);
     }
 
     static partial class ActorExtension<T, U>
