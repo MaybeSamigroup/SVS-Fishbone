@@ -27,13 +27,15 @@ namespace Fishbone
             data.PngData = data.PngData != null ? Encode.Implant(data.PngData, bytes) : Encode.Implant(bytes);
 
         static ZipArchive ToArchive(byte[] bytes) =>
-            new ZipArchive(new MemoryStream(bytes.Length == 0 ? NoExtension : bytes));
-
-        static Action<MemoryStream> Save(Action<ZipArchive> actions) =>
-            stream => actions.Apply(new ZipArchive(stream, ZipArchiveMode.Create)).Try(Plugin.Instance.Log.LogError);
+            new ZipArchive(new MemoryStream()
+                .With(stream => stream.Write(bytes.Length == 0 ? NoExtension : bytes))
+                .With(stream => stream.Seek(0, SeekOrigin.Begin)), ZipArchiveMode.Update);
 
         static byte[] ToBinary(Action<ZipArchive> actions) =>
             new MemoryStream().With(Save(actions)).ToArray();
+
+        static Action<MemoryStream> Save(Action<ZipArchive> actions) =>
+            stream => actions.Apply(new ZipArchive(stream, ZipArchiveMode.Create)).Try(Plugin.Instance.Log.LogError);
     }
 
     public static partial class Extension<T, U>
@@ -47,6 +49,12 @@ namespace Fishbone
 
         static bool TryGetEntry(ZipArchive archive, string path, out ZipArchiveEntry entry) =>
             null != (entry = archive.GetEntry(path));
+
+        static void Translate<V>(Func<V, T> map, ZipArchive archive, ZipArchiveEntry entry) where V : new() =>
+            SaveChara(archive, map(Json<V>.Load(Plugin.Instance.Log.LogError, entry.Open())));
+
+        static void Translate<V>(Func<V, U> map, ZipArchive archive, ZipArchiveEntry entry) where V : new() =>
+            SaveCoord(archive, map(Json<V>.Load(Plugin.Instance.Log.LogError, entry.Open())));
 
         internal static void SaveChara(ZipArchive archive, T value) =>
             SerializeChara(archive.CreateEntry(Path).Open(), value);
@@ -73,6 +81,9 @@ namespace Fishbone
 
         static bool TryGetEntry(ZipArchive archive, string path, out ZipArchiveEntry entry) =>
             null != (entry = archive.GetEntry(path));
+
+        static void Translate<V>(Func<V, T> map, ZipArchive archive, ZipArchiveEntry entry) where V : new() =>
+            SaveChara(archive, map(Json<V>.Load(Plugin.Instance.Log.LogError, entry.Open())));
 
         static void Cleanup(ZipArchive archive) =>
             TryGetEntry(archive, Path, out var entry).Maybe(entry.Delete);

@@ -90,6 +90,10 @@ namespace Fishbone
             Json<T>.Load.Apply(Plugin.Instance.Log.LogError);
         public static Func<Stream, U> DeserializeCoord =
             Json<U>.Load.Apply(Plugin.Instance.Log.LogError);
+        public static Action<HumanData, ZipArchive> Translate<V>(string path, Func<V, T> map) where V: new() =>
+            (_, archive) => TryGetEntry(archive, path, out var entry).Maybe(F.Apply(Translate, map, archive, entry));
+        public static Action<HumanDataCoordinate, ZipArchive> Translate<V>(string path, Func<V, U> map) where V: new() =>
+            (_, archive) => TryGetEntry(archive, path, out var entry).Maybe(F.Apply(Translate, map, archive, entry));
     }
 
     // Attribute for simple extensions
@@ -112,6 +116,8 @@ namespace Fishbone
             Json<T>.Save.Apply(Plugin.Instance.Log.LogError);
         public static Func<Stream, T> DeserializeChara =
             Json<T>.Load.Apply(Plugin.Instance.Log.LogError);
+        public static Action<HumanData, ZipArchive> Translate<V>(string path, Func<V, T> map) where V: new() =>
+            (_, archive) => TryGetEntry(archive, path, out var entry).Maybe(F.Apply(Translate, map, archive, entry));
     }
 
     // Main plugin class

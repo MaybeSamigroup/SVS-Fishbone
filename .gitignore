@@ -1,7 +1,4 @@
-**/*.dll
-**/*.exe
-**/*.runtimeconfig.json
+Release/
 obj/
 bin/
-*.sln
 *.zip

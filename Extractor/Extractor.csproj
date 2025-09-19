@@ -14,9 +14,16 @@
         </Compile>
     </ItemGroup>
     <Target Name="Release" AfterTargets="Build">
-        <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="..\Release\$(AssemblyName)"/>
-        <Copy SourceFiles="$(OutputPath)\$(AssemblyName).exe" DestinationFolder="..\Release\$(AssemblyName)"/>
-        <Copy SourceFiles="$(OutputPath)\$(AssemblyName).runtimeconfig.json" DestinationFolder="..\Release\$(AssemblyName)"/>
+		<ItemGroup>
+			<Binaries Include="$(OutputPath)\*.dll"/>
+			<Binaries Include="$(OutputPath)\*.exe"/>
+			<Binaries Include="$(OutputPath)\*.runtimeconfig.json"/>
+		</ItemGroup>
+		<Copy SourceFiles="@(Binaries)" DestinationFolder="..\Release\$(AssemblyName)"/>
         <ZipDirectory SourceDirectory="..\Release\$(AssemblyName)" Overwrite="true" DestinationFile="..\$(AssemblyName).zip"/>
     </Target>
+	<Target Name="CleanRelease" AfterTargets="Clean">
+		<RemoveDir Directories="..\Release\$(AssemblyName)"/>
+		<Delete Files="..\$(AssemblyName).zip"/>
+	</Target>
 </Project>

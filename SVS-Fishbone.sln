@@ -1,0 +1,58 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Extractor", "Extractor\Extractor.csproj", "{AB6A9952-3184-24A1-3B6F-CE10F1A537C1}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "CoastalSmell", "CoastalSmell", "{6CD179C4-C2C6-FDD9-A3B9-37CC9E432F87}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Fishbone", "Fishbone", "{3DD79502-F954-D61B-69C7-33AFB849EC2C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DC_CoastalSmell", "CoastalSmell\DC\DC_CoastalSmell.csproj", "{5F0623BD-F8DC-0EF6-C992-2C94D980F986}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SVS_CoastalSmell", "CoastalSmell\SVS\SVS_CoastalSmell.csproj", "{F809F18C-CF8C-EA1E-1285-2A6AE15F0AF1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DC_Fishbone", "Fishbone\DC\DC_Fishbone.csproj", "{97383A83-1B6F-0827-5AC6-4887F715FF72}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SVS_Fishbone", "Fishbone\SVS\SVS_Fishbone.csproj", "{F0828863-5062-B01F-EF9B-1B433514853C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{AB6A9952-3184-24A1-3B6F-CE10F1A537C1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AB6A9952-3184-24A1-3B6F-CE10F1A537C1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AB6A9952-3184-24A1-3B6F-CE10F1A537C1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AB6A9952-3184-24A1-3B6F-CE10F1A537C1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5F0623BD-F8DC-0EF6-C992-2C94D980F986}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5F0623BD-F8DC-0EF6-C992-2C94D980F986}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5F0623BD-F8DC-0EF6-C992-2C94D980F986}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5F0623BD-F8DC-0EF6-C992-2C94D980F986}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F809F18C-CF8C-EA1E-1285-2A6AE15F0AF1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F809F18C-CF8C-EA1E-1285-2A6AE15F0AF1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F809F18C-CF8C-EA1E-1285-2A6AE15F0AF1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F809F18C-CF8C-EA1E-1285-2A6AE15F0AF1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{97383A83-1B6F-0827-5AC6-4887F715FF72}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{97383A83-1B6F-0827-5AC6-4887F715FF72}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{97383A83-1B6F-0827-5AC6-4887F715FF72}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{97383A83-1B6F-0827-5AC6-4887F715FF72}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F0828863-5062-B01F-EF9B-1B433514853C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F0828863-5062-B01F-EF9B-1B433514853C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F0828863-5062-B01F-EF9B-1B433514853C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F0828863-5062-B01F-EF9B-1B433514853C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{5F0623BD-F8DC-0EF6-C992-2C94D980F986} = {6CD179C4-C2C6-FDD9-A3B9-37CC9E432F87}
+		{F809F18C-CF8C-EA1E-1285-2A6AE15F0AF1} = {6CD179C4-C2C6-FDD9-A3B9-37CC9E432F87}
+		{97383A83-1B6F-0827-5AC6-4887F715FF72} = {3DD79502-F954-D61B-69C7-33AFB849EC2C}
+		{F0828863-5062-B01F-EF9B-1B433514853C} = {3DD79502-F954-D61B-69C7-33AFB849EC2C}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B492B3DD-D5FB-4D0C-9093-DACCDBEFB21B}
+	EndGlobalSection
+EndGlobal

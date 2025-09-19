@@ -92,6 +92,10 @@
         <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="$(GamePath)\BepInEx\plugins\" />
     </Target>
     <Target Name="Release" AfterTargets="Build">
+		<ItemGroup>
+			<UITexture Include="Resource\*.*"/>
+		</ItemGroup>
+		<Copy SourceFiles="@(UITexture)" DestinationFolder="..\..\Release\$(GameName)\UserData\plugins\CoastalSmell"/>
         <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="..\..\Release\$(GameName)\BepinEx\plugins"/>
     </Target>
 </Project>
