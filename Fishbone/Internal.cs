@@ -35,7 +35,7 @@ namespace Fishbone
             new MemoryStream().With(Save(actions)).ToArray();
 
         static Action<MemoryStream> Save(Action<ZipArchive> actions) =>
-            stream => actions.Apply(new ZipArchive(stream, ZipArchiveMode.Create)).Try(Plugin.Instance.Log.LogError);
+            stream => actions.ApplyDisposable(new ZipArchive(stream, ZipArchiveMode.Create)).Try(Plugin.Instance.Log.LogError);
     }
 
     public static partial class Extension<T, U>
