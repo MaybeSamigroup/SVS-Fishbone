@@ -75,7 +75,7 @@ enabled = true
 
 Extract the [latest release](https://github.com/MaybeSamigroup/SVS-Fishbone/releases/latest) DigitalCraft.zip to your DigitalCraft install directory.
 
-## Migration from 1.x.x release
+## Migration from 1.x.x to 2.x.x
 
 Remove Fishbone.dll from BepinEx/plugins.
 
@@ -85,6 +85,13 @@ Cards made with 1.x.x is still supported to load in SVS, but not in DC.
 
 To use them in DC, should saved agein with 2.x.x.
 
+## Migration from 2.x.x to 3.x.x
+
+These directories contained in previous releases are no longer used.
+Please move it contents to new one and delete it.
+
+- (GameRoot)/UserData/plugins/SamabakeScramble.SardineTail
+
 ## How it works
 
 Fishbone extensions are embedded into game character or coordinate portraits as a PNG private extension chunk named `"fsBN"`.  
@@ -92,4 +99,4 @@ This allows arbitrary plugin data to be stored and retrieved alongside character
 
 ## How to use
 
-TODO!
+refer the [Framework introduction](https://github.com/MaybeSamigroup/SVS-Fishbone/wiki)
