@@ -42,10 +42,18 @@ namespace Fishbone
             [typeof(string), typeof(Il2CppSystem.Version), typeof(bool), typeof(bool)], [ArgumentType.Normal, ArgumentType.Out, ArgumentType.Normal, ArgumentType.Normal])]
         static void CostumeInfoInitFileListPostfix() =>
             OnSkipPng = SkipPngProc;
+
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(DigitalCraft.DigitalCraft), nameof(DigitalCraft.DigitalCraft.SaveScene))]
+        static void DigitalCraftSaveScenePrefix() =>
+            Extension.SaveScene();
     }
 
     public static partial class Extension
     {
+        internal static void SaveScene() =>
+            Human.list.Yield().ForEach(Save);
+
         internal static void Save(Human human) =>
             Implant(human.data, ToBinary(OnSaveChara.Apply(human)));
     }
