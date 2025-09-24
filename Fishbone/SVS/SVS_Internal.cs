@@ -380,7 +380,7 @@ namespace Fishbone
             F.Apply(Plugin.Instance.Log.LogDebug, "Custom initialized.");
 
         internal static void CustomInitialize() =>
-            ChangeCustomCoord = PrepareInitialize;
+            ChangeCustomCoord = HumanCustom.Instance.Human == null ? PrepareSaveCoord : PrepareInitialize;
 
         internal static void CopyActorToCustom() =>
             OnCopyActorToCustom.Apply(GetHumanCustomTarget).Try(Plugin.Instance.Log.LogError);

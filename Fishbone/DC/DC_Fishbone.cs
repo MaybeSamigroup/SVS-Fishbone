@@ -1,15 +1,19 @@
 using System;
 using System.IO.Compression;
-using System.Collections.Generic;
 using Character;
 using HarmonyLib;
 using BepInEx.Unity.IL2CPP;
+using CoastalSmell;
 
 namespace Fishbone
 {
     public static partial class Extension
     {
-        public static event Action<Human, ZipArchive> OnSaveChara = delegate { };
+        public static event Action<Human> PrepareSaveChara =
+            _ => Plugin.Instance.Log.LogDebug("Custom character save.");
+
+        public static event Action<Human, ZipArchive> OnSaveChara =
+            (human, _) => PrepareSaveChara.Apply(human).Try(Plugin.Instance.Log.LogError);
 
         public static T Chara<T, U>(Human human)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
@@ -20,6 +24,16 @@ namespace Fishbone
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
             HumanExtension<T, U>.Coord(human);
+
+        public static void Chara<T, U>(Human human, T mods)
+            where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+            where U : CoordinateExtension<U>, new() =>
+            HumanExtension<T, U>.Chara(human, mods);
+
+        public static void Coord<T, U>(Human human, U mods)
+            where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+            where U : CoordinateExtension<U>, new() =>
+            HumanExtension<T, U>.Coord(human, mods);
 
         public static void Register<T, U>()
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
@@ -44,28 +58,6 @@ namespace Fishbone
             PreLoadChara += HumanExtension<T>.LoadChara;
             Plugin.Instance.Log.LogDebug($"SimpleExtension<{typeof(T)}> regiistered.");
         }
-    }
-
-    public partial class HumanExtension<T, U>
-        where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
-        where U : CoordinateExtension<U>, new()
-    {
-        static readonly Dictionary<Human, T> Characters = new();
-
-        public static T Chara(Human human) =>
-            Characters.GetValueOrDefault(human, new());
-
-        public static U Coord(Human human) =>
-            Characters.GetValueOrDefault(human, new T()).Get(human.data.Status.coordinateType);
-    }
-
-    public partial class HumanExtension<T>
-        where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
-    {
-        static readonly Dictionary<Human, T> Characters = new();
-
-        public static T Chara(Human human) =>
-            Characters.GetValueOrDefault(human, new());
     }
 
     public partial class Plugin : BasePlugin

@@ -48,6 +48,18 @@ namespace Fishbone
                 ? ActorExtension<T, U>.Coord(index)
                 : HumanExtension<T, U>.Coord;
 
+        public static void Chara<T, U>(Human human, T mods)
+            where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+            where U : CoordinateExtension<U>, new() =>
+            HumanActors.TryGetValue(human, out var index)
+                .Either(() => HumanExtension<T, U>.Chara = mods, F.Apply(ActorExtension<T, U>.Coord, index, mods));
+
+        public static void Coord<T, U>(Human human, U mods)
+            where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+            where U : CoordinateExtension<U>, new() =>
+            HumanActors.TryGetValue(human, out var index)
+                .Either(() => HumanExtension<T, U>.Coord = mods, F.Apply(ActorExtension<T, U>.Coord, index, mods));
+
         public static void Register<T, U>()
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new()
@@ -78,6 +90,11 @@ namespace Fishbone
                 ? ActorExtension<T>.Chara(index)
                 : HumanExtension<T>.Chara;
 
+        public static void Set<T>(Human human, T mods)
+            where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
+            HumanActors.TryGetValue(human, out var index)
+                .Either(F.Apply(HumanExtension<T>.Set, mods), F.Apply(ActorExtension<T>.Chara, index, mods));
+
         public static void Register<T>()
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
         {
@@ -105,10 +122,20 @@ namespace Fishbone
     {
         static T Current = new();
 
-        public static T Chara => Current;
+        static int CoordinateType =>
+            HumanCustom.Instance?.Human?.data?.Status.coordinateType ?? 0;
 
-        public static U Coord =>
-            Current.Get(HumanCustom.Instance?.Human?.data?.Status.coordinateType ?? 0) ?? new ();
+        public static T Chara
+        {
+            get => Current;
+            set => Current = value;
+        }
+
+        public static U Coord
+        {
+            get => Current.Get(CoordinateType) ?? new();
+            set => Current = Current.Merge(CoordinateType, value);
+        }
     }
 
     public partial class HumanExtension<T>
@@ -116,7 +143,11 @@ namespace Fishbone
     {
         static T Current = new();
 
-        public static T Chara => Current;
+        public static T Chara
+        {
+            get => Current;
+            set => Current = value;
+        }
     }
 
     public partial class ActorExtension<T, U>
@@ -137,6 +168,16 @@ namespace Fishbone
 
         public static U Coord(int index) =>
             Coords.GetValueOrDefault(index, new());
+
+        public static void Set(SaveData.Actor actor, T mods) =>
+            Coord(actor.charasGameParam.Index, mods);
+
+        public static void Set(SaveData.Actor actor, U mods) =>
+            Coord(actor.charasGameParam.Index, mods);
+
+        public static void Coord(int index, T mods) => Charas[index] = mods;
+
+        public static void Coord(int index, U mods) => Coords[index] = mods; 
     }
 
     public partial class ActorExtension<T>
@@ -149,6 +190,11 @@ namespace Fishbone
 
         public static T Chara(int index) =>
             Charas.GetValueOrDefault(index, new());
+
+        public static void Chara(SaveData.Actor actor, T mods) =>
+            Chara(actor.charasGameParam.Index, mods);
+
+        public static void Chara(int index, T mods) => Charas[index] = mods;
     }
 
     public partial class Plugin : BasePlugin

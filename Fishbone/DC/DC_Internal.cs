@@ -58,10 +58,24 @@ namespace Fishbone
             Implant(human.data, ToBinary(OnSaveChara.Apply(human)));
     }
 
-    public partial class HumanExtension<T, U>
+    internal class HumanExtension<T, U>
         where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
         where U : CoordinateExtension<U>, new()
     {
+        static readonly Dictionary<Human, T> Characters = new();
+
+        internal static T Chara(Human human) =>
+            Characters.GetValueOrDefault(human, new());
+
+        internal static U Coord(Human human) =>
+            Characters.GetValueOrDefault(human, new T()).Get(human.data.Status.coordinateType);
+
+        internal static void Chara(Human human, T mods) =>
+            Characters[human] = mods;
+
+        internal static void Coord(Human human, U mods) =>
+            Characters[human] = Chara(human).Merge(human.data.Status.coordinateType, mods);
+
         internal static void SaveChara(Human human, ZipArchive archive) =>
             Extension<T, U>.SaveChara(archive, Characters.GetValueOrDefault(human, new()));
 
@@ -78,9 +92,17 @@ namespace Fishbone
                 .Merge(human.data.Status.coordinateType,  limit, Extension<T, U>.Resolve(Coord(human)));
     }
 
-    public partial class HumanExtension<T>
+    internal class HumanExtension<T>
         where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
+        static readonly Dictionary<Human, T> Characters = new();
+
+        internal static T Chara(Human human) =>
+            Characters.GetValueOrDefault(human, new());
+
+        internal static void Chara(Human human, T mods) =>
+            Characters[human] = mods;
+
         internal static void SaveChara(Human human, ZipArchive archive) =>
             Extension<T>.SaveChara(archive, Characters.GetValueOrDefault(human, new()));
 
