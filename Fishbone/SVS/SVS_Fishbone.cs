@@ -93,7 +93,7 @@ namespace Fishbone
         public static void Set<T>(Human human, T mods)
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
             HumanActors.TryGetValue(human, out var index)
-                .Either(F.Apply(HumanExtension<T>.Set, mods), F.Apply(ActorExtension<T>.Chara, index, mods));
+                .Either(() => HumanExtension<T>.Chara = mods, F.Apply(ActorExtension<T>.Chara, index, mods));
 
         public static void Register<T>()
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
