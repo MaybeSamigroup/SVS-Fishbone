@@ -58,7 +58,7 @@ namespace Fishbone
             Implant(human.data, ToBinary(OnSaveChara.Apply(human)));
     }
 
-    internal class HumanExtension<T, U>
+    internal static class HumanExtension<T, U>
         where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
         where U : CoordinateExtension<U>, new()
     {
@@ -92,7 +92,7 @@ namespace Fishbone
                 .Merge(human.data.Status.coordinateType,  limit, Extension<T, U>.Resolve(Coord(human)));
     }
 
-    internal class HumanExtension<T>
+    internal static class HumanExtension<T>
         where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
         static readonly Dictionary<Human, T> Characters = new();

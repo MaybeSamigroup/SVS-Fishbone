@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Collections.Generic;
+using Il2CppSystem.Threading;
 using UniRx;
 using UniRx.Triggers;
 using Cysharp.Threading.Tasks;
@@ -17,9 +18,13 @@ namespace CoastalSmell
         /// <summary>
         /// Executes <paramref name="action"/> when <paramref name="predicate"/> is true, otherwise tries again next frame.
         /// </summary>
-        public static Action<Func<bool>, Action> DoOnCondition =
-            (predicate, action) => predicate()
-                .Either(DoNextFrame.Apply(DoOnCondition.Apply(predicate).Apply(action)), action);
+        public static Func<Func<bool>, Action, Action> DoOnCondition =
+            (predicate, action) => new CancellationTokenSource()
+                .With(DoOnConditionAndToken.Apply(predicate).Apply(action)).Cancel;
+
+        static Action<Func<bool>, Action, CancellationTokenSource> DoOnConditionAndToken =
+            (predicate, action, source) => UniTask.WaitUntil(predicate,
+                PlayerLoopTiming.Update, source.Token).ContinueWith(action);
     }
 
     public static class Util<T> where T : SingletonInitializer<T>

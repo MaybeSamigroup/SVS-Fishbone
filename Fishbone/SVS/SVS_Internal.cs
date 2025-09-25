@@ -19,6 +19,58 @@ using CoordLimit = Character.HumanDataCoordinate.LoadLimited.Flags;
 
 namespace Fishbone
 {
+    internal partial class HumanExtension<T, U>
+        where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+        where U : CoordinateExtension<U>, new()
+    {
+        static T Current = new();
+
+        static int CoordinateType =>
+            HumanCustom.Instance?.Human?.data?.Status.coordinateType ?? 0;
+
+        internal static T Chara() => Current;
+        internal static U Coord() => Current.Get(CoordinateType);
+        internal static void Chara(T value) => Current = value;
+        internal static void Coord(U value) => Plugin.Instance.Log
+            .LogInfo(Util.ToJson(Current = Current.Merge(CoordinateType, value)));
+    }
+
+    internal static partial class HumanExtension<T>
+        where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
+    {
+        static T Current = new();
+        internal static T Chara() => Current;
+        internal static void Chara(T value) => Current = value;
+    }
+
+    internal static partial class ActorExtension<T, U>
+        where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+        where U : CoordinateExtension<U>, new()
+    {
+        static readonly Dictionary<int, T> Charas = new();
+        static readonly Dictionary<int, U> Coords = new();
+
+        internal static T Chara(int index) =>
+            Charas.GetValueOrDefault(index, new());
+
+        internal static U Coord(int index) =>
+            Coords.GetValueOrDefault(index, new());
+
+        internal static void Chara(int index, T mods) => Charas[index] = mods;
+
+        internal static void Coord(int index, U mods) => Coords[index] = mods; 
+    }
+
+    internal static partial class ActorExtension<T>
+        where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
+    {
+        static readonly Dictionary<int, T> Charas = new();
+
+        internal static T Chara(int index) => Charas.GetValueOrDefault(index, new());
+
+        internal static void Chara(int index, T mods) => Charas[index] = mods;
+    }
+
     #region Save
 
     static partial class Hooks
@@ -54,25 +106,25 @@ namespace Fishbone
             Implant(actor.charFile, ToBinary(OnSaveActor.Apply(actor)));
     }
 
-    public partial class HumanExtension<T, U>
+    internal static partial class HumanExtension<T, U>
         where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
         where U : CoordinateExtension<U>, new()
     {
         internal static void SaveChara(ZipArchive archive) =>
-            Extension<T, U>.SaveChara(archive, Chara);
+            Extension<T, U>.SaveChara(archive, Chara());
 
         internal static void SaveCoord(ZipArchive archive) =>
-            Extension<T, U>.SaveCoord(archive, Coord);
+            Extension<T, U>.SaveCoord(archive, Coord());
     }
 
-    public partial class HumanExtension<T>
+    internal static partial class HumanExtension<T>
         where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
         internal static void SaveChara(ZipArchive archive) =>
-            Extension<T>.SaveChara(archive, Chara);
+            Extension<T>.SaveChara(archive, Chara());
     }
 
-    public partial class ActorExtension<T, U>
+    internal static partial class ActorExtension<T, U>
         where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
         where U : CoordinateExtension<U>, new()
     {
@@ -80,7 +132,7 @@ namespace Fishbone
             Extension<T, U>.SaveChara(archive, Charas.GetValueOrDefault(actor.charasGameParam.Index, new()));
     }
 
-    public partial class ActorExtension<T>
+    internal static partial class ActorExtension<T>
         where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
         internal static void Save(SaveData.Actor actor, ZipArchive archive) =>
@@ -230,7 +282,7 @@ namespace Fishbone
         };
     }
 
-    public partial class HumanExtension<T, U>
+    internal static partial class HumanExtension<T, U>
         where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
         where U : CoordinateExtension<U>, new()
     {
@@ -241,10 +293,10 @@ namespace Fishbone
             Current = Current.Merge(limit, Extension<T, U>.Resolve(human.data, Current));
 
         internal static void LoadCoord(Human human, CoordLimit limit) =>
-            Current = Current.Merge(human.data.Status.coordinateType, limit, Extension<T, U>.Resolve(Coord));
+            Current = Current.Merge(human.data.Status.coordinateType, limit, Extension<T, U>.Resolve(Coord()));
     }
 
-    public partial class HumanExtension<T>
+    internal static partial class HumanExtension<T>
         where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
         internal static void Initialize() =>
@@ -254,7 +306,7 @@ namespace Fishbone
             Current = Current.Merge(limit, Extension<T>.Resolve(human.data, Current));
     }
 
-    public partial class ActorExtension<T, U>
+    internal static partial class ActorExtension<T, U>
         where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
         where U : CoordinateExtension<U>, new()
     {
@@ -271,7 +323,7 @@ namespace Fishbone
                     Extension<T, U>.Resolve(Coords[actor.charasGameParam.Index]));
     }
 
-    public partial class ActorExtension<T>
+    internal static partial class ActorExtension<T>
         where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
         internal static void LoadActor(SaveData.Actor actor) =>
@@ -380,7 +432,7 @@ namespace Fishbone
             F.Apply(Plugin.Instance.Log.LogDebug, "Custom initialized.");
 
         internal static void CustomInitialize() =>
-            ChangeCustomCoord = HumanCustom.Instance.Human == null ? PrepareSaveCoord : PrepareInitialize;
+            ChangeCustomCoord = HumanCustom.Instance.Human == null ? NotifySaveCoord : PrepareInitialize;
 
         internal static void CopyActorToCustom() =>
             OnCopyActorToCustom.Apply(GetHumanCustomTarget).Try(Plugin.Instance.Log.LogError);
@@ -389,7 +441,7 @@ namespace Fishbone
             OnCopyCustomToActor.Apply(GetHumanCustomTarget).Try(Plugin.Instance.Log.LogError);
     }
 
-    public partial class HumanExtension<T, U>
+    internal static partial class HumanExtension<T, U>
         where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
         where U : CoordinateExtension<U>, new()
     {
@@ -397,26 +449,26 @@ namespace Fishbone
             Current = Current.Merge(CharaLimit.All, ActorExtension<T, U>.Chara(index));
     }
 
-    public partial class HumanExtension<T>
+    internal static partial class HumanExtension<T>
         where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
         internal static void OnCopy(int index) =>
             Current = Current.Merge(CharaLimit.All, ActorExtension<T>.Chara(index));
     }
 
-    public partial class ActorExtension<T, U>
+    internal static partial class ActorExtension<T, U>
         where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
         where U : CoordinateExtension<U>, new()
     {
         internal static void OnCopy(int index) =>
-            Charas[index] = Charas[index].Merge(CharaLimit.All, HumanExtension<T, U>.Chara);
+            Charas[index] = Charas[index].Merge(CharaLimit.All, HumanExtension<T, U>.Chara());
     }
 
-    public partial class ActorExtension<T>
+    internal static partial class ActorExtension<T>
         where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
         internal static void OnCopy(int index) =>
-            Charas[index] = Charas[index].Merge(CharaLimit.All, HumanExtension<T>.Chara);
+            Charas[index] = Charas[index].Merge(CharaLimit.All, HumanExtension<T>.Chara());
     }
 
     #endregion
@@ -426,9 +478,10 @@ namespace Fishbone
     static partial class Extension
     {
         internal static event Action<int, int> OnActorCoordChange = delegate { };
-        internal static Action ChangeCustomCoord = PrepareSaveCoord;
+        internal static Action ChangeCustomCoord = NotifySaveCoord;
         internal static void PrepareInitialize() =>
-            (ChangeCustomCoord = PrepareSaveCoord).With(NotifyInitialize);
+            (ChangeCustomCoord = NotifySaveCoord).With(NotifyInitialize);
+        static void NotifySaveCoord() => PrepareSaveCoord();
         static void NotifyInitialize() =>
             OnCustomInitialize.Try(Plugin.Instance.Log.LogError);
         internal static void CustomChangeCoord(Human human, int coordinateType) => ChangeCustomCoord();
@@ -438,7 +491,7 @@ namespace Fishbone
             OnActorCoordChange.Apply(actor).Apply(coordinateType).Try(Plugin.Instance.Log.LogError);
     }
 
-    static partial class ActorExtension<T, U>
+    internal static partial class ActorExtension<T, U>
     {
         internal static void CoordinateChange(int actor, int coordinateType) =>
             Coords[actor] = Charas[actor].Get(coordinateType);
