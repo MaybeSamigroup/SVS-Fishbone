@@ -15,22 +15,22 @@ namespace Fishbone
         public static event Action<Human, ZipArchive> OnSaveChara =
             (human, _) => PrepareSaveChara.Apply(human).Try(Plugin.Instance.Log.LogError);
 
-        public static T Chara<T, U>(Human human)
+        public static T Chara<T, U>(this Human human)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
             HumanExtension<T, U>.Chara(human);
 
-        public static U Coord<T, U>(Human human)
+        public static U Coord<T, U>(this Human human)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
             HumanExtension<T, U>.Coord(human);
 
-        public static void Chara<T, U>(Human human, T mods)
+        public static void Chara<T, U>(this Human human, T mods)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
             HumanExtension<T, U>.Chara(human, mods);
 
-        public static void Coord<T, U>(Human human, U mods)
+        public static void Coord<T, U>(this Human human, U mods)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
             HumanExtension<T, U>.Coord(human, mods);
@@ -46,7 +46,7 @@ namespace Fishbone
             Plugin.Instance.Log.LogDebug($"ComplexExtension<{typeof(T)},{typeof(U)}> regiistered.");
         }
 
-        public static T Chara<T>(Human human)
+        public static T Chara<T>(this Human human)
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
             HumanExtension<T>.Chara(human);
 
