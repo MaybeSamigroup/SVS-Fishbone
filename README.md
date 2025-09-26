@@ -16,7 +16,7 @@ Extension data will extracted as same name zip file in same folder of source fil
 
 ## Prerequisites (Aicomi)
 
-- [BepInEx](https://github.com/BepInEx/BepInE)
+- [BepInEx](https://github.com/BepInEx/BepInEx)
   - [Bleeding Edge (BE) build](https://builds.bepinex.dev/projects/bepinex_be) #738 or later
 
 Confirmed working under Aicomi 1.0.0.
@@ -44,7 +44,7 @@ Extract the [latest release](https://github.com/MaybeSamigroup/SVS-Fishbone/rele
 
 Confirmed working under DigitalCraft 2.0.0.
 
-- [BepInEx](https://github.com/BepInEx/BepInE)
+- [BepInEx](https://github.com/BepInEx/BepInEx)
   - [Bleeding Edge (BE) build](https://builds.bepinex.dev/projects/bepinex_be) #697 or later
 
 ## Installation (DigitalCraft Standalone)
