@@ -100,7 +100,7 @@ To use them in DC, should saved agein with 2.x.x.
 These directories contained in previous releases are no longer used.
 Please move it contents to new one and delete it.
 
-- (GameRoot)/UserData/plugins/SamabakeScramble.SardineTail
+- (GameRoot)/UserData/plugins/SamabakeScramble.CoastallSmell
 
 ## How it works
 
