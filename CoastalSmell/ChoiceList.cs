@@ -3,8 +3,13 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+#if AICOMI
+using R3;
+using R3.Triggers;
+#else
 using UniRx;
 using UniRx.Triggers;
+#endif
 
 namespace CoastalSmell
 {

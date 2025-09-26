@@ -1,5 +1,6 @@
 using System;
 using System.IO.Compression;
+using AC.User;
 using Character;
 using CharacterCreation;
 using HarmonyLib;
@@ -20,18 +21,18 @@ namespace Fishbone
         public static event Action<ZipArchive> OnSaveCoord =
             archive => PrepareSaveCoord.Try(Plugin.Instance.Log.LogError);
 
-        public static event Action<SaveData.Actor> PrepareSaveActor = actor =>
-            Plugin.Instance.Log.LogDebug($"Simulation actor{actor.charasGameParam.Index} save.");
-        public static event Action<SaveData.Actor, ZipArchive> OnSaveActor =
+        public static event Action<ActorData> PrepareSaveActor = actor =>
+            Plugin.Instance.Log.LogDebug($"Simulation actor{actor.Index()} save.");
+        public static event Action<ActorData, ZipArchive> OnSaveActor =
             (actor, _) => PrepareSaveActor.Apply(actor).Try(Plugin.Instance.Log.LogError); 
 
         public static event Action<Human> OnLoadCustomChara = delegate { };
         public static event Action<Human> OnLoadCustomCoord = delegate { };
 
-        public static event Action<SaveData.Actor> OnLoadActor =
+        public static event Action<ActorData> OnLoadActor =
             actor => PreLoadActor.Apply(actor).Try(Plugin.Instance.Log.LogError); 
-        public static event Action<SaveData.Actor, Human> OnLoadActorChara = delegate { };
-        public static event Action<SaveData.Actor, Human> OnLoadActorCoord = delegate { };
+        public static event Action<ActorData, Human> OnLoadActorChara = delegate { };
+        public static event Action<ActorData, Human> OnLoadActorCoord = delegate { };
 
         public static T Chara<T, U>(this Human human)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
@@ -59,25 +60,25 @@ namespace Fishbone
             HumanActors.TryGetValue(human, out var index)
                 .Either(F.Apply(Coord<T, U>, mods), F.Apply(ActorExtension<T, U>.Coord, index, mods));
 
-        public static T Chara<T, U>(this SaveData.Actor actor)
+        public static T Chara<T, U>(this ActorData actor)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
-            ActorExtension<T, U>.Chara(actor.charasGameParam.Index);
+            ActorExtension<T, U>.Chara(actor.Index());
 
-        public static U Coord<T, U>(this SaveData.Actor actor)
+        public static U Coord<T, U>(this ActorData actor)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
-            ActorExtension<T, U>.Coord(actor.charasGameParam.Index);
+            ActorExtension<T, U>.Coord(actor.Index());
 
-        public static void Chara<T, U>(this SaveData.Actor actor, T mods)
+        public static void Chara<T, U>(this ActorData actor, T mods)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
-            ActorExtension<T, U>.Chara(actor.charasGameParam.Index, mods);
+            ActorExtension<T, U>.Chara(actor.Index(), mods);
 
-        public static void Coord<T, U>(this SaveData.Actor actor, U mods)
+        public static void Coord<T, U>(this ActorData actor, U mods)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
-            ActorExtension<T, U>.Coord(actor.charasGameParam.Index, mods);
+            ActorExtension<T, U>.Coord(actor.Index(), mods);
 
         public static T Chara<T, U>()
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
@@ -134,13 +135,13 @@ namespace Fishbone
             HumanActors.TryGetValue(human, out var index)
                 .Either(F.Apply(Chara, mods), F.Apply(ActorExtension<T>.Chara, index, mods));
 
-        public static T Chara<T>(this SaveData.Actor actor)
+        public static T Chara<T>(this ActorData actor)
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
-            ActorExtension<T>.Chara(actor.charasGameParam.Index);
+            ActorExtension<T>.Chara(actor.Index());
 
-        public static void Chara<T>(this SaveData.Actor actor, T mods)
+        public static void Chara<T>(this ActorData actor, T mods)
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
-            ActorExtension<T>.Chara(actor.charasGameParam.Index, mods);
+            ActorExtension<T>.Chara(actor.Index(), mods);
 
         public static T Chara<T>()
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
@@ -170,9 +171,10 @@ namespace Fishbone
         }
         public static void HumanCustomReload() => HumanCustomReload(HumanCustom.Instance);
     }
+
     public partial class Plugin : BasePlugin
     {
-        public const string Process = "SamabakeScramble";
+        public const string Process = "Aicomi";
         public override void Load()
         {
             Instance = this;

@@ -1,8 +1,13 @@
 using System;
 using UnityEngine;
 using TMPro;
+#if AICOMI
+using R3;
+using R3.Triggers;
+#else
 using UniRx;
 using UniRx.Triggers;
+#endif
 using BepInEx.Unity.IL2CPP;
 using BepInEx.Configuration;
 
@@ -28,7 +33,7 @@ namespace CoastalSmell
         Action<Unit> ToUpdate(RectTransform ui) =>
             _ => (AnchorX.Value, AnchorY.Value) = (ui.anchoredPosition.x, ui.anchoredPosition.y);
         void PrepareDisposable(GameObject go) =>
-            Disposables = new CompositeDisposable(Disposable.Create(F.Apply(UnityEngine.Object.Destroy, go)));
+            Disposables = new CompositeDisposable().With(cd => cd.Add(Disposable.Create(F.Apply(UnityEngine.Object.Destroy, go))));
         public void Apply(GameObject go) => go.With(PrepareDisposable)
             .With(UGUI.ModifyAt("Title", "Label")(UGUI.Cmp<TextMeshProUGUI>(ui => Title = ui)))
             .With(UGUI.Go(active: State.Value)).GetComponentInParent<ObservableUpdateTrigger>()

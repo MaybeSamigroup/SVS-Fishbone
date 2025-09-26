@@ -2,12 +2,18 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 using Il2CppSystem.Threading;
+#if AICOMI
+using R3;
+using R3.Triggers;
+using ILLGAMES.Unity.Component;
+#else
 using UniRx;
 using UniRx.Triggers;
-using Cysharp.Threading.Tasks;
 using ILLGames.Unity.Component;
+#endif
 using BepInEx;
 using BepInEx.Unity.IL2CPP;
+using Cysharp.Threading.Tasks;
 
 namespace CoastalSmell
 {
@@ -24,7 +30,7 @@ namespace CoastalSmell
 
         static Action<Func<bool>, Action, CancellationTokenSource> DoOnConditionAndToken =
             (predicate, action, source) => UniTask.WaitUntil(predicate,
-                PlayerLoopTiming.Update, source.Token).ContinueWith(action);
+                Cysharp.Threading.Tasks.PlayerLoopTiming.Update, source.Token).ContinueWith(action);
     }
 
     public static class Util<T> where T : SingletonInitializer<T>
@@ -37,7 +43,7 @@ namespace CoastalSmell
                 .Subscribe(AwaitStartup.Apply(onStartup).Apply(onDestroy).Ignoring<Unit>());
 
         public static Action<Action, Action> Hook = (onStartup, onDestroy) =>
-            SingletonInitializer<T>.WaitUntilSetup(Il2CppSystem.Threading.CancellationToken.None)
+            SingletonInitializer<T>.WaitUntilSetup(CancellationToken.None)
                 .ContinueWith(AwaitDestroy.Apply(onStartup).Apply(onDestroy));
     }
 
@@ -212,7 +218,7 @@ namespace CoastalSmell
         internal static BepInEx.Logging.ManualLogSource Logger;
         public const string Guid = $"{Process}.{Name}";
         public const string Name = "CoastalSmell";
-        public const string Version = "1.0.6";
+        public const string Version = "1.0.7";
 
         public override void Load() =>
             (Logger = Log).With(Sprites.Initialize).With(UGUI.Initialize);

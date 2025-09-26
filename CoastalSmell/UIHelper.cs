@@ -5,11 +5,18 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using Cysharp.Threading.Tasks;
+#if AICOMI
+using R3;
+using R3.Triggers;
+using ILLGAMES.Unity.UI;
+using ILLGAMES.Unity.UI.ColorPicker;
+#else
 using UniRx;
 using UniRx.Triggers;
-using Cysharp.Threading.Tasks;
 using ILLGames.Unity.UI;
 using ILLGames.Unity.UI.ColorPicker;
+#endif
 using ScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode;
 using ScreenMatchMode = UnityEngine.UI.CanvasScaler.ScreenMatchMode;
 using BepInEx;
@@ -292,12 +299,14 @@ namespace CoastalSmell
                             offsetMin: new(0, 0),
                             offsetMax: new(0, 0),
                             pivot: new(0, 1))))
-                        .With(Cmp(LayoutGroup<VerticalLayoutGroup>(spacing: 6, padding: new(6, 6, 6, 6))))
+                        .With(Cmp(LayoutGroup<VerticalLayoutGroup>(
+                            spacing: 6,
+                            padding: new() { left = 6, right = 6, top = 6, bottom = 6 })))
                         .With(Cmp<UI_DragWindow>())
                         .With(Content("Title")(
                             Cmp(Layout(width: width, height: 30)) +
                             Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.ColorBg.Get())) +
-                            Cmp(LayoutGroup<HorizontalLayoutGroup>(padding: new(20, 20, 0, 0))) +
+                            Cmp(LayoutGroup<HorizontalLayoutGroup>(padding: new() { left = 20, right = 20, top = 0, bottom = 0 })) +
                             Content($"Label")(Cmp(Font() + Text(text: name)))))
                         .With(handle.Apply)
                         .transform))
@@ -371,7 +380,7 @@ namespace CoastalSmell
         public static Func<float, float, string, GameObject, GameObject> Check =
             (width, height, name, parent) => new GameObject($"Background.{name}")
                 .With(Go(parent: parent.transform))
-                .With(Cmp(LayoutGroup<HorizontalLayoutGroup>(padding: new(5, 5, 0, 0), childAlignment: TextAnchor.MiddleCenter)))
+                .With(Cmp(LayoutGroup<HorizontalLayoutGroup>(padding: new() { left = 5, right = 5, top = 0, bottom = 0 }, childAlignment: TextAnchor.MiddleCenter)))
                 .With(Cmp(Layout(width: width + 10, height: height)))
                 .With(Content(name)(
                     Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.LightBg.Get(), alphaHit: 0)) +
@@ -425,7 +434,7 @@ namespace CoastalSmell
                     (false, Selectable.Transition.SpriteSwap, ToggleSprites, ui.gameObject.GetComponent<Image>())))
                 .With(Content($"{name}.State")(
                     Cmp(Image(color: new(1, 1, 1, 1), sprite: SimpleSprites.ToggleOn.Get(), alphaHit: 0)) +
-                    Cmp(LayoutGroup<HorizontalLayoutGroup>(padding: new(10, 10, 0, 0))) +
+                    Cmp(LayoutGroup<HorizontalLayoutGroup>(padding: new RectOffset() { left = 10, right = 10, top = 0, bottom = 0 })) +
                     Cmp(RtFill) + Cmp<Image, Toggle>((image, ui) => ui.graphic = image) +
                     Content($"{name}.Label")(Cmp(Font(size: height) + Text(text: name)) + Cmp(RtFill))));
         static SpriteState ButtonSprites => new SpriteState()
@@ -455,7 +464,7 @@ namespace CoastalSmell
                     (false, Selectable.Transition.SpriteSwap, InputSprites, ui.gameObject.GetComponent<Image>())))
                 .With(Content($"{name}.State")(
                     Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.DarkBg.Get(), alphaHit: 0)) +
-                    Cmp(LayoutGroup<HorizontalLayoutGroup>(padding: new(10, 10, 0, 0))) +
+                    Cmp(LayoutGroup<HorizontalLayoutGroup>(padding: new() { left = 10, right = 10, top = 0, bottom = 0 })) +
                     Cmp(RtFill) + Cmp<Image, Toggle>((image, ui) => ui.graphic = image) +
                     Content($"{name}.Label")(Cmp(Font(size: height) + Text(text: name)) + Cmp(RtFill))));
         static TMP_FontAsset FontAsset;

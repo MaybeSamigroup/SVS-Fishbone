@@ -2,11 +2,11 @@
 
 ## Fishbone
 
-Plugin API to serialize and deserialize character or coordinate-bound extension data, for SamabakeScramble and DigitalCraft.
+Plugin API to serialize and deserialize character or coordinate-bound extension data, for Aicomi, SamabakeScramble and DigitalCraft.
 
 ## CoastalSmell
 
-Plugin API to generate UnityUI component in runtime and syntax suggers, for SamabakeScramble and DigitalCraft.
+Plugin API to generate UnityUI component in runtime and syntax suggers, for Aicomi, SamabakeScramble and DigitalCraft.
 
 ## Extractor
 
@@ -14,30 +14,40 @@ Extension data extractor from Drag & Dropped Chracacter and Coordinate cards.
 
 Extension data will extracted as same name zip file in same folder of source file.
 
-## Prerequisites (SVS)
+## Prerequisites (Aicomi)
+
+- [BepInEx](https://github.com/BepInEx/BepInE)
+  - [Bleeding Edge (BE) build](https://builds.bepinex.dev/projects/bepinex_be) #738 or later
+
+Confirmed working under Aicomi 1.0.0.
+Currently prerelease state.
+
+## Prerequisites (SamabakeScramble)
 
 - [HF Patch for Summer Vacation Scramble](https://github.com/ManlyMarco/SVS-HF_Patch)
 
-Confirmed working under SamabakeScramble 1.1.6 and DigitalCraft 2.0.0.
+Confirmed working under SamabakeScramble 1.1.6.
 
-## Installation (SVS)
+## Installation (SamabakeScramble)
 
 Extract the [latest release](https://github.com/MaybeSamigroup/SVS-Fishbone/releases/latest) SamabakeScramble.zip to your SamabakeScramble install directory.
 
-## Prerequisites (DC with HC)
+## Prerequisites (DigitalCraft with HoneyCome)
 
 - [HF patch for HoneyCome and DigitalCraft](https://github.com/ManlyMarco/HC-HF_Patch)
 
-## Installation (DC with HC)
+## Installation (DigitalCraft with HoneyCome)
 
 Extract the [latest release](https://github.com/MaybeSamigroup/SVS-Fishbone/releases/latest) DigitalCraft.zip to your HoneyCome install directory.
 
-## Prerequisites (DC Standalone)
+## Prerequisites (DigitalCraft Standalone)
+
+Confirmed working under DigitalCraft 2.0.0.
 
 - [BepInEx](https://github.com/BepInEx/BepInE)
   - [Bleeding Edge (BE) build](https://builds.bepinex.dev/projects/bepinex_be) #697 or later
 
-## Installation (DC Standalone)
+## Installation (DigitalCraft Standalone)
 
 Extract BepinEx bleeding edge build into Digital Craft install directory.
 

@@ -1,0 +1,82 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net6</TargetFramework>
+        <AssemblyName>AC_Fishbone</AssemblyName>
+        <Description>plugin api to serialize and deserialize character or coordinate bound extension data, for Aicomi</Description>
+        <LangVersion>latest</LangVersion>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <GameName>Aicomi</GameName>
+        <GamePath>$([MSBuild]::GetRegistryValue('HKEY_CURRENT_USER\Software\ILLGAMES\$(GameName)','INSTALLDIR'))</GamePath>
+        <DefineConstants>AICOMI</DefineConstants>
+    </PropertyGroup>
+    <ItemGroup>
+        <Compile Include="..\..\Png.cs">
+            <Link>Png.cs</Link>
+        </Compile>
+        <Compile Include="..\Fishbone.cs">
+            <Link>Fishbone.cs</Link>
+        </Compile>
+        <Compile Include="..\Internal.cs">
+            <Link>Internal.cs</Link>
+        </Compile>
+        <ProjectReference Include="..\..\CoastalSmell\AC\AC_CoastalSmell.csproj">
+            <Private>False</Private>
+            <ExcludeAssets>all</ExcludeAssets>
+        </ProjectReference>
+        <Reference Include="0Harmony">
+            <HintPath>$(GamePath)\BepInEx\core\0Harmony.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="BepInEx.Core">
+            <HintPath>$(GamePath)\BepInEx\core\BepInEx.Core.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="BepInEx.Unity.IL2CPP">
+            <HintPath>$(GamePath)\BepInEx\core\BepInEx.Unity.IL2CPP.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="Il2CppInterop.Runtime">
+            <HintPath>$(GamePath)\BepInEx\core\Il2CppInterop.Runtime.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="Il2Cppmscorlib">
+            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\Il2Cppmscorlib.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="UnityEngine.CoreModule">
+            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UnityEngine.CoreModule.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="R3">
+            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\R3.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="R3.Unity">
+            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\R3.Unity.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="UniTask">
+            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UniTask.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="Assembly-CSharp">
+            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\Assembly-CSharp.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="IL">
+            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\ILGLib.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+    </ItemGroup>
+    <Target Name="Deploy" AfterTargets="Build">
+        <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="$(GamePath)\BepInEx\plugins\" />
+    </Target>
+    <Target Name="Release" AfterTargets="Build">
+        <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="..\..\Release\$(GameName)\BepinEx\plugins"/>
+        <ZipDirectory SourceDirectory="..\..\Release\$(GameName)" Overwrite="true" DestinationFile="..\..\$(AssemblyName).zip"/>
+    </Target>
+	<Target Name="CleanRelease" AfterTargets="Clean">
+		<RemoveDir Directories="..\..\Release\$(GameName)"/>
+		<Delete Files="..\..\$(AssemblyName).zip"/>
+	</Target>
+</Project>

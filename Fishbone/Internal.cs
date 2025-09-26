@@ -4,7 +4,11 @@ using System.IO;
 using System.IO.Compression;
 using System.Reflection;
 using Character;
+#if AICOMI
+using ILLGAMES.IO;
+#else
 using ILLGames.IO;
+#endif
 using HarmonyLib;
 using CoastalSmell;
 using LoadFlags = Character.HumanData.LoadFileInfo.Flags;
@@ -157,14 +161,22 @@ namespace Fishbone
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanBody), nameof(HumanBody.OnUpdateShader), [])]
         static void HumanLoadPrefix(HumanBody __instance) =>
+#if AICOMI
+            (NowLoading is null).Maybe(OnCharacterLoad(__instance._human));
+#else
             (NowLoading is null).Maybe(OnCharacterLoad(__instance.human));
+#endif
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanFace), nameof(HumanFace.LoadGagMaterial), [])]
         [HarmonyPatch(typeof(HumanFace), nameof(HumanFace.OnUpdateShader), [])]
         [HarmonyPatch(typeof(HumanFace), nameof(HumanFace.ChangeHead), typeof(int), typeof(bool))]
         static void HumanLoadPrefix(HumanFace __instance) =>
+#if AICOMI
+            (NowLoading is null).Maybe(OnCharacterLoad(__instance._human));
+#else
             (NowLoading is null).Maybe(OnCharacterLoad(__instance.human));
+#endif
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(Human), nameof(Human.Create), typeof(HumanData))]
@@ -306,12 +318,20 @@ namespace Fishbone
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanBody), nameof(HumanBody.OnUpdateCoordinate))]
         static void HumanBodyOnUpdateCoordinatePrefix(HumanBody __instance) =>
+#if AICOMI
+            CoordLimits = CoordLimit.None.With(OnCoordinateReload(__instance._human, CoordLimits));
+#else
             CoordLimits = CoordLimit.None.With(OnCoordinateReload(__instance.human, CoordLimits));
+#endif
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanFace), nameof(HumanFace.OnUpdateCoordinate))]
         static void HumanFaceOnUpdateCoordinatePrefix(HumanFace __instance) =>
+#if AICOMI
+            CoordLimits = CoordLimit.None.With(OnCoordinateReload(__instance._human, CoordLimits));
+#else
             CoordLimits = CoordLimit.None.With(OnCoordinateReload(__instance.human, CoordLimits));
+#endif
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(Human), nameof(Human.ReloadCoordinate), typeof(Human.ReloadFlags))]
@@ -323,12 +343,20 @@ namespace Fishbone
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanCoordinate), nameof(HumanCoordinate.ChangeCoordinateType), typeof(ChaFileDefine.CoordinateType), typeof(bool))]
         static void HumanCoordinateChangeCoordinateTypePrefix(HumanCoordinate __instance, ChaFileDefine.CoordinateType type, bool changeBackCoordinateType) =>
+#if AICOMI
+            (changeBackCoordinateType || __instance._human.data.Status.coordinateType != (int)type).Maybe(PreCoordinateChange(__instance._human, (int)type));
+#else
             (changeBackCoordinateType || __instance.human.data.Status.coordinateType != (int)type).Maybe(PreCoordinateChange(__instance.human, (int)type));
+#endif
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanCoordinate), nameof(HumanCoordinate.ChangeCoordinateType), typeof(ChaFileDefine.CoordinateType), typeof(bool))]
         static void HumanCoordinateChangeCoordinateTypePostfix(HumanCoordinate __instance) =>
+#if AICOMI
+            OnCoordinateChange(__instance._human);
+#else
             OnCoordinateChange(__instance.human);
+#endif
 
         static Action PreCoordinateChange(Human human, int coordinateType) =>
             ((OnCoordinateChange, _) = (OnCoordinateChangeProc, F.Apply(Extension.ChangeCoord, human, coordinateType))).Item2;

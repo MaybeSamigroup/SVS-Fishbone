@@ -43,7 +43,7 @@ namespace Fishbone
             OnSaveChara += HumanExtension<T, U>.SaveChara;
             PreLoadChara += HumanExtension<T, U>.LoadChara;
             PreLoadCoord += HumanExtension<T, U>.LoadCoord;
-            Plugin.Instance.Log.LogDebug($"ComplexExtension<{typeof(T)},{typeof(U)}> regiistered.");
+            Plugin.Instance.Log.LogDebug($"ComplexExtension<{typeof(T)},{typeof(U)}> registered.");
         }
 
         public static T Chara<T>(this Human human)
@@ -56,7 +56,7 @@ namespace Fishbone
             RegisterInternal<T>();
             OnSaveChara += HumanExtension<T>.SaveChara;
             PreLoadChara += HumanExtension<T>.LoadChara;
-            Plugin.Instance.Log.LogDebug($"SimpleExtension<{typeof(T)}> regiistered.");
+            Plugin.Instance.Log.LogDebug($"SimpleExtension<{typeof(T)}> registered.");
         }
     }
 
