@@ -27,9 +27,10 @@ namespace Fishbone
         public static event Action<Human> OnLoadCoord = delegate { };
 
         public static Dictionary<K, V> Merge<K, V>(this Dictionary<K, V> mods, K index, V mod) =>
-            mods.Where(entry => !index.Equals(entry.Key))
-                .Select(entry => new Tuple<K, V>(entry.Key, entry.Value))
-                .Append(new Tuple<K, V>(index, mod)).ToDictionary();
+            mods == null ? new() { [index] = mod } :
+                mods.Where(entry => !index.Equals(entry.Key))
+                    .Select(entry => new Tuple<K, V>(entry.Key, entry.Value))
+                    .Append(new Tuple<K, V>(index, mod)).ToDictionary();
     }
 
     // Extension interfaces
@@ -90,9 +91,9 @@ namespace Fishbone
             Json<T>.Load.Apply(Plugin.Instance.Log.LogError);
         public static Func<Stream, U> DeserializeCoord =
             Json<U>.Load.Apply(Plugin.Instance.Log.LogError);
-        public static Action<HumanData, ZipArchive> Translate<V>(string path, Func<V, T> map) where V: new() =>
+        public static Action<HumanData, ZipArchive> Translate<V>(string path, Func<V, T> map) where V : new() =>
             (_, archive) => TryGetEntry(archive, path, out var entry).Maybe(F.Apply(Translate, map, archive, entry));
-        public static Action<HumanDataCoordinate, ZipArchive> Translate<V>(string path, Func<V, U> map) where V: new() =>
+        public static Action<HumanDataCoordinate, ZipArchive> Translate<V>(string path, Func<V, U> map) where V : new() =>
             (_, archive) => TryGetEntry(archive, path, out var entry).Maybe(F.Apply(Translate, map, archive, entry));
     }
 
@@ -116,7 +117,7 @@ namespace Fishbone
             Json<T>.Save.Apply(Plugin.Instance.Log.LogError);
         public static Func<Stream, T> DeserializeChara =
             Json<T>.Load.Apply(Plugin.Instance.Log.LogError);
-        public static Action<HumanData, ZipArchive> Translate<V>(string path, Func<V, T> map) where V: new() =>
+        public static Action<HumanData, ZipArchive> Translate<V>(string path, Func<V, T> map) where V : new() =>
             (_, archive) => TryGetEntry(archive, path, out var entry).Maybe(F.Apply(Translate, map, archive, entry));
     }
 
@@ -128,11 +129,9 @@ namespace Fishbone
     {
         public const string Guid = $"{Process}.{Name}";
         public const string Name = "Fishbone";
-        public const string Version = "3.0.2";
-
+        public const string Version = "3.0.3";
         internal static Plugin Instance;
         private Harmony Patch;
-
         public override bool Unload() =>
             true.With(Patch.UnpatchSelf) && base.Unload();
     }

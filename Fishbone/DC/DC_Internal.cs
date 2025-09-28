@@ -28,8 +28,7 @@ namespace Fishbone
             [typeof(string), typeof(DigitalCraft.SceneDataFile)], [ArgumentType.Normal, ArgumentType.Out])]
         [HarmonyPatch(typeof(DigitalCraft.SceneInfo), nameof(DigitalCraft.SceneInfo.Load),
             [typeof(string), typeof(Il2CppSystem.Version), typeof(bool), typeof(bool)], [ArgumentType.Normal, ArgumentType.Out, ArgumentType.Normal, ArgumentType.Normal])]
-        static void CostumeInfoInitFileListPrefix() =>
-            OnSkipPng = SkipPngSkip;
+        static void CostumeInfoInitFileListPrefix() => CoordLoadHook = CoordLoadHook.Skip;
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.GetProductNo))]
@@ -40,8 +39,7 @@ namespace Fishbone
             [typeof(string), typeof(DigitalCraft.SceneDataFile)], [ArgumentType.Normal, ArgumentType.Out])]
         [HarmonyPatch(typeof(DigitalCraft.SceneInfo), nameof(DigitalCraft.SceneInfo.Load),
             [typeof(string), typeof(Il2CppSystem.Version), typeof(bool), typeof(bool)], [ArgumentType.Normal, ArgumentType.Out, ArgumentType.Normal, ArgumentType.Normal])]
-        static void CostumeInfoInitFileListPostfix() =>
-            OnSkipPng = SkipPngProc;
+        static void CostumeInfoInitFileListPostfix() => CoordLoadHook = new CoordLoadWait();
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(DigitalCraft.DigitalCraft), nameof(DigitalCraft.DigitalCraft.SaveScene))]
@@ -56,6 +54,13 @@ namespace Fishbone
 
         internal static void Save(Human human) =>
             Implant(human.data, ToBinary(OnSaveChara.Apply(human)));
+    }
+    static partial class Hooks
+    {
+        [HarmonyPostfix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanCoordinate), nameof(HumanCoordinate.ChangeCoordinateType), typeof(ChaFileDefine.CoordinateType), typeof(bool))]
+        static void HumanCoordinateChangeCoordinateTypePostfix(HumanCoordinate __instance, ChaFileDefine.CoordinateType type, bool changeBackCoordinateType) =>
+            (changeBackCoordinateType || __instance.human.data.Status.coordinateType != (int)type).Maybe(F.Apply(Extension.LoadCoord, __instance.human));
     }
 
     internal static class HumanExtension<T, U>
@@ -81,15 +86,19 @@ namespace Fishbone
 
         internal static void Prepare(Human human) =>
             human.component.OnDestroyAsObservable()
-                .Subscribe(F.Apply(Characters.Remove, human).Ignoring().Ignoring<Unit>()); 
+                .Subscribe(F.Apply(Characters.Remove, human).Ignoring().Ignoring<Unit>());
 
-        internal static void LoadChara(Human human, CharaLimit limit) =>
-            Characters[human] = Characters.TryGetValue(human, out var current) ?
-                current.Merge(limit, Extension<T, U>.Resolve(human.data, current)) : Extension<T, U>.Resolve(human.data, new());
+        internal static void LoadChara(Human human, CharaLimit limit, T value) =>
+            Characters[human] = Characters.GetValueOrDefault(human, new()).Merge(limit, value);
 
-        internal static void LoadCoord(Human human, CoordLimit limit) =>
-            Characters[human] = Characters.GetValueOrDefault(human, new())
-                .Merge(human.data.Status.coordinateType,  limit, Extension<T, U>.Resolve(Coord(human)));
+        internal static void LoadCoord(Human human, CoordLimit limit, U value) =>
+            Characters[human] = Characters.GetValueOrDefault(human, new()).Merge(human.data.Status.coordinateType, limit, value);
+
+        internal static void JoinCopyTrack(CopyTrack track, T value) =>
+            track.OnResolveHuman += (human, limit) => LoadChara(human, limit, value);
+
+        internal static void JoinLimitTrack(CoordTrack track, U value) =>
+            track.OnResolve += (human, limit) => LoadCoord(human, limit, value);
     }
 
     internal static class HumanExtension<T>
@@ -106,7 +115,10 @@ namespace Fishbone
         internal static void SaveChara(Human human, ZipArchive archive) =>
             Extension<T>.SaveChara(archive, Characters.GetValueOrDefault(human, new()));
 
-        internal static void LoadChara(Human human, CharaLimit limit) =>
-            Characters[human] = Characters[human].Merge(limit, Extension<T>.Resolve(human.data, Characters[human]));
+        internal static void LoadChara(Human human, CharaLimit limit, T value) =>
+            Characters[human] = Characters.GetValueOrDefault(human, new()).Merge(limit, value);
+
+        internal static void JoinCopyTrack(CopyTrack track, T value) =>
+            track.OnResolveHuman += (human, limit) => LoadChara(human, limit, value);
     }
 }

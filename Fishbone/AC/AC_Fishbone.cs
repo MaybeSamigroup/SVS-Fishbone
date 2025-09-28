@@ -22,16 +22,16 @@ namespace Fishbone
             archive => PrepareSaveCoord.Try(Plugin.Instance.Log.LogError);
 
         public static event Action<ActorData> PrepareSaveActor = actor =>
-            Plugin.Instance.Log.LogDebug($"Simulation actor{actor.Index()} save.");
+            Plugin.Instance.Log.LogDebug($"Simulation actor{actor.ToIndex()} save.");
         public static event Action<ActorData, ZipArchive> OnSaveActor =
-            (actor, _) => PrepareSaveActor.Apply(actor).Try(Plugin.Instance.Log.LogError); 
+            (actor, _) => PrepareSaveActor.Apply(actor).Try(Plugin.Instance.Log.LogError);
 
         public static event Action<Human> OnLoadCustomChara = delegate { };
         public static event Action<Human> OnLoadCustomCoord = delegate { };
 
-        public static event Action<ActorData> OnLoadActor =
-            actor => PreLoadActor.Apply(actor).Try(Plugin.Instance.Log.LogError); 
-        public static event Action<ActorData, Human> OnLoadActorChara = delegate { };
+        public static event Action<ActorData> OnLoadActor = delegate { };
+        public static event Action<ActorData, Human> OnLoadActorChara =
+            (actor, _) => Plugin.Instance.Log.LogDebug($"Simulation actor{actor.ToIndex()} humanize.");
         public static event Action<ActorData, Human> OnLoadActorCoord = delegate { };
 
         public static T Chara<T, U>(this Human human)
@@ -63,22 +63,22 @@ namespace Fishbone
         public static T Chara<T, U>(this ActorData actor)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
-            ActorExtension<T, U>.Chara(actor.Index());
+            ActorExtension<T, U>.Chara(actor.ToIndex());
 
         public static U Coord<T, U>(this ActorData actor)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
-            ActorExtension<T, U>.Coord(actor.Index());
+            ActorExtension<T, U>.Coord(actor.ToIndex());
 
         public static void Chara<T, U>(this ActorData actor, T mods)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
-            ActorExtension<T, U>.Chara(actor.Index(), mods);
+            ActorExtension<T, U>.Chara(actor.ToIndex(), mods);
 
         public static void Coord<T, U>(this ActorData actor, U mods)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
-            ActorExtension<T, U>.Coord(actor.Index(), mods);
+            ActorExtension<T, U>.Coord(actor.ToIndex(), mods);
 
         public static T Chara<T, U>()
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
@@ -108,19 +108,17 @@ namespace Fishbone
             OnSaveChara += HumanExtension<T, U>.SaveChara;
             OnSaveCoord += HumanExtension<T, U>.SaveCoord;
             OnSaveActor += ActorExtension<T, U>.Save;
-            PreLoadCustomChara += HumanExtension<T, U>.LoadChara;
-            PreLoadCustomCoord += HumanExtension<T, U>.LoadCoord;
-            PreLoadActor += ActorExtension<T, U>.LoadActor;
-            PreLoadActorChara += ActorExtension<T, U>.LoadChara;
-            PreLoadActorCoord += ActorExtension<T, U>.LoadCoord;
-            OnCopyCustomToActor += ActorExtension<T, U>.OnCopy;
-            OnCopyActorToCustom += HumanExtension<T, U>.OnCopy;
-            OnActorCoordChange += ActorExtension<T, U>.CoordinateChange;
-            OnEnterCustom += Extension<T, U>.Initialize;
-            OnLeaveCustom += Extension<T, U>.Initialize;
-            OnEnterCustom += HumanExtension<T, U>.Initialize;
-            OnLeaveCustom += HumanExtension<T, U>.Initialize;
+            OnEnterCustom += HumanExtension<T, U>.EnterCustom;
+            OnLeaveCustom += HumanExtension<T, U>.LeaveCustom;
+            OnEnterCustom += ActorExtension<T, U>.EnterCustom;
+            OnLeaveCustom += ActorExtension<T, U>.LeaveCustom;
+            OnCopyCustomToActor += ActorExtension<T, U>.Copy;
+            OnCopyActorToCustom += HumanExtension<T, U>.Copy;
             OnCustomInitialize += HumanExtension<T, U>.Initialize;
+            OnSwapIndex = ActorExtension<T, U>.SwapIndex;
+            HumanExtension<T, U>.LeaveCustom();
+            ActorExtension<T, U>.LeaveCustom();
+            ActorExtension<T, U>.Initialize();
             Plugin.Instance.Log.LogDebug($"ComplexExtension<{typeof(T)},{typeof(U)}> registered.");
         }
 
@@ -137,11 +135,11 @@ namespace Fishbone
 
         public static T Chara<T>(this ActorData actor)
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
-            ActorExtension<T>.Chara(actor.Index());
+            ActorExtension<T>.Chara(actor.ToIndex());
 
         public static void Chara<T>(this ActorData actor, T mods)
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
-            ActorExtension<T>.Chara(actor.Index(), mods);
+            ActorExtension<T>.Chara(actor.ToIndex(), mods);
 
         public static T Chara<T>()
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
@@ -157,21 +155,21 @@ namespace Fishbone
             RegisterInternal<T>();
             OnSaveChara += HumanExtension<T>.SaveChara;
             OnSaveActor += ActorExtension<T>.Save;
-            PreLoadCustomChara += HumanExtension<T>.LoadChara;
-            PreLoadActor += ActorExtension<T>.LoadActor;
-            PreLoadActorChara += ActorExtension<T>.LoadChara;
-            OnCopyCustomToActor += ActorExtension<T>.OnCopy;
-            OnCopyActorToCustom += HumanExtension<T>.OnCopy;
-            OnEnterCustom += Extension<T>.Initialize;
-            OnLeaveCustom += Extension<T>.Initialize;
-            OnEnterCustom += HumanExtension<T>.Initialize;
-            OnLeaveCustom += HumanExtension<T>.Initialize;
+            OnEnterCustom += HumanExtension<T>.EnterCustom;
+            OnLeaveCustom += HumanExtension<T>.LeaveCustom;
+            OnEnterCustom += ActorExtension<T>.EnterCustom;
+            OnLeaveCustom += ActorExtension<T>.LeaveCustom;
+            OnCopyCustomToActor += ActorExtension<T>.Copy;
+            OnCopyActorToCustom += HumanExtension<T>.Copy;
             OnCustomInitialize += HumanExtension<T>.Initialize;
+            OnSwapIndex = ActorExtension<T>.SwapIndex;
+            HumanExtension<T>.LeaveCustom();
+            ActorExtension<T>.LeaveCustom();
+            ActorExtension<T>.Initialize();
             Plugin.Instance.Log.LogDebug($"SimpleExtension<{typeof(T)}> registered.");
         }
         public static void HumanCustomReload() => HumanCustomReload(HumanCustom.Instance);
     }
-
     public partial class Plugin : BasePlugin
     {
         public const string Process = "Aicomi";

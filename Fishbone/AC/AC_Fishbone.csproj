@@ -7,7 +7,7 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <GameName>Aicomi</GameName>
         <GamePath>$([MSBuild]::GetRegistryValue('HKEY_CURRENT_USER\Software\ILLGAMES\$(GameName)','INSTALLDIR'))</GamePath>
-        <DefineConstants>AICOMI</DefineConstants>
+        <DefineConstants>$(GameName)</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
         <Compile Include="..\..\Png.cs">
@@ -18,6 +18,9 @@
         </Compile>
         <Compile Include="..\Internal.cs">
             <Link>Internal.cs</Link>
+        </Compile>
+        <Compile Include="..\Custom.cs">
+            <Link>Custom.cs</Link>
         </Compile>
         <ProjectReference Include="..\..\CoastalSmell\AC\AC_CoastalSmell.csproj">
             <Private>False</Private>

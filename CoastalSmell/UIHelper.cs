@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using Cysharp.Threading.Tasks;
-#if AICOMI
+#if Aicomi
 using R3;
 using R3.Triggers;
 using ILLGAMES.Unity.UI;

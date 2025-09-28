@@ -41,8 +41,8 @@ namespace Fishbone
         {
             RegisterInternal<T, U>();
             OnSaveChara += HumanExtension<T, U>.SaveChara;
-            PreLoadChara += HumanExtension<T, U>.LoadChara;
-            PreLoadCoord += HumanExtension<T, U>.LoadCoord;
+            Extension<T, U>.OnCopyTrackStart += HumanExtension<T, U>.JoinCopyTrack;
+            Extension<T, U>.OnCoordTrackStart += HumanExtension<T, U>.JoinLimitTrack;
             Plugin.Instance.Log.LogDebug($"ComplexExtension<{typeof(T)},{typeof(U)}> registered.");
         }
 
@@ -55,7 +55,7 @@ namespace Fishbone
         {
             RegisterInternal<T>();
             OnSaveChara += HumanExtension<T>.SaveChara;
-            PreLoadChara += HumanExtension<T>.LoadChara;
+            Extension<T>.OnCopyTrackStart += HumanExtension<T>.JoinCopyTrack;
             Plugin.Instance.Log.LogDebug($"SimpleExtension<{typeof(T)}> registered.");
         }
     }
@@ -67,6 +67,7 @@ namespace Fishbone
         {
             Instance = this;
             Patch = Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks");
+            CharaLoadHook.LoadFlagResolver = CharaLoadHook.CraftFlagResolver;
         }
     }
 }

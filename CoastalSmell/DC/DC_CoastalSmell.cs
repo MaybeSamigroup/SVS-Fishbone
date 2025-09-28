@@ -3,6 +3,8 @@ using System;
 using UnityEngine;
 using ILLGames.Unity.UI.ColorPicker;
 using UniRx;
+using Il2CppInterop.Runtime.InteropTypes.Arrays;
+using Il2CppInterop.Runtime.Runtime;
 
 namespace CoastalSmell
 {
@@ -10,6 +12,9 @@ namespace CoastalSmell
     {
         public static Action<Action> DoNextFrame =
             action => Observable.NextFrame().Subscribe(action.Ignoring<Unit>());
+
+        public static unsafe Span<byte> AsSpan(this Il2CppStructArray<byte> array) =>
+            new Span<byte>(IntPtr.Add(array.Pointer, sizeof(Il2CppObject) + sizeof(void*) + sizeof(nuint)).ToPointer(), array.Length);
     }
 
     public static partial class UGUI

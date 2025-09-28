@@ -7,6 +7,7 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <GameName>SamabakeScramble</GameName>
         <GamePath>$([MSBuild]::GetRegistryValue('HKEY_CURRENT_USER\Software\ILLGAMES\$(GameName)','INSTALLDIR'))</GamePath>
+        <DefineConstants>$(GameName)</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
         <Compile Include="..\..\Png.cs">
@@ -17,6 +18,9 @@
         </Compile>
         <Compile Include="..\Internal.cs">
             <Link>Internal.cs</Link>
+        </Compile>
+        <Compile Include="..\Custom.cs">
+            <Link>Custom.cs</Link>
         </Compile>
         <ProjectReference Include="..\..\CoastalSmell\SVS\SVS_CoastalSmell.csproj">
             <Private>False</Private>

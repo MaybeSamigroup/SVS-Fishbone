@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 using TMPro;
-#if AICOMI
+#if Aicomi
 using R3;
 using R3.Triggers;
 #else

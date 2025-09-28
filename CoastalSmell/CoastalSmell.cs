@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 using Il2CppSystem.Threading;
-#if AICOMI
+#if Aicomi
 using R3;
 using R3.Triggers;
 using ILLGAMES.Unity.Component;
@@ -21,16 +21,18 @@ namespace CoastalSmell
 
     public static partial class Util
     {
-        /// <summary>
-        /// Executes <paramref name="action"/> when <paramref name="predicate"/> is true, otherwise tries again next frame.
-        /// </summary>
+#if DigitalCraft        
+        public static Action<Func<bool>, Action> DoOnCondition =
+            (predicate, action) => predicate()
+                .Either(DoNextFrame.Apply(DoOnCondition.Apply(predicate).Apply(action)), action);
+#else
         public static Func<Func<bool>, Action, Action> DoOnCondition =
             (predicate, action) => new CancellationTokenSource()
                 .With(DoOnConditionAndToken.Apply(predicate).Apply(action)).Cancel;
-
         static Action<Func<bool>, Action, CancellationTokenSource> DoOnConditionAndToken =
             (predicate, action, source) => UniTask.WaitUntil(predicate,
                 Cysharp.Threading.Tasks.PlayerLoopTiming.Update, source.Token).ContinueWith(action);
+#endif
     }
 
     public static class Util<T> where T : SingletonInitializer<T>
@@ -218,8 +220,7 @@ namespace CoastalSmell
         internal static BepInEx.Logging.ManualLogSource Logger;
         public const string Guid = $"{Process}.{Name}";
         public const string Name = "CoastalSmell";
-        public const string Version = "1.0.7";
-
+        public const string Version = "1.0.8";
         public override void Load() =>
             (Logger = Log).With(Sprites.Initialize).With(UGUI.Initialize);
     }

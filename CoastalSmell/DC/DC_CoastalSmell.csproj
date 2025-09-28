@@ -4,8 +4,10 @@
         <AssemblyName>DC_CoastalSmell</AssemblyName>
         <Description>Syntax suggers for DigitalCraft BepinEx plugins</Description>
         <LangVersion>latest</LangVersion>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <GameName>DigitalCraft</GameName>
         <GamePath>$([MSBuild]::GetRegistryValue('HKEY_CURRENT_USER\Software\ILLGAMES\$(GameName)','INSTALLDIR'))</GamePath>
+        <DefineConstants>$(GameName)</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
         <Compile Include="..\CoastalSmell.cs">

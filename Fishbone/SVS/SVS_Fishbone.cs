@@ -23,13 +23,12 @@ namespace Fishbone
         public static event Action<SaveData.Actor> PrepareSaveActor = actor =>
             Plugin.Instance.Log.LogDebug($"Simulation actor{actor.charasGameParam.Index} save.");
         public static event Action<SaveData.Actor, ZipArchive> OnSaveActor =
-            (actor, _) => PrepareSaveActor.Apply(actor).Try(Plugin.Instance.Log.LogError); 
+            (actor, _) => PrepareSaveActor.Apply(actor).Try(Plugin.Instance.Log.LogError);
 
         public static event Action<Human> OnLoadCustomChara = delegate { };
         public static event Action<Human> OnLoadCustomCoord = delegate { };
 
-        public static event Action<SaveData.Actor> OnLoadActor =
-            actor => PreLoadActor.Apply(actor).Try(Plugin.Instance.Log.LogError); 
+        public static event Action<SaveData.Actor> OnLoadActor = delegate { };
         public static event Action<SaveData.Actor, Human> OnLoadActorChara = delegate { };
         public static event Action<SaveData.Actor, Human> OnLoadActorCoord = delegate { };
 
@@ -107,19 +106,16 @@ namespace Fishbone
             OnSaveChara += HumanExtension<T, U>.SaveChara;
             OnSaveCoord += HumanExtension<T, U>.SaveCoord;
             OnSaveActor += ActorExtension<T, U>.Save;
-            PreLoadCustomChara += HumanExtension<T, U>.LoadChara;
-            PreLoadCustomCoord += HumanExtension<T, U>.LoadCoord;
-            PreLoadActor += ActorExtension<T, U>.LoadActor;
-            PreLoadActorChara += ActorExtension<T, U>.LoadChara;
-            PreLoadActorCoord += ActorExtension<T, U>.LoadCoord;
-            OnCopyCustomToActor += ActorExtension<T, U>.OnCopy;
-            OnCopyActorToCustom += HumanExtension<T, U>.OnCopy;
+            OnCopyCustomToActor += ActorExtension<T, U>.Copy;
+            OnCopyActorToCustom += HumanExtension<T, U>.Copy;
             OnActorCoordChange += ActorExtension<T, U>.CoordinateChange;
-            OnEnterCustom += Extension<T, U>.Initialize;
-            OnLeaveCustom += Extension<T, U>.Initialize;
-            OnEnterCustom += HumanExtension<T, U>.Initialize;
-            OnLeaveCustom += HumanExtension<T, U>.Initialize;
+            OnEnterCustom += HumanExtension<T, U>.EnterCustom;
+            OnLeaveCustom += HumanExtension<T, U>.LeaveCustom;
+            OnEnterCustom += ActorExtension<T, U>.EnterCustom;
+            OnLeaveCustom += ActorExtension<T, U>.LeaveCustom;
             OnCustomInitialize += HumanExtension<T, U>.Initialize;
+            HumanExtension<T,U>.LeaveCustom();
+            ActorExtension<T,U>.LeaveCustom();
             Plugin.Instance.Log.LogDebug($"ComplexExtension<{typeof(T)},{typeof(U)}> registered.");
         }
 
@@ -156,16 +152,15 @@ namespace Fishbone
             RegisterInternal<T>();
             OnSaveChara += HumanExtension<T>.SaveChara;
             OnSaveActor += ActorExtension<T>.Save;
-            PreLoadCustomChara += HumanExtension<T>.LoadChara;
-            PreLoadActor += ActorExtension<T>.LoadActor;
-            PreLoadActorChara += ActorExtension<T>.LoadChara;
-            OnCopyCustomToActor += ActorExtension<T>.OnCopy;
-            OnCopyActorToCustom += HumanExtension<T>.OnCopy;
-            OnEnterCustom += Extension<T>.Initialize;
-            OnLeaveCustom += Extension<T>.Initialize;
-            OnEnterCustom += HumanExtension<T>.Initialize;
-            OnLeaveCustom += HumanExtension<T>.Initialize;
+            OnCopyCustomToActor += ActorExtension<T>.Copy;
+            OnCopyActorToCustom += HumanExtension<T>.Copy;
+            OnEnterCustom += HumanExtension<T>.EnterCustom;
+            OnLeaveCustom += HumanExtension<T>.LeaveCustom;
+            OnEnterCustom += ActorExtension<T>.EnterCustom;
+            OnLeaveCustom += ActorExtension<T>.LeaveCustom;
             OnCustomInitialize += HumanExtension<T>.Initialize;
+            HumanExtension<T>.LeaveCustom();
+            ActorExtension<T>.LeaveCustom();
             Plugin.Instance.Log.LogDebug($"SimpleExtension<{typeof(T)}> registered.");
         }
         public static void HumanCustomReload() => HumanCustomReload(HumanCustom.Instance);

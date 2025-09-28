@@ -3,7 +3,7 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-#if AICOMI
+#if Aicomi
 using R3;
 using R3.Triggers;
 #else
