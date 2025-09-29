@@ -19,8 +19,7 @@ Extension data will extracted as same name zip file in same folder of source fil
 - [BepInEx](https://github.com/BepInEx/BepInEx)
   - [Bleeding Edge (BE) build](https://builds.bepinex.dev/projects/bepinex_be) #738 or later
 
-Confirmed working under Aicomi 1.0.0.
-Currently prerelease state.
+Confirmed working under Aicomi 1.0.1.
 
 ## Prerequisites (SamabakeScramble)
 
