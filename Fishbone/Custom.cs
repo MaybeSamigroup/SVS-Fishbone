@@ -74,12 +74,10 @@ namespace Fishbone
         where U : CoordinateExtension<U>, new()
     {
         static T Current = new();
-        static int CoordinateType =>
-            HumanCustom.Instance?.Human?.data?.Status.coordinateType ?? 0;
         internal static T Chara() => Current;
-        internal static U Coord() => Current.Get(CoordinateType);
+        internal static U Coord() => Current.Get(Extension.CustomCoordinateType);
         internal static void Chara(T value) => Current = value;
-        internal static void Coord(U value) => Current = Current.Merge(CoordinateType, value);
+        internal static void Coord(U value) => Current = Current.Merge(Extension.CustomCoordinateType, value);
     }
     internal static partial class HumanExtension<T>
         where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
@@ -173,6 +171,8 @@ namespace Fishbone
         internal static event Action OnEnterCustom = delegate
         {
             Hooks.OnEnterCustom();
+            OnCustomInitialize();
+            CustomCoordinateType = 0;
             ClearCopyTrack();
             ClearHumanToActors();
 
@@ -186,6 +186,8 @@ namespace Fishbone
         internal static event Action OnLeaveCustom = delegate
         {
             Hooks.OnLeaveCustom();
+            OnCustomInitialize();
+            CustomCoordinateType = 0;
             ClearCopyTrack();
             ClearHumanToActors();
 
@@ -225,13 +227,11 @@ namespace Fishbone
             Current = new();
         internal static void EnterCustom()
         {
-            Current = new();
             Extension<T, U>.OnCopyTrackStart += JoinCopyTrack;
             Extension<T, U>.OnCoordTrackStart += JoinCoordTrack;
         }
         internal static void LeaveCustom()
         {
-            Current = new();
             Extension<T, U>.OnCopyTrackStart -= JoinCopyTrack;
             Extension<T, U>.OnCoordTrackStart -= JoinCoordTrack;
         }
@@ -313,7 +313,7 @@ namespace Fishbone
     internal partial class CopyTrack
     {
         internal event Action<Actor> OnResolveActor =
-            actor => Plugin.Instance.Log.LogDebug($"actor{actor.ToIndex()} loaded: {actor.ToHumanData().Pointer}");
+            actor => Plugin.Instance.Log.LogDebug($"Actor{actor.ToIndex()} loaded: {actor.ToHumanData().Pointer}");
         internal void Resolve(Actor actor) =>
             (F.Apply(OnResolveActor, actor) + F.Apply(Extension.LoadActor, actor)).Try(Plugin.Instance.Log.LogError);
     }
@@ -408,10 +408,13 @@ namespace Fishbone
     #region Coordinate Change
     static partial class Extension
     {
+        internal static int CustomCoordinateType { get; set; } = 0;
+        internal static void CustomChangeCoord(Human human, int coordinateType) =>
+            (PrepareSaveCoord + F.Apply(CustomChangeCoord, coordinateType) + OnLoadCoord.Apply(human)).Try(Plugin.Instance.Log.LogError);
+        static void CustomChangeCoord(int coordinateType) =>
+            CustomCoordinateType = coordinateType;
+
         internal static event Action<ActorIndex, int> OnActorCoordChange = delegate { };
-        internal static void NotifyPrepareSaveCoord() => PrepareSaveCoord();
-        internal static void CustomChangeCoord(Human human) =>
-            OnLoadCoord.Apply(human).Try(Plugin.Instance.Log.LogError);
         internal static void ActorChangeCoord(Human human, int coordinateType) =>
             HumanToActors.TryGetValue(human, out var actor).Maybe(F.Apply(ActorChangeCoord, actor, coordinateType));
         static void ActorChangeCoord(ActorIndex actor, int coordinateType) =>

@@ -26,16 +26,12 @@ namespace Fishbone
         public static event Action<ActorData, ZipArchive> OnSaveActor =
             (actor, _) => PrepareSaveActor.Apply(actor).Try(Plugin.Instance.Log.LogError);
 
-        public static event Action<Human> OnLoadCustomChara =
-            _ => Plugin.Instance.Log.LogDebug("Custom character load.");
-        public static event Action<Human> OnLoadCustomCoord = 
-            human => Plugin.Instance.Log.LogDebug($"Custom coordinate load. {human.data.Status.coordinateType}");
+        public static event Action<Human> OnLoadCustomChara = delegate { };
+        public static event Action<Human> OnLoadCustomCoord = delegate { };
 
         public static event Action<ActorData> OnLoadActor = delegate { };
-        public static event Action<ActorData, Human> OnLoadActorChara =
-            (actor, _) => Plugin.Instance.Log.LogDebug($"Simulation actor{actor.ToIndex()} humanize.");
-        public static event Action<ActorData, Human> OnLoadActorCoord = 
-            (actor, _) => Plugin.Instance.Log.LogDebug($"Simulation actor{actor.ToIndex()} coordinate load.");
+        public static event Action<ActorData, Human> OnLoadActorChara = delegate { };
+        public static event Action<ActorData, Human> OnLoadActorCoord = delegate { };
 
         public static T Chara<T, U>(this Human human)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()

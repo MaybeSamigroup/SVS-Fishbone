@@ -38,7 +38,7 @@ namespace Fishbone
         static readonly string Path =
             typeof(T).GetCustomAttribute(typeof(ExtensionAttribute<T, U>))
                 is ExtensionAttribute<T, U> extension ? extension.Path :
-                throw new InvalidDataException($"{typeof(T)} is not bones to stuck.");
+                throw new InvalidDataException($"{typeof(T)} does not have valid extension attribute.");
         static bool TryGetEntry(ZipArchive archive, string path, out ZipArchiveEntry entry) =>
             null != (entry = archive.GetEntry(path));
         static void Translate<V>(Func<V, T> map, ZipArchive archive, ZipArchiveEntry entry) where V : new() =>
@@ -160,7 +160,7 @@ namespace Fishbone
     {
         CharaLimit Flags;
         internal event Action<Human, CharaLimit> OnResolveHuman =
-            (human, limit) => Plugin.Instance.Log.LogDebug($"chara loaded: {human.data.Pointer}, {limit}");
+            (human, limit) => Plugin.Instance.Log.LogDebug($"Character loaded: {human.data.Pointer}, {limit}");
         internal CopyTrack() =>
              Flags = CharaLimit.None;
         internal void MergeLimit(CharaLimit limit) =>

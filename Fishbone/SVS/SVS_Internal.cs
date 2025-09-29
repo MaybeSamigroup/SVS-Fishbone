@@ -1,4 +1,3 @@
-using System;
 using System.Linq;
 using UniRx;
 using SaveData;
@@ -33,13 +32,8 @@ namespace Fishbone
     {
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(CoordinateTypeChange), nameof(CoordinateTypeChange.ChangeType), typeof(int))]
-        static void CoordinateTypeChangeChangeTypePrefix() =>
-            Extension.NotifyPrepareSaveCoord();
-
-        [HarmonyPostfix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(CoordinateTypeChange), nameof(CoordinateTypeChange.ChangeType), typeof(int))]
-        static void CoordinateTypeChangeChangeTypePostfix(CoordinateTypeChange __instance) =>
-            Extension.CustomChangeCoord(__instance._human);
+        static void CoordinateTypeChangeChangeTypePrefix(CoordinateTypeChange __instance, int type) =>
+            Extension.CustomChangeCoord(__instance._human, type);
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanCoordinate), nameof(HumanCoordinate.ChangeCoordinateType), typeof(ChaFileDefine.CoordinateType), typeof(bool))]

@@ -22,11 +22,9 @@ namespace Fishbone
         public static event Action<HumanDataCoordinate, ZipArchive> OnPreprocessCoord =
             (data, archive) => Plugin.Instance.Log.LogDebug($"Coordinate preprocess:{data.Pointer},{archive.Entries.Count}");
 
-        public static event Action<Human> OnLoadChara =
-            (human) => Plugin.Instance.Log.LogDebug($"Character loaded:{human.data.Pointer},{human.data.Status.coordinateType}");
+        public static event Action<Human> OnLoadChara = delegate { };
 
-        public static event Action<Human> OnLoadCoord =
-            (human) => Plugin.Instance.Log.LogDebug($"Coordinate loaded:{human.data.Pointer},{human.data.Status.coordinateType}");
+        public static event Action<Human> OnLoadCoord = delegate { };
 
         public static Dictionary<K, V> Merge<K, V>(this Dictionary<K, V> mods, K index, V mod) =>
             mods == null ? new() { [index] = mod } :

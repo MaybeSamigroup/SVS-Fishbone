@@ -12,7 +12,7 @@ namespace Fishbone
     public static partial class Extension
     {
         internal static event Action<(int, int), (int, int)> OnSwapIndex =
-            (src, dst) => Plugin.Instance.Log.LogDebug($"on swap {src} => ${dst}");
+            (src, dst) => Plugin.Instance.Log.LogDebug($"Actor swapped {src} => ${dst}");
         internal static void SwapIndex((int, int) src, (int, int) dst) =>
             OnSwapIndex.Apply(src).Apply(dst).Try(Plugin.Instance.Log.LogError);
         internal static void StartAllActorTrack() =>
@@ -65,8 +65,7 @@ namespace Fishbone
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(CoordinateTypeChange), nameof(CoordinateTypeChange.ChangeType), typeof(int))]
         static void CoordinateTypeChangeChangeTypePrefix(CoordinateTypeChange __instance, int type) =>
-            (__instance._human.With(Extension.NotifyPrepareSaveCoord).data.Status.coordinateType = type)
-                .With(F.Apply(Extension.CustomChangeCoord, __instance._human));
+            Extension.CustomChangeCoord(__instance._human, type);
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanCoordinate), nameof(HumanCoordinate.ChangeCoordinateTypeAndReload), typeof(ChaFileDefine.CoordinateType), typeof(bool))]
