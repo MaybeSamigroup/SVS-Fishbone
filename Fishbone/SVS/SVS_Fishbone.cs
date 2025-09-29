@@ -35,27 +35,27 @@ namespace Fishbone
         public static T Chara<T, U>(this Human human)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
-            HumanActors.TryGetValue(human, out var index)
+            HumanToActors.TryGetValue(human, out var index)
                 ? ActorExtension<T, U>.Chara(index)
                 : HumanExtension<T, U>.Chara();
 
         public static U Coord<T, U>(this Human human)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
-            HumanActors.TryGetValue(human, out var index)
+            HumanToActors.TryGetValue(human, out var index)
                 ? ActorExtension<T, U>.Coord(index)
                 : HumanExtension<T, U>.Coord();
 
         public static void Chara<T, U>(this Human human, T mods)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
-            HumanActors.TryGetValue(human, out var index)
+            HumanToActors.TryGetValue(human, out var index)
                 .Either(F.Apply(Chara<T, U>, mods), F.Apply(ActorExtension<T, U>.Chara, index, mods));
 
         public static void Coord<T, U>(this Human human, U mods)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
-            HumanActors.TryGetValue(human, out var index)
+            HumanToActors.TryGetValue(human, out var index)
                 .Either(F.Apply(Coord<T, U>, mods), F.Apply(ActorExtension<T, U>.Coord, index, mods));
 
         public static T Chara<T, U>(this SaveData.Actor actor)
@@ -121,13 +121,13 @@ namespace Fishbone
 
         public static T Chara<T>(this Human human)
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
-            HumanActors.TryGetValue(human, out var index)
+            HumanToActors.TryGetValue(human, out var index)
                 ? ActorExtension<T>.Chara(index)
                 : HumanExtension<T>.Chara();
 
         public static void Chara<T>(this Human human, T mods)
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
-            HumanActors.TryGetValue(human, out var index)
+            HumanToActors.TryGetValue(human, out var index)
                 .Either(F.Apply(Chara, mods), F.Apply(ActorExtension<T>.Chara, index, mods));
 
         public static T Chara<T>(this SaveData.Actor actor)

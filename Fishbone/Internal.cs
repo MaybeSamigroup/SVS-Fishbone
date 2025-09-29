@@ -171,9 +171,11 @@ namespace Fishbone
     }
     public static partial class Extension
     {
+        internal static event Action<Human> OnHumanResolve = ResolveCopyTrack;
+        internal static void HumanResolve(Human human) => OnHumanResolve(human);
         internal static event Action<HumanData, HumanData, CharaLimit> OnCopy = UpdateCopyTrack;
         internal static void Copy(HumanData src, HumanData dst, CharaLimit limit) => OnCopy(src, dst, limit);
-        internal static Dictionary<HumanData, CopyTrack> CopyTracks = new();
+        static Dictionary<HumanData, CopyTrack> CopyTracks = new();
         internal static void ClearCopyTrack() =>
             CopyTracks.Clear();
         internal static CopyTrack StartCopyTrack(HumanData data) =>
@@ -225,9 +227,9 @@ namespace Fishbone
         [HarmonyPatch(typeof(HumanBody), nameof(HumanBody.OnUpdateShader), [])]
         static void HumanLoadPrefix(HumanBody __instance) =>
 #if Aicomi
-            Extension.ResolveCopyTrack(__instance._human);
+            Extension.HumanResolve(__instance._human);
 #else
-            Extension.ResolveCopyTrack(__instance.human);
+            Extension.HumanResolve(__instance.human);
 #endif
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanFace), nameof(HumanFace.LoadGagMaterial), [])]
@@ -235,9 +237,9 @@ namespace Fishbone
         [HarmonyPatch(typeof(HumanFace), nameof(HumanFace.ChangeHead), typeof(int), typeof(bool))]
         static void HumanLoadPrefix(HumanFace __instance) =>
 #if Aicomi
-            Extension.ResolveCopyTrack(__instance._human);
+            Extension.HumanResolve(__instance._human);
 #else
-            Extension.ResolveCopyTrack(__instance.human);
+            Extension.HumanResolve(__instance.human);
 #endif
     }
     #endregion

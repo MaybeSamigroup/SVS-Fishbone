@@ -45,7 +45,7 @@ namespace CoastalSmell
                 .Subscribe(AwaitStartup.Apply(onStartup).Apply(onDestroy).Ignoring<Unit>());
 
         public static Action<Action, Action> Hook = (onStartup, onDestroy) =>
-            SingletonInitializer<T>.WaitUntilSetup(CancellationToken.None)
+            SingletonInitializer<T>.WaitUntilSetup(new CancellationTokenSource().Token)
                 .ContinueWith(AwaitDestroy.Apply(onStartup).Apply(onDestroy));
     }
 
@@ -220,7 +220,7 @@ namespace CoastalSmell
         internal static BepInEx.Logging.ManualLogSource Logger;
         public const string Guid = $"{Process}.{Name}";
         public const string Name = "CoastalSmell";
-        public const string Version = "1.0.8";
+        public const string Version = "1.1.8";
         public override void Load() =>
             (Logger = Log).With(Sprites.Initialize).With(UGUI.Initialize);
     }

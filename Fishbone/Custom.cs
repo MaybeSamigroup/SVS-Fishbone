@@ -41,7 +41,9 @@ namespace Fishbone
                 var (group, index) => Game.Instance.SaveData[group, index],
             };
         internal static ActorIndex ToIndex(this Actor actor) =>
-            (actor is AC.User.UniqueNPCData || actor.Guid is (-1, -1)) ? actor.With(actor.SolveCharaFileName).ToUniqueNPCIndex() : (actor.Guid.Group, actor.Guid.Index);
+            (actor is AC.User.UniqueNPCData || actor.Guid is (-1, -1)) ?
+                actor.With(actor.SolveCharaFileName).ToUniqueNPCIndex() : (actor.Guid.Group, actor.Guid.Index);
+
         static ActorIndex ToUniqueNPCIndex(this Actor actor) =>
             Path.GetFileName(actor.CharaFileName) switch
             {
@@ -196,8 +198,8 @@ namespace Fishbone
         };
         internal static void Initialize()
         {
-            Util<HumanCustom>.Hook(() => OnEnterCustom(), () => OnLeaveCustom());
             OnLeaveCustom();
+            Util<HumanCustom>.Hook(() => OnEnterCustom(), () => OnLeaveCustom());
         }
     }
     #endregion
@@ -317,38 +319,38 @@ namespace Fishbone
     }
     public static partial class Extension
     {
-        static Dictionary<Human, ActorIndex> HumanActors = new();
+        static Dictionary<Human, ActorIndex> HumanToActors = new();
         internal static event Action<Human, ActorIndex> OnActorHumanize = UpdateHumanToActor;
         internal static bool ToActorIndex(HumanData data, out ActorIndex index) =>
             (index = CurrentActors()
                 .Where(actor => data == actor.ToHumanData())
                 .Select(actor => actor.ToIndex())
                 .FirstOrDefault(
-                    HumanActors
+                    HumanToActors
                         .Where(entry => entry.Key.data == data)
                         .Select(entry => entry.Value)
                         .FirstOrDefault(NotFound))) != NotFound;
         internal static bool ToActorIndex(Human human, out ActorIndex index) =>
-            HumanActors.TryGetValue(human, out index);
+            HumanToActors.TryGetValue(human, out index);
         static void CheckActorCopy(HumanData src, HumanData dst, CharaLimit limit) =>
             ToActorIndex(src, out var index).Maybe(F.Apply(StartActorTrack, dst, index));
-        static void StartActorTrack(HumanData data, ActorIndex index) =>
+        internal static void StartActorTrack(HumanData data, ActorIndex index) =>
             StartCopyTrack(data).OnResolveHuman += (human, _) => ResolveHumanToActor(human, index);
-        internal static void ResolveHumanToActor(Human human, ActorIndex index) =>
-            (OnActorHumanize.Apply(human).Apply(index) +
+        static void ResolveHumanToActor(Human human, ActorIndex index) =>
+            (OnActorHumanize.Apply(human).Apply(index) + OnLoadChara.Apply(human) +
                 OnLoadActorChara.Apply(index.ToActor()).Apply(human)).Try(Plugin.Instance.Log.LogError);
-        internal static void UpdateHumanToActor(Human human, ActorIndex index) =>
-            HumanActors.ContainsKey(human).Either(
+        static void UpdateHumanToActor(Human human, ActorIndex index) =>
+            HumanToActors.ContainsKey(human).Either(
                 F.Apply(ObserveOnDestroy, human) +
                 F.Apply(AssignHumanToActor, human, index),
                 F.Apply(AssignHumanToActor, human, index));
         static void AssignHumanToActor(Human human, ActorIndex index) =>
-            HumanActors[human] = index;
+            HumanToActors[human] = index;
         static void ObserveOnDestroy(Human human) =>
             human.gameObject.GetComponent<ObservableDestroyTrigger>()
                 .OnDestroyAsObservable().Subscribe(Dispose(human));
-        static Action<Unit> Dispose(Human human) => _ => HumanActors.Remove(human);
-        static void ClearHumanToActors() => HumanActors.Clear();
+        static Action<Unit> Dispose(Human human) => _ => HumanToActors.Remove(human);
+        static void ClearHumanToActors() => HumanToActors.Clear();
     }
     #endregion
 
@@ -358,7 +360,7 @@ namespace Fishbone
         static void CheckCustomCopy(HumanData src, HumanData dst, CharaLimit limit) =>
             (HumanCustom.Instance == null ? F.DoNothing :
                 src == HumanCustom.Instance.DefaultData ?
-                    OnCustomInitialize + TrackSpecial(dst) :
+                    OnCustomInitialize + TrackSpecial(dst):
                 src == HumanCustom.Instance.Received.HumanData &&
                     ToActorIndex(src, out var srcIndex) ?
                     OnCopyActorToCustom.Apply(srcIndex) + TrackSpecial(dst) :
@@ -411,7 +413,7 @@ namespace Fishbone
         internal static void CustomChangeCoord(Human human) =>
             OnLoadCoord.Apply(human).Try(Plugin.Instance.Log.LogError);
         internal static void ActorChangeCoord(Human human, int coordinateType) =>
-            HumanActors.TryGetValue(human, out var actor).Maybe(F.Apply(ActorChangeCoord, actor, coordinateType));
+            HumanToActors.TryGetValue(human, out var actor).Maybe(F.Apply(ActorChangeCoord, actor, coordinateType));
         static void ActorChangeCoord(ActorIndex actor, int coordinateType) =>
             OnActorCoordChange.Apply(actor).Apply(coordinateType).Try(Plugin.Instance.Log.LogError);
     }

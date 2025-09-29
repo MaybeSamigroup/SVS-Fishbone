@@ -15,6 +15,11 @@ namespace Fishbone
             (src, dst) => Plugin.Instance.Log.LogDebug($"on swap {src} => ${dst}");
         internal static void SwapIndex((int, int) src, (int, int) dst) =>
             OnSwapIndex.Apply(src).Apply(dst).Try(Plugin.Instance.Log.LogError);
+        internal static void StartAllActorTrack() =>
+            AllActors(Manager.Game.Instance.SaveData)
+                .Where(actor => actor != null)
+                .Where(actor => !HumanToActors.Values.Contains(actor.ToIndex()))
+                .ForEach(actor => StartActorTrack(actor.ToHumanData(), actor.ToIndex()));
     }
     internal static partial class ActorExtension<T, U>
         where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
@@ -59,13 +64,9 @@ namespace Fishbone
     {
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(CoordinateTypeChange), nameof(CoordinateTypeChange.ChangeType), typeof(int))]
-        static void CoordinateTypeChangeChangeTypePrefix() =>
-            Extension.NotifyPrepareSaveCoord();
-
-        [HarmonyPostfix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(CoordinateTypeChange), nameof(CoordinateTypeChange.ChangeType), typeof(int))]
-        static void CoordinateTypeChangeChangeTypePostfix(CoordinateTypeChange __instance) =>
-            Extension.CustomChangeCoord(__instance._human);
+        static void CoordinateTypeChangeChangeTypePrefix(CoordinateTypeChange __instance, int type) =>
+            (__instance._human.With(Extension.NotifyPrepareSaveCoord).data.Status.coordinateType = type)
+                .With(F.Apply(Extension.CustomChangeCoord, __instance._human));
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanCoordinate), nameof(HumanCoordinate.ChangeCoordinateTypeAndReload), typeof(ChaFileDefine.CoordinateType), typeof(bool))]
@@ -119,15 +120,22 @@ namespace Fishbone
             Extension.ResolveCopy(__instance);
 
         [HarmonyPostfix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(Seat), nameof(Seat.SetData))]
+        static void SeatSetData(ActorData data) =>
+            Extension.StartActorTrack(data.ToHumanData(), data.ToIndex());
+
+        [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(RegistrationUI), nameof(RegistrationUI.Swap))]
         static void RegistrationUISwapPostfix(RegistrationUI.SwapData from, RegistrationUI.SwapData to) =>
             Extension.SwapIndex((from.Group, from.DataIndex), (to.Group, to.DataIndex));
 
-        [HarmonyPostfix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(AC.CharaBase), nameof(AC.CharaBase.SetRoot))]
-        static void CharaBaseSetRootPostfix(AC.CharaBase __instance) =>
-            Extension.ToActorIndex(__instance.CharaData, out var index)
-                .Maybe(() => Extension.ResolveHumanToActor(__instance.Chara, index));
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(AC.Scene.HomeScene), nameof(AC.Scene.HomeScene.RunTutorialSequence))]
+        [HarmonyPatch(typeof(AC.Scene.HomeScene), nameof(AC.Scene.HomeScene.RunFestivalSequence))]
+        [HarmonyPatch(typeof(AC.Scene.HomeScene), nameof(AC.Scene.HomeScene.RunLazySundaySequence))]
+        [HarmonyPatch(typeof(AC.Scene.HomeScene), nameof(AC.Scene.HomeScene.RunDateScenarioSequence))]
+        [HarmonyPatch(typeof(AC.Scene.HomeScene), nameof(AC.Scene.HomeScene.RunDefaultScenarioSequence))]
+        static void HomeSceneRunADVPrefix() => Extension.StartAllActorTrack();
     }
     #endregion
 }
