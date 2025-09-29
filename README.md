@@ -21,6 +21,10 @@ Extension data will extracted as same name zip file in same folder of source fil
 
 Confirmed working under Aicomi 1.0.1.
 
+## Installation (Aicomi)
+
+Extract the [latest release](https://github.com/MaybeSamigroup/SVS-Fishbone/releases/latest) AC_Fishbone.zip to your Aicomi install directory.
+
 ## Prerequisites (SamabakeScramble)
 
 - [HF Patch for Summer Vacation Scramble](https://github.com/ManlyMarco/SVS-HF_Patch)
@@ -29,7 +33,7 @@ Confirmed working under SamabakeScramble 1.1.6.
 
 ## Installation (SamabakeScramble)
 
-Extract the [latest release](https://github.com/MaybeSamigroup/SVS-Fishbone/releases/latest) SamabakeScramble.zip to your SamabakeScramble install directory.
+Extract the [latest release](https://github.com/MaybeSamigroup/SVS-Fishbone/releases/latest) SVS_Fishbone.zip to your SamabakeScramble install directory.
 
 ## Prerequisites (DigitalCraft with HoneyCome)
 
@@ -37,7 +41,7 @@ Extract the [latest release](https://github.com/MaybeSamigroup/SVS-Fishbone/rele
 
 ## Installation (DigitalCraft with HoneyCome)
 
-Extract the [latest release](https://github.com/MaybeSamigroup/SVS-Fishbone/releases/latest) DigitalCraft.zip to your HoneyCome install directory.
+Extract the [latest release](https://github.com/MaybeSamigroup/SVS-Fishbone/releases/latest) DC_Fishbone.zip to your HoneyCome install directory.
 
 ## Prerequisites (DigitalCraft Standalone)
 
