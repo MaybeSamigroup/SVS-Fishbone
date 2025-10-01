@@ -12,6 +12,8 @@ using R3;
 using R3.Triggers;
 using ILLGAMES.Rigging;
 using ILLGAMES.Extensions;
+using AC.User;
+using AC.Scene.FreeH;
 using Actor = AC.User.ActorData;
 using ActorIndex = (int, int);
 #else
@@ -37,14 +39,20 @@ namespace Fishbone
         internal static Actor ToActor(this ActorIndex value) =>
             value switch
             {
-                var (group, index) when group < 0 => Game.Instance.SaveData.UniqueNPCList[index],
+                var (group, index) when group is -1 => Game.Instance.SaveData.UniqueNPCList[index],
+                var (group, index) when group is -2 => FreeHScene.Instance._attackList[index].ActorData,
+                var (group, index) when group is -3 => FreeHScene.Instance._receiveList[index].ActorData,
                 var (group, index) => Game.Instance.SaveData[group, index],
             };
         internal static ActorIndex ToIndex(this Actor actor) =>
-            (actor is AC.User.UniqueNPCData || actor.Guid is (-1, -1)) ?
-                actor.With(actor.SolveCharaFileName).ToUniqueNPCIndex() : (actor.Guid.Group, actor.Guid.Index);
-
-        static ActorIndex ToUniqueNPCIndex(this Actor actor) =>
+            (actor, actor.Guid, FreeHScene.Instance) switch
+            {
+                (_, _, not null) => ToFreeHSceneIndex(actor),
+                (UniqueNPCData, _, _) or
+                (_, (-1, -1), null) => ToUniqueNPCIndex(actor.With(actor.SolveCharaFileName)),
+                (_, _, _) => (actor.Guid.Group, actor.Guid.Index)
+            };
+        static ActorIndex ToUniqueNPCIndex(Actor actor) =>
             Path.GetFileName(actor.CharaFileName) switch
             {
                 "AC_F_-1" => (-1, 0),
@@ -52,9 +60,22 @@ namespace Fishbone
                 "AC_F_-3" => (-1, 2),
                 _ => (-1, -1)
             };
+        static ActorIndex ToFreeHSceneIndex(Actor actor) =>
+            IndexInList(actor, -2, FreeHScene.Instance._attackList)
+                .Concat(IndexInList(actor, -3, FreeHScene.Instance._receiveList))
+                .FirstOrDefault((-1, -1));
+        static IEnumerable<ActorIndex> IndexInList(Actor actor, int group,
+            Il2CppSystem.Collections.Generic.List<FreeHScene.CharaInfo> infos) =>
+            Enumerable.Range(0, infos.Count)
+                .Where(index => actor == infos[index].ActorData)
+                .Select(index => (group, index));
         internal static IEnumerable<Actor> CurrentActors() =>
-            Game.Instance?.SaveData?.AllActors();
-        internal static IEnumerable<Actor> AllActors(this AC.User.SaveData input) =>
+            FreeHScene.Instance is null ? Game.Instance?.SaveData?.AllActors()
+                : FreeHScene.Instance._attackList.ToArray()
+                    .Concat(FreeHScene.Instance._receiveList.ToArray())
+                    .Select(info => info.ActorData)
+                    .Where(actor => actor.HumanData != null); 
+        internal static IEnumerable<Actor> AllActors(this SaveData input) =>
             [.. input.Actors.ToArray().SelectMany(group => group.ToArray() ?? []), ..input.UniqueNPCList.Values];
     }
 #else
@@ -334,12 +355,12 @@ namespace Fishbone
             HumanToActors.TryGetValue(human, out index);
         static void CheckActorCopy(HumanData src, HumanData dst, CharaLimit limit) =>
             ToActorIndex(src, out var index).Maybe(F.Apply(StartActorTrack, dst, index));
-        internal static void StartActorTrack(HumanData data, ActorIndex index) =>
+        static void StartActorTrack(HumanData data, ActorIndex index) =>
             StartCopyTrack(data).OnResolveHuman += (human, _) => ResolveHumanToActor(human, index);
         static void ResolveHumanToActor(Human human, ActorIndex index) =>
             (OnActorHumanize.Apply(human).Apply(index) + OnLoadChara.Apply(human) +
                 OnLoadActorChara.Apply(index.ToActor()).Apply(human)).Try(Plugin.Instance.Log.LogError);
-        static void UpdateHumanToActor(Human human, ActorIndex index) =>
+        internal static void UpdateHumanToActor(Human human, ActorIndex index) =>
             HumanToActors.ContainsKey(human).Either(
                 F.Apply(ObserveOnDestroy, human) +
                 F.Apply(AssignHumanToActor, human, index),
@@ -416,9 +437,9 @@ namespace Fishbone
 
         internal static event Action<ActorIndex, int> OnActorCoordChange = delegate { };
         internal static void ActorChangeCoord(Human human, int coordinateType) =>
-            HumanToActors.TryGetValue(human, out var actor).Maybe(F.Apply(ActorChangeCoord, actor, coordinateType));
-        static void ActorChangeCoord(ActorIndex actor, int coordinateType) =>
-            OnActorCoordChange.Apply(actor).Apply(coordinateType).Try(Plugin.Instance.Log.LogError);
+            HumanToActors.TryGetValue(human, out var actor).Maybe(F.Apply(ActorChangeCoord, actor, human, coordinateType));
+        static void ActorChangeCoord(ActorIndex actor, Human human, int coordinateType) =>
+            (OnActorCoordChange.Apply(actor).Apply(coordinateType) + OnLoadCoord.Apply(human)).Try(Plugin.Instance.Log.LogError);
     }
     internal static partial class ActorExtension<T, U>
     {

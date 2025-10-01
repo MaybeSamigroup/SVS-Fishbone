@@ -1,8 +1,9 @@
 using System;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using System.Linq;
+
 #if Aicomi
 using R3;
 using R3.Triggers;
@@ -17,6 +18,7 @@ namespace CoastalSmell
     {
         GameObject View;
         Toggle State;
+        Toggle Unavailable;
         TextMeshProUGUI Text;
         public string[] Options { get; init; }
         public ChoiceList(float width, float height, string name, params string[] values) =>
@@ -25,6 +27,7 @@ namespace CoastalSmell
                 .With(UGUI.Cmp(UGUI.ToggleGroup(allowSwitchOff: false)))
                 .With(UGUI.Cmp(UGUI.Fitter()))
                 .With(PopulateList(width, height, Options = values))
+                .With(PopulateUnavailable(width, height))
                 .transform.parent.parent.gameObject
                 .With(UGUI.Cmp<LayoutElement>(UnityEngine.Object.Destroy))
                 .With(UGUI.Cmp<ObservablePointerExitTrigger>(ObserveCancel))
@@ -36,6 +39,9 @@ namespace CoastalSmell
                     .With(UGUI.Cmp<Toggle, ToggleGroup>((ui, group) => ui.group = group))
                     .GetComponent<Toggle>().OnPointerClickAsObservable()
                     .Subscribe(OnComplete(value)));
+        Action<GameObject> PopulateUnavailable(float width, float height) =>
+            parent => UGUI.Toggle(width, height, "NotAvailable", parent)
+                .With(UGUI.Cmp<Toggle, ToggleGroup>((ui, group) => (Unavailable = ui).group = group)).SetActive(false);
         void ObserveCancel(ObservablePointerExitTrigger trigger) =>
             trigger.OnPointerExitAsObservable().Subscribe(OnCancel);
         Action<UnityEngine.EventSystems.PointerEventData> OnCancel => _ =>
@@ -71,6 +77,7 @@ namespace CoastalSmell
             (State, Text) = (toggle, text.With(Initialize));
         void Initialize(TextMeshProUGUI text) =>
             View.GetComponentsInChildren<Toggle>()
-                .Where(toggle => toggle.gameObject.name == text.text).First().Set(true, false);
+                .Where(toggle => toggle.gameObject.name == text.text)
+                .FirstOrDefault(Unavailable).Set(true, false);
     }
 }

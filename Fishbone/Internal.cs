@@ -24,7 +24,7 @@ namespace Fishbone
     #region Common Definitions
     public static partial class Extension
     {
-        static void Implant(HumanData data, byte[] bytes) =>
+        internal static void Implant(HumanData data, byte[] bytes) =>
             data.PngData = data.PngData != null ? Encode.Implant(data.PngData, bytes) : Encode.Implant(bytes);
         static byte[] ToBinary(Action<ZipArchive> actions) =>
             new MemoryStream().With(Save(actions)).ToArray();
@@ -79,14 +79,10 @@ namespace Fishbone
     #endregion
 
     #region Character Definitions
-    internal class CharaLoadHook
+    internal partial class CharaLoadHook
     {
         internal static Func<LoadFlags, CharaLoadHook> DisabledResolver = _ => Skip;
         internal static Func<LoadFlags, CharaLoadHook> EnabledResolver = _ => new CharaLoadWithPng();
-        internal static Func<LoadFlags, CharaLoadHook> CraftFlagResolver = flags =>
-            flags is (LoadFlags.Custom | LoadFlags.Coorde | LoadFlags.Parameter | LoadFlags.Graphic | LoadFlags.About)
-                  or (LoadFlags.Custom | LoadFlags.Coorde | LoadFlags.Parameter | LoadFlags.Graphic | LoadFlags.About | LoadFlags.Status)
-                ? new CharaLoadWithoutPng() : Skip;
         internal static Func<LoadFlags, CharaLoadHook> CustomFlagResolver = flags =>
             flags is (LoadFlags.About | LoadFlags.Coorde)
                   or (LoadFlags.About | LoadFlags.Graphic)
@@ -131,6 +127,7 @@ namespace Fishbone
             source.Seek(offset, Il2CppSystem.IO.SeekOrigin.Begin);
         }
     }
+
     static partial class Hooks
     {
         static CharaLoadHook CharaLoadHook = CharaLoadHook.Skip;
@@ -151,7 +148,7 @@ namespace Fishbone
     {
         internal static event Action<HumanData, ZipArchive, CopyTrack> OnPreprocessCharaWithCopyTrack =
             (data, archive, _) => OnPreprocessChara.Apply(data).Apply(archive).Try(Plugin.Instance.Log.LogError);
-        internal static void Preprocess(HumanData data, Stream stream) =>
+        internal static void Preprocess(HumanData data, MemoryStream stream) =>
             OnPreprocessCharaWithCopyTrack.Apply(data)
                 .Apply(new ZipArchive(stream, ZipArchiveMode.Update))
                 .Apply(StartCopyTrack(data)).Try(Plugin.Instance.Log.LogError);

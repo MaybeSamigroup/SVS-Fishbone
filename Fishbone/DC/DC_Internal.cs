@@ -5,10 +5,12 @@ using UniRx.Triggers;
 using Character;
 using HarmonyLib;
 using CoastalSmell;
+using LoadFlags = Character.HumanData.LoadFileInfo.Flags;
 using CharaLimit = Character.HumanData.LoadLimited.Flags;
 using CoordLimit = Character.HumanDataCoordinate.LoadLimited.Flags;
 using Il2CppReader = Il2CppSystem.IO.BinaryReader;
 using Il2CppWriter = Il2CppSystem.IO.BinaryWriter;
+using System;
 
 namespace Fishbone
 {
@@ -45,6 +47,18 @@ namespace Fishbone
         [HarmonyPatch(typeof(DigitalCraft.DigitalCraft), nameof(DigitalCraft.DigitalCraft.SaveScene))]
         static void DigitalCraftSaveScenePrefix() =>
             Extension.SaveScene();
+    }
+    internal partial class CharaLoadHook
+    {
+        internal static Func<LoadFlags, CharaLoadHook> CraftFlagResolver = flags =>
+            flags is (LoadFlags.Custom | LoadFlags.Coorde | LoadFlags.Parameter | LoadFlags.Graphic | LoadFlags.About)
+                  or (LoadFlags.Custom | LoadFlags.Coorde | LoadFlags.Parameter | LoadFlags.Graphic | LoadFlags.About | LoadFlags.Status)
+                ? new CharaLoadWithoutPngAndOverwrite() : Skip;
+    }
+    internal class CharaLoadWithoutPngAndOverwrite : CharaLoadWithoutPng
+    {
+        internal override CharaLoadHook Resolve(HumanData data) =>
+            base.Resolve(data).With(F.Apply(Extension.Implant, data, Stream.ToArray()));
     }
 
     public static partial class Extension

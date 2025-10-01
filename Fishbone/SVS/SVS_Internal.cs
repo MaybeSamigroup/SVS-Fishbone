@@ -35,7 +35,7 @@ namespace Fishbone
         static void CoordinateTypeChangeChangeTypePrefix(CoordinateTypeChange __instance, int type) =>
             Extension.CustomChangeCoord(__instance._human, type);
 
-        [HarmonyPostfix, HarmonyWrapSafe]
+        [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanCoordinate), nameof(HumanCoordinate.ChangeCoordinateType), typeof(ChaFileDefine.CoordinateType), typeof(bool))]
         static void HumanCoordinateChangeCoordinateTypePostfix(HumanCoordinate __instance, ChaFileDefine.CoordinateType type, bool changeBackCoordinateType) =>
             (changeBackCoordinateType || __instance.human.data.Status.coordinateType != (int)type)
