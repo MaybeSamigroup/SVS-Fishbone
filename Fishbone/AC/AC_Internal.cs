@@ -72,7 +72,7 @@ namespace Fishbone
         static void HumanLoadForCustom(Human _) { }
         static void HumanLoadForActors(Human human) =>
             Extension.ToActorIndex(human.data, out var index)
-                .Maybe(F.Apply(Extension.UpdateHumanToActor, human, index)); 
+                .Maybe(F.Apply(Extension.ResolveHumanToActor, human, index)); 
         internal static void OnEnterCustom() =>
             (CharaLoadHook.LoadFlagResolver, HumanLoadAction) = (CharaLoadHook.CustomFlagResolver, HumanLoadForCustom);
         internal static void OnLeaveCustom() =>

@@ -357,10 +357,10 @@ namespace Fishbone
             ToActorIndex(src, out var index).Maybe(F.Apply(StartActorTrack, dst, index));
         static void StartActorTrack(HumanData data, ActorIndex index) =>
             StartCopyTrack(data).OnResolveHuman += (human, _) => ResolveHumanToActor(human, index);
-        static void ResolveHumanToActor(Human human, ActorIndex index) =>
+        internal static void ResolveHumanToActor(Human human, ActorIndex index) =>
             (OnActorHumanize.Apply(human).Apply(index) + OnLoadChara.Apply(human) +
                 OnLoadActorChara.Apply(index.ToActor()).Apply(human)).Try(Plugin.Instance.Log.LogError);
-        internal static void UpdateHumanToActor(Human human, ActorIndex index) =>
+        static void UpdateHumanToActor(Human human, ActorIndex index) =>
             HumanToActors.ContainsKey(human).Either(
                 F.Apply(ObserveOnDestroy, human) +
                 F.Apply(AssignHumanToActor, human, index),
