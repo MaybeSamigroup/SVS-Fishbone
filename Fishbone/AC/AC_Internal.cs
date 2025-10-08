@@ -3,6 +3,7 @@ using System.Linq;
 using AC.User;
 using AC.Scene.Home.UI;
 using Character;
+using CharacterCreation;
 using HarmonyLib;
 using CoastalSmell;
 
@@ -56,6 +57,11 @@ namespace Fishbone
     }
     static partial class Hooks
     {
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(CoordinateTypeChange), nameof(CoordinateTypeChange.ChangeType), typeof(int))]
+        static void CoordinateTypeChangeChangeTypePrefix(CoordinateTypeChange __instance, int type) =>
+            Extension.CustomChangeCoord(__instance._human, type);
+
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanCloth.ClothesCoordeCacheCommand), nameof(HumanCloth.ClothesCoordeCacheCommand.ChangeAll))]
         static void ClothesCoordeCacheCommandChangeAll(HumanCloth.ClothesCoordeCacheCommand __instance) =>
