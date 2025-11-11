@@ -23,7 +23,7 @@ using BepInEx;
 
 namespace CoastalSmell
 {
-    enum SimpleSprites
+    public enum SimpleSprites
     {
         ToggleBg,
         ToggleNa,
@@ -32,7 +32,7 @@ namespace CoastalSmell
         CheckOn,
         AlphaSample
     }
-    enum BorderSprites
+    public enum BorderSprites
     {
         Border,
         DarkBg,
@@ -43,7 +43,7 @@ namespace CoastalSmell
         ButtonHi,
         ButtonOn
     }
-    static class Sprites
+    public static class Sprites
     {
         static Dictionary<SimpleSprites, Sprite> Simples = new();
         static Dictionary<BorderSprites, Sprite> Borders = new();
@@ -51,8 +51,8 @@ namespace CoastalSmell
             Path.Combine(Paths.GameRootPath, "UserData", "plugins", Plugin.Name, $"{item}.png");
         static void RegisterSprite(this GameObject go, Sprite item) =>
             go.With(UGUI.Cmp(UGUI.Image(sprite: item)));
-        internal static Sprite Get(this SimpleSprites item) => Simples[item];
-        internal static Sprite Get(this BorderSprites item) => Borders[item];
+        public static Sprite Get(this SimpleSprites item) => Simples[item];
+        public static Sprite Get(this BorderSprites item) => Borders[item];
         static void Setup(Transform parent) =>
             (Simples, Borders) = (
                 Enum.GetValues<SimpleSprites>()
@@ -102,7 +102,7 @@ namespace CoastalSmell
             go => action(ObservableTriggerExtensions.GetOrAddComponent<T>(go));
         public static Action<GameObject> Cmp<U, T>(Action<U, T> action) where T : Component where U : Component =>
             go => action(ObservableTriggerExtensions.GetOrAddComponent<U>(go), go.GetComponentInParent<T>(true));
-        public static Action<T> Behavior<T>(bool? enabled) where T : Behaviour => ui => ui.enabled = enabled ?? ui.enabled;
+        public static Action<T> Behaviour<T>(bool? enabled) where T : Behaviour => ui => ui.enabled = enabled ?? ui.enabled;
         public static Action<Canvas> Canvas(RenderMode? renderMode = RenderMode.ScreenSpaceOverlay) => ui =>
             (ui.renderMode, ui.sortingOrder) = (renderMode ?? ui.renderMode, 1);
         public static Action<CanvasScaler> CanvasScaler(

@@ -15,12 +15,10 @@ namespace Fishbone
             F.Apply(Plugin.Instance.Log.LogDebug, "Custom character save.");
         public static event Action<ZipArchive> OnSaveChara =
             archive => PrepareSaveChara.Try(Plugin.Instance.Log.LogError);
-
         public static event Action PrepareSaveCoord =
-            () => Plugin.Instance.Log.LogDebug($"Custom coordinate {HumanCustom.Instance.Human.data.Status.coordinateType} save.");
+            F.Apply(Plugin.Instance.Log.LogDebug, "Custom coordinate save.");
         public static event Action<ZipArchive> OnSaveCoord =
             archive => PrepareSaveCoord.Try(Plugin.Instance.Log.LogError);
-
         public static event Action<ActorData> PrepareSaveActor = actor =>
             Plugin.Instance.Log.LogDebug($"Simulation actor{actor.ToIndex()} save.");
         public static event Action<ActorData, ZipArchive> OnSaveActor =
@@ -107,6 +105,10 @@ namespace Fishbone
             OnSaveChara += HumanExtension<T, U>.SaveChara;
             OnSaveCoord += HumanExtension<T, U>.SaveCoord;
             OnSaveActor += ActorExtension<T, U>.Save;
+            OnCharaConversion += HumanExtension<T, U>.SaveChara;
+            OnCoordConversion += HumanExtension<T, U>.SaveCoord;
+            OnEnterConversion += HumanExtension<T, U>.EnterConversion;
+            OnLeaveConversion += HumanExtension<T, U>.EnterConversion;
             OnEnterCustom += HumanExtension<T, U>.EnterCustom;
             OnLeaveCustom += HumanExtension<T, U>.LeaveCustom;
             OnEnterCustom += ActorExtension<T, U>.EnterCustom;
@@ -154,6 +156,9 @@ namespace Fishbone
             RegisterInternal<T>();
             OnSaveChara += HumanExtension<T>.SaveChara;
             OnSaveActor += ActorExtension<T>.Save;
+            OnCharaConversion += HumanExtension<T>.SaveChara;
+            OnEnterConversion += HumanExtension<T>.EnterConversion;
+            OnLeaveConversion += HumanExtension<T>.EnterConversion;
             OnEnterCustom += HumanExtension<T>.EnterCustom;
             OnLeaveCustom += HumanExtension<T>.LeaveCustom;
             OnEnterCustom += ActorExtension<T>.EnterCustom;

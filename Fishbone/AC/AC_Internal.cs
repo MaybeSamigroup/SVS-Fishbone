@@ -6,6 +6,7 @@ using Character;
 using CharacterCreation;
 using HarmonyLib;
 using CoastalSmell;
+using Cysharp.Threading.Tasks;
 
 namespace Fishbone
 {
@@ -71,7 +72,6 @@ namespace Fishbone
     #endregion
 
     #region Load
-
     static partial class Hooks
     {
         static event Action<Human> HumanLoadAction = HumanLoadForActors;
@@ -83,6 +83,15 @@ namespace Fishbone
             (CharaLoadHook.LoadFlagResolver, HumanLoadAction) = (CharaLoadHook.CustomFlagResolver, HumanLoadForCustom);
         internal static void OnLeaveCustom() =>
             (CharaLoadHook.LoadFlagResolver, HumanLoadAction) = (CharaLoadHook.DisabledResolver, HumanLoadForActors);
+
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(AC.Scene.ConvertHumanDataScene), nameof(AC.Scene.ConvertHumanDataScene.ConvertAsync))]
+        static void ConvertHumanDataSceneConvertAsyncPrefix() => Extension.EnterConversion();
+
+        [HarmonyPostfix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(AC.Scene.ConvertHumanDataScene), nameof(AC.Scene.ConvertHumanDataScene.ConvertAsync))]
+        static void ConvertHumanDataSceneConvertAsyncPostfix(ref UniTask __result) =>
+            __result = __result.ContinueWith((Action)Extension.LeaveConversion);
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(Human), nameof(Human.Load))]

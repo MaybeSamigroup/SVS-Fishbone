@@ -1,5 +1,7 @@
+using System;
 using System.Linq;
 using UniRx;
+using Cysharp.Threading.Tasks;
 using SaveData;
 using Character;
 using CharacterCreation;
@@ -69,6 +71,16 @@ namespace Fishbone
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.GetProductNo))]
         static void CostumeInfoInitFileListPostfix() => CoordLoadHook = new CoordLoadWait();
+
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(SV.ConvertHumanDataScene), nameof(SV.ConvertHumanDataScene.ConvertAsync))]
+        static void ConvertHumanDataSceneConvertAsyncPrefix() => Extension.EnterConversion();
+
+        [HarmonyPostfix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(SV.ConvertHumanDataScene), nameof(SV.ConvertHumanDataScene.ConvertAsync))]
+        static void ConvertHumanDataSceneConvertAsyncPostfix(ref UniTask __result) =>
+            __result = __result.ContinueWith((Action)Extension.LeaveConversion);
+
     }
     #endregion
 

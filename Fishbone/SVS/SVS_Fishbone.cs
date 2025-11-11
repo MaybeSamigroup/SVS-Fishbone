@@ -14,12 +14,10 @@ namespace Fishbone
             F.Apply(Plugin.Instance.Log.LogDebug, "Custom character save.");
         public static event Action<ZipArchive> OnSaveChara =
             archive => PrepareSaveChara.Try(Plugin.Instance.Log.LogError);
-
         public static event Action PrepareSaveCoord =
             F.Apply(Plugin.Instance.Log.LogDebug, "Custom coordinate save.");
         public static event Action<ZipArchive> OnSaveCoord =
             archive => PrepareSaveCoord.Try(Plugin.Instance.Log.LogError);
-
         public static event Action<SaveData.Actor> PrepareSaveActor = actor =>
             Plugin.Instance.Log.LogDebug($"Simulation actor{actor.charasGameParam.Index} save.");
         public static event Action<SaveData.Actor, ZipArchive> OnSaveActor =
@@ -106,6 +104,10 @@ namespace Fishbone
             OnSaveChara += HumanExtension<T, U>.SaveChara;
             OnSaveCoord += HumanExtension<T, U>.SaveCoord;
             OnSaveActor += ActorExtension<T, U>.Save;
+            OnCharaConversion += HumanExtension<T, U>.SaveChara;
+            OnCoordConversion += HumanExtension<T, U>.SaveCoord;
+            OnEnterConversion += HumanExtension<T, U>.EnterConversion;
+            OnLeaveConversion += HumanExtension<T, U>.EnterConversion;
             OnCopyCustomToActor += ActorExtension<T, U>.Copy;
             OnCopyActorToCustom += HumanExtension<T, U>.Copy;
             OnActorCoordChange += ActorExtension<T, U>.CoordinateChange;
@@ -152,6 +154,9 @@ namespace Fishbone
             RegisterInternal<T>();
             OnSaveChara += HumanExtension<T>.SaveChara;
             OnSaveActor += ActorExtension<T>.Save;
+            OnCharaConversion += HumanExtension<T>.SaveChara;
+            OnEnterConversion += HumanExtension<T>.EnterConversion;
+            OnLeaveConversion += HumanExtension<T>.EnterConversion;
             OnCopyCustomToActor += ActorExtension<T>.Copy;
             OnCopyActorToCustom += HumanExtension<T>.Copy;
             OnEnterCustom += HumanExtension<T>.EnterCustom;

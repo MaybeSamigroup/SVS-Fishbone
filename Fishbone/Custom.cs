@@ -70,7 +70,7 @@ namespace Fishbone
                 .Where(index => actor == infos[index].ActorData)
                 .Select(index => (group, index));
         internal static IEnumerable<Actor> CurrentActors() =>
-            FreeHScene.Instance is null ? Game.Instance?.SaveData?.AllActors()
+            FreeHScene.Instance is null ? Game.Instance?.SaveData?.AllActors() ?? []
                 : FreeHScene.Instance._attackList.ToArray()
                     .Concat(FreeHScene.Instance._receiveList.ToArray())
                     .Select(info => info.ActorData)
@@ -134,29 +134,74 @@ namespace Fishbone
     {
         static void Save(string path, Action<ZipArchive> actions) =>
             File.WriteAllBytes(path, Encode.Implant(File.ReadAllBytes(path), ToBinary(actions)));
-        internal static void SaveChara(string path) => Save(path, OnSaveChara);
-        internal static void SaveCoord(string path) => Save(path, OnSaveCoord);
+        internal static Action<string> SaveChara = SaveCustomChara;
+        internal static Action<string> SaveCoord = SaveCustomCoord;
+        internal static void SaveCustomChara(string path) => Save(path, OnSaveChara);
+        internal static void SaveCustomCoord(string path) => Save(path, OnSaveCoord);
+        internal static event Action<ZipArchive> OnCharaConversion =
+            _ => Plugin.Instance.Log.LogDebug("Character Conversion"); 
+        internal static event Action<ZipArchive> OnCoordConversion =
+            _ => Plugin.Instance.Log.LogDebug("Coordinate Conversion"); 
+        internal static void SaveConversionChara(string path) =>
+             Save(path.With(Plugin.Instance.Log.LogInfo), OnCharaConversion);
+        internal static void SaveConversionCoord(string path) =>
+            Save(path.With(Plugin.Instance.Log.LogInfo), OnCoordConversion);
         internal static void SaveActor(Actor actor) =>
             Implant(actor.ToHumanData(), ToBinary(OnSaveActor.Apply(actor)));
+        internal static event Action OnEnterConversion;
+        internal static event Action OnLeaveConversion;
+        internal static void EnterConversion()
+        {
+            OnCustomInitialize();
+            CustomCoordinateType = 0;
+            SaveChara = SaveConversionChara;
+            SaveCoord = SaveConversionCoord;
+            OnEnterConversion();
+        }
+        internal static void LeaveConversion()
+        {
+            OnCustomInitialize();
+            CustomCoordinateType = 0;
+            SaveChara = SaveCustomChara;
+            SaveCoord = SaveCustomCoord;
+            OnLeaveConversion();
+        }
     }
     internal static partial class HumanExtension<T, U>
-        where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
-        where U : CoordinateExtension<U>, new()
     {
         internal static void SaveChara(ZipArchive archive) =>
             Extension<T, U>.SaveChara(archive, Chara());
         internal static void SaveCoord(ZipArchive archive) =>
             Extension<T, U>.SaveCoord(archive, Coord());
+        internal static void ResolveConversion(CopyTrack _, T value) =>
+            Current = value;
+        internal static void ResolveConversion(CoordTrack _, U value) =>
+            (Current = Current.Merge(Extension.CustomCoordinateType, value))
+                .With(() => Plugin.Instance.Log.LogInfo("Conversion Applied")); 
+
+        internal static void EnterConversion()
+        {
+            Extension<T, U>.OnCopyTrackStart += ResolveConversion;
+            Extension<T, U>.OnCoordTrackStart += ResolveConversion;
+        }
+        internal static void LeaveConversion()
+        {
+            Extension<T, U>.OnCopyTrackStart -= ResolveConversion;
+            Extension<T, U>.OnCoordTrackStart -= ResolveConversion;
+        }
     }
     internal static partial class HumanExtension<T>
-        where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
         internal static void SaveChara(ZipArchive archive) =>
             Extension<T>.SaveChara(archive, Chara());
+        internal static void ResolveConversion(CopyTrack _, T value) =>
+            Current = value;
+        internal static void EnterConversion() =>
+            Extension<T>.OnCopyTrackStart += ResolveConversion;
+        internal static void LeaveConversion() =>
+            Extension<T>.OnCopyTrackStart -= ResolveConversion;
     }
     internal static partial class ActorExtension<T, U>
-        where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
-        where U : CoordinateExtension<U>, new()
     {
         internal static void Save(Actor actor, ZipArchive archive) =>
             Extension<T, U>.SaveChara(archive, Charas.GetValueOrDefault(actor.ToIndex(), new()));
@@ -236,8 +281,6 @@ namespace Fishbone
             OnLoadCustomCoord.Apply(human).Try(Plugin.Instance.Log.LogError);
     }
     internal static partial class HumanExtension<T, U>
-        where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
-        where U : CoordinateExtension<U>, new()
     {
         internal static void JoinCopyTrack(CopyTrack track, T value) =>
             track.OnResolveHuman += (human, limit) => Current = Current.Merge(limit, value);
@@ -258,7 +301,6 @@ namespace Fishbone
         }
     }
     internal static partial class HumanExtension<T>
-        where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
         internal static void LoadChara(Human _, CharaLimit limit, T value) =>
             Current = Current.Merge(limit, value);
@@ -285,8 +327,6 @@ namespace Fishbone
                 .Maybe(() => OnLoadActorCoord.Apply(index.ToActor()).Apply(human).Try(Plugin.Instance.Log.LogError));
     }
     internal static partial class ActorExtension<T, U>
-        where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
-        where U : CoordinateExtension<U>, new()
     {
         internal static void LoadActor(Actor actor, T value) =>
             Charas[actor.ToIndex()] = value;
@@ -317,7 +357,6 @@ namespace Fishbone
         }
     }
     internal static partial class ActorExtension<T>
-        where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
         internal static void LoadActor(Actor actor, T value) =>
             Charas[actor.ToIndex()] = value;
@@ -399,27 +438,21 @@ namespace Fishbone
             F.Apply(Plugin.Instance.Log.LogDebug, "Custom initialized.");
     }
     internal static partial class HumanExtension<T, U>
-        where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
-        where U : CoordinateExtension<U>, new()
     {
         internal static void Copy(ActorIndex index) =>
             Current = Current.Merge(CharaLimit.All, ActorExtension<T, U>.Chara(index));
     }
     internal static partial class HumanExtension<T>
-        where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
         internal static void Copy(ActorIndex index) =>
             Current = Current.Merge(CharaLimit.All, ActorExtension<T>.Chara(index));
     }
     internal static partial class ActorExtension<T, U>
-        where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
-        where U : CoordinateExtension<U>, new()
     {
         internal static void Copy(ActorIndex index) =>
             Charas[index] = Charas[index].Merge(CharaLimit.All, HumanExtension<T, U>.Chara());
     }
     internal static partial class ActorExtension<T>
-        where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
         internal static void Copy(ActorIndex index) =>
             Charas[index] = Charas[index].Merge(CharaLimit.All, HumanExtension<T>.Chara());
