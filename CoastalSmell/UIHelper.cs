@@ -7,12 +7,10 @@ using UnityEngine.UI;
 using TMPro;
 using Cysharp.Threading.Tasks;
 #if Aicomi
-using R3;
 using R3.Triggers;
 using ILLGAMES.Unity.UI;
 using ILLGAMES.Unity.UI.ColorPicker;
 #else
-using UniRx;
 using UniRx.Triggers;
 using ILLGames.Unity.UI;
 using ILLGames.Unity.UI.ColorPicker;
@@ -315,6 +313,41 @@ namespace CoastalSmell
             (name, parent) => new GameObject(name)
                 .With(Go(parent: parent.transform, active: false))
                 .With(Cmp(Image(color: new(0.5f, 0.5f, 0.5f, 0.7f), sprite: BorderSprites.ColorBg.Get())));
+
+        public static Func<float, float, string, GameObject, GameObject> ScrollWrap =>
+            (width, height, name, go) => go
+                .With(Go(parent: new GameObject(name)
+                    .With(Go(parent: new GameObject($"ScrollView.{name}")
+                        .With(Go(parent: go.transform.parent.transform))
+                        .With(Cmp(Image(color: new(0, 0, 0, 0))))
+                        .With(Cmp(Layout(width: width, height: height)))
+                        .With(Cmp(LayoutGroup<HorizontalLayoutGroup>(
+                            reverseArrangement: true,
+                            childForceExpandHeight: true)))
+                        .With(Cmp<ScrollRect>(ui => (ui.horizontal, ui.vertical, ui.scrollSensitivity) = (false, true, Math.Min(200, height / 2))))
+                        .With(Content($"Scrollbar.{name}")(
+                            Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get())) +
+                            Cmp(Layout(width: 5, height: height)) +
+                            Cmp<Scrollbar>(ui => ui.direction = Scrollbar.Direction.BottomToTop) +
+                            Cmp<Scrollbar, ScrollRect>((scroll, ui) => ui.verticalScrollbar = scroll) +
+                            Content($"Slider.{name}")(
+                                Cmp(RtFill) +
+                                Content($"Handle.{name}")(
+                                    Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.ColorBg.Get())) + Cmp(RtFill) +
+                                    Cmp<RectTransform, Scrollbar>((rt, ui) => ui.handleRect = rt)))))
+                    .transform))
+                    .With(Cmp(Layout(width: width - 5, height: height)))
+                    .With(Cmp<RectMask2D>())
+                    .With(Cmp<RectTransform, ScrollRect>((rt, ui) => ui.viewport = rt))
+                    .transform))
+                .With(Cmp(Rt(
+                    anchorMin: new(0, 1),
+                    anchorMax: new(0, 1),
+                    offsetMin: new(0, 0),
+                    offsetMax: new(0, 0),
+                    pivot: new(0, 1))))
+                .With(Cmp<RectTransform, ScrollRect>((rt, ui) => (ui.content, ui.normalizedPosition) = (rt, new(0, 1))));
+
         public static Func<float, float, string, GameObject, GameObject> ScrollView =>
             (width, height, name, parent) => new GameObject(name)
                 .With(Go(parent: new GameObject($"Viewport.{name}")

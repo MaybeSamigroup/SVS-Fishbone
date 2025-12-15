@@ -10,8 +10,13 @@
         <DefineConstants>$(GameName)</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
+        <PackageReference Include="System.Reactive" Version="6.1.0"/>
+        <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.752"/>
         <Compile Include="..\CoastalSmell.cs">
             <Link>CoastalSmell.cs</Link>
+        </Compile>
+        <Compile Include="..\Reactive.cs">
+            <Link>Reactive.cs</Link>
         </Compile>
         <Compile Include="..\IOHelper.cs">
             <Link>IOHelper.cs</Link>
@@ -25,22 +30,6 @@
         <Compile Include="..\WindowHandle.cs">
             <Link>WindowHelper.cs</Link>
         </Compile>
-        <Reference Include="0Harmony">
-            <HintPath>$(GamePath)\BepInEx\core\0Harmony.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="BepInEx.Core">
-            <HintPath>$(GamePath)\BepInEx\core\BepInEx.Core.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="BepInEx.Unity.IL2CPP">
-            <HintPath>$(GamePath)\BepInEx\core\BepInEx.Unity.IL2CPP.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="Il2CppInterop.Runtime">
-            <HintPath>$(GamePath)\BepInEx\core\Il2CppInterop.Runtime.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
         <Reference Include="Il2Cppmscorlib">
             <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\Il2Cppmscorlib.dll</HintPath>
             <Private>False</Private>
@@ -90,14 +79,5 @@
             <Private>False</Private>
         </Reference>
     </ItemGroup>
-    <Target Name="Deploy" AfterTargets="Build">
-        <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="$(GamePath)\BepInEx\plugins\" />
-    </Target>
-    <Target Name="Release" AfterTargets="Build">
-		<ItemGroup>
-			<UITexture Include="Resource\*.*"/>
-		</ItemGroup>
-		<Copy SourceFiles="@(UITexture)" DestinationFolder="..\..\Release\$(GameName)\UserData\plugins\CoastalSmell"/>
-        <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="..\..\Release\$(GameName)\BepinEx\plugins"/>
-    </Target>
+    <Import Project="../Tasks.xml"/>
 </Project>

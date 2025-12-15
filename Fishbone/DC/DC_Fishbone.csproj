@@ -10,6 +10,8 @@
         <DefineConstants>$(GameName)</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
+        <PackageReference Include="System.Reactive" Version="6.1.0"/>
+        <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.752"/>
         <Compile Include="..\..\Png.cs">
             <Link>Png.cs</Link>
         </Compile>
@@ -23,22 +25,6 @@
             <Private>False</Private>
             <ExcludeAssets>all</ExcludeAssets>
         </ProjectReference>
-        <Reference Include="0Harmony">
-            <HintPath>$(GamePath)\BepInEx\core\0Harmony.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="BepInEx.Core">
-            <HintPath>$(GamePath)\BepInEx\core\BepInEx.Core.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="BepInEx.Unity.IL2CPP">
-            <HintPath>$(GamePath)\BepInEx\core\BepInEx.Unity.IL2CPP.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="Il2CppInterop.Runtime">
-            <HintPath>$(GamePath)\BepInEx\core\Il2CppInterop.Runtime.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
         <Reference Include="Il2Cppmscorlib">
             <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\Il2Cppmscorlib.dll</HintPath>
             <Private>False</Private>
@@ -64,15 +50,5 @@
             <Private>False</Private>
         </Reference>
     </ItemGroup>
-    <Target Name="Deploy" AfterTargets="Build">
-        <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="$(GamePath)\BepInEx\plugins\" />
-    </Target>
-    <Target Name="Release" AfterTargets="Build">
-        <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="..\..\Release\$(GameName)\BepinEx\plugins"/>
-        <ZipDirectory SourceDirectory="..\..\Release\$(GameName)" Overwrite="true" DestinationFile="..\..\$(AssemblyName).zip"/>
-    </Target>
-	<Target Name="CleanRelease" AfterTargets="Clean">
-		<RemoveDir Directories="..\..\Release\$(GameName)"/>
-		<Delete Files="..\..\$(AssemblyName).zip"/>
-	</Target>
+    <Import Project="../Tasks.xml"/>
 </Project>

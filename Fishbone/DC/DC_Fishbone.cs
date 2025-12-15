@@ -1,19 +1,27 @@
 using System;
 using System.IO.Compression;
+using System.Reactive.Linq;
 using Character;
 using HarmonyLib;
 using BepInEx.Unity.IL2CPP;
-using CoastalSmell;
 
 namespace Fishbone
 {
     public static partial class Extension
     {
-        public static event Action<Human> PrepareSaveChara =
-            _ => Plugin.Instance.Log.LogDebug("Custom character save.");
+        public static IObservable<Human> OnPrepareSaveChara =>
+            OnSaveChara.Select(tuple => tuple.Item1);
 
-        public static event Action<Human, ZipArchive> OnSaveChara =
-            (human, _) => PrepareSaveChara.Apply(human).Try(Plugin.Instance.Log.LogError);
+        public static IObservable<(Human, ZipArchive)> OnSaveChara =
+            Observable.Create<(Human, ZipArchive)>(observer => Hooks.OnSaveHuman.Subscribe(actor => Save(actor, observer)));
+
+        public static IObservable<Human> OnLoadChara =
+            OnTrackChara.SelectMany(tuple => tuple.Item1.OnResolve);
+
+        public static IObservable<Human> OnLoadCoord =>
+            OnTrackCoord.SelectMany(tuple => tuple.Item1.OnResolve.Select(pair => pair.Item1));
+
+        public static IObservable<(Human, int)> OnChangeCoord = Hooks.OnChangeCoordinate;
 
         public static T Chara<T, U>(this Human human)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
@@ -39,10 +47,10 @@ namespace Fishbone
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new()
         {
-            RegisterInternal<T, U>();
-            OnSaveChara += HumanExtension<T, U>.SaveChara;
-            Extension<T, U>.OnCopyTrackStart += HumanExtension<T, U>.JoinCopyTrack;
-            Extension<T, U>.OnCoordTrackStart += HumanExtension<T, U>.JoinLimitTrack;
+            OnSaveChara.Subscribe(tuple => Extension<T, U>.SaveChara(tuple.Item2, HumanExtension<T, U>.Chara(tuple.Item1)));
+            Extension<T, U>.OnLoadChara.Subscribe(tuple => HumanExtension<T, U>.Chara(tuple.Item1, tuple.Item2));
+            Extension<T, U>.OnLoadChara.Subscribe(tuple => HumanExtension<T, U>.Prepare(tuple.Item1));
+            Extension<T, U>.OnLoadCoordInternal.Subscribe(tuple => HumanExtension<T, U>.Coord(tuple.Item1).Merge(tuple.Item2, tuple.Item3));
             Plugin.Instance.Log.LogDebug($"ComplexExtension<{typeof(T)},{typeof(U)}> registered.");
         }
 
@@ -53,13 +61,24 @@ namespace Fishbone
         public static void Register<T>()
             where T : SimpleExtension<T>, ComplexExtension<T,T>, CharacterExtension<T>, CoordinateExtension<T>, new()
         {
-            RegisterInternal<T>();
-            OnSaveChara += HumanExtension<T>.SaveChara;
-            Extension<T>.OnCopyTrackStart += HumanExtension<T>.JoinCopyTrack;
+            OnSaveChara.Subscribe(tuple => Extension<T>.SaveChara(tuple.Item2, HumanExtension<T>.Chara(tuple.Item1)));
+            Extension<T>.OnLoadChara.Subscribe(tuple => HumanExtension<T>.Chara(tuple.Item1, tuple.Item2));
+            Extension<T>.OnLoadChara.Subscribe(tuple => HumanExtension<T>.Prepare(tuple.Item1));
             Plugin.Instance.Log.LogDebug($"SimpleExtension<{typeof(T)}> registered.");
         }
     }
-
+    public static partial class Extension<T, U>
+    {
+        public static IObservable<(HumanData, T)> OnPreprocessChara =>
+            OnTrackChara.Select(tuple => (tuple.Item2, tuple.Item3));
+        public static IObservable<(HumanDataCoordinate, U)> OnPreprocessCoord =>
+            OnCoordLimitTrack.Select(tuple => (tuple.Item2, tuple.Item3));
+    }
+    public static partial class Extension<T>
+    {
+        public static IObservable<(HumanData, T)> OnPreprocessChara =>
+            OnTrackChara.Select(tuple => (tuple.Item2, tuple.Item3));
+    }
     public partial class Plugin : BasePlugin
     {
         public const string Process = "DigitalCraft";
@@ -67,7 +86,7 @@ namespace Fishbone
         {
             Instance = this;
             Patch = Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks");
-            CharaLoadHook.LoadFlagResolver = CharaLoadHook.CraftFlagResolver;
+            Extension.Initialize();
         }
     }
 }

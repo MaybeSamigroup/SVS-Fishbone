@@ -1,6 +1,6 @@
-using System;
 using System.Linq;
-using UniRx;
+using System.Reactive;
+using System.Reactive.Linq;
 using Cysharp.Threading.Tasks;
 using SaveData;
 using Character;
@@ -15,90 +15,42 @@ namespace Fishbone
     {
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.SaveCharaFileBeforeAction))]
-        static void HumanDataSaveCharaFileBeforeAction(string path) =>
-            Extension.SaveChara(path);
+        static void HumanDataSaveCharaFileBeforeAction(string path) => SaveCustomChara.OnNext(path);
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.SaveFile))]
-        static void HumanDataCoordinateSaveFilePostfix(string path) =>
-            Extension.SaveCoord(path);
+        static void HumanDataCoordinateSaveFilePostfix(string path) => SaveCustomCoord.OnNext(path);
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(WorldData), nameof(WorldData.Save), typeof(string))]
         static void WorldSavePrefix(WorldData __instance) =>
             __instance.Charas.Yield()
                 .Where(entry => entry != null && entry.Item2 != null)
-                .ForEach(entry => Extension.SaveActor(entry.Item2));
-    }
-    static partial class Hooks
-    {
-        [HarmonyPrefix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(CoordinateTypeChange), nameof(CoordinateTypeChange.ChangeType), typeof(int))]
-        static void CoordinateTypeChangeChangeTypePrefix(CoordinateTypeChange __instance, int type) =>
-            Extension.CustomChangeCoord(__instance._human, type);
-
-        [HarmonyPrefix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(HumanCoordinate), nameof(HumanCoordinate.ChangeCoordinateType), typeof(ChaFileDefine.CoordinateType), typeof(bool))]
-        static void HumanCoordinateChangeCoordinateTypePostfix(HumanCoordinate __instance, ChaFileDefine.CoordinateType type, bool changeBackCoordinateType) =>
-            (changeBackCoordinateType || __instance.human.data.Status.coordinateType != (int)type)
-                .Maybe(F.Apply(Extension.ActorChangeCoord, __instance.human, (int)type));
-    }
-
-    #endregion
-
-    #region Load Custom
-    static partial class Hooks
-    {
-        internal static void OnEnterCustom() =>
-            CharaLoadHook.LoadFlagResolver = CharaLoadHook.CustomFlagResolver;
-        internal static void OnLeaveCustom() =>
-            CharaLoadHook.LoadFlagResolver = CharaLoadHook.DisabledResolver;
-
-        [HarmonyPrefix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(SV.EntryScene.EntryFileListSelecter), nameof(SV.EntryScene.EntryFileListSelecter.Initialize))]
-        static void EntryFileListSelecterInitializePrefix() =>
-            CharaLoadHook.LoadFlagResolver = CharaLoadHook.DisabledResolver;
-
-        [HarmonyPostfix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(SV.EntryScene.EntryFileListSelecter), nameof(SV.EntryScene.EntryFileListSelecter.Initialize))]
-        static void EntryFileListSelecterInitializePostfix() =>
-            CharaLoadHook.LoadFlagResolver = CharaLoadHook.EnabledResolver;
-
-        [HarmonyPrefix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.GetProductNo))]
-        static void CostumeInfoInitFileListPrefix() => CoordLoadHook = CoordLoadHook.Skip;
-
-        [HarmonyPostfix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.GetProductNo))]
-        static void CostumeInfoInitFileListPostfix() => CoordLoadHook = new CoordLoadWait();
-
-        [HarmonyPrefix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(SV.ConvertHumanDataScene), nameof(SV.ConvertHumanDataScene.ConvertAsync))]
-        static void ConvertHumanDataSceneConvertAsyncPrefix() => Extension.EnterConversion();
-
-        [HarmonyPostfix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(SV.ConvertHumanDataScene), nameof(SV.ConvertHumanDataScene.ConvertAsync))]
-        static void ConvertHumanDataSceneConvertAsyncPostfix(ref UniTask __result) =>
-            __result = __result.ContinueWith((Action)Extension.LeaveConversion);
-
+                .Select(entry => entry.Item2).ForEach(SaveActor.OnNext);
     }
     #endregion
 
-    #region Load Actor
+    #region Load Chara
     static partial class Hooks
     {
+
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(SV.EntryScene.EntryFileListSelecter), nameof(SV.EntryScene.EntryFileListSelecter.Initialize))]
+        static void EntryFileListSelecterInitializePrefix() => CharaLoadTrack.Mode = CharaLoadTrack.Ignore;
+
+        [HarmonyPostfix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(SV.EntryScene.EntryFileListSelecter), nameof(SV.EntryScene.EntryFileListSelecter.Initialize))]
+        static void EntryFileListSelecterInitializePostfix() => CharaLoadTrack.Mode = CharaLoadTrack.FlagIgnore;
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(WorldData), nameof(WorldData.Load), typeof(string))]
         [HarmonyPatch(typeof(SV.EntryScene.EntryFileListSelecter), nameof(SV.EntryScene.EntryFileListSelecter.Execute))]
-        static void SaveDataWorldDataLoadPrefix() =>
-            CharaLoadHook.LoadFlagResolver = CharaLoadHook.EnabledResolver;
+        static void SaveDataWorldDataLoadPrefix() => CharaLoadTrack.Mode = CharaLoadTrack.FlagIgnore;
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(WorldData), nameof(WorldData.Load), typeof(string))]
         [HarmonyPatch(typeof(SV.EntryScene.EntryFileListSelecter), nameof(SV.EntryScene.EntryFileListSelecter.Execute))]
-        static void SaveDataWorldDataLoadPostfix() =>
-            CharaLoadHook.LoadFlagResolver = CharaLoadHook.DisabledResolver;
+        static void SaveDataWorldDataLoadPostfix() => CharaLoadTrack.Mode = CharaLoadTrack.Ignore;
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(SV.EntryScene.CharaListView.SelectListUI.ListSelectController),
@@ -107,11 +59,58 @@ namespace Fishbone
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(Actor), nameof(Actor.SetBytes))]
-        static void ActorSetBytes(Actor actor) => Extension.ResolveCopy(actor);
+        static void ActorSetBytes(Actor actor) => ActorResolve.OnNext(actor);
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(SV.EntryScene.CharaEntry), nameof(SV.EntryScene.CharaEntry.Entry))]
-        static void CharaEntryPostfix(Actor __result) => Extension.ResolveCopy(__result);
+        static void CharaEntryPostfix(Actor __result) => ActorResolve.OnNext(__result);
+    }
+    #endregion
+
+    #region Load Coord
+    static partial class Hooks
+    {
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.GetProductNo))]
+        [HarmonyPatch(typeof(Localize.Translate.Manager), nameof(Localize.Translate.Manager.CreateCoordinateInfo), typeof(byte), typeof(bool))]
+        [HarmonyPatch(typeof(Localize.Translate.Manager), nameof(Localize.Translate.Manager.CreateCoordinateInfo), typeof(byte), typeof(bool), typeof(HumanDataCoordinate.LoadFileInfo.Flags))]
+        static void CoordinateLoadIgnore() => CoordLoadTrack.Mode = CoordLoadTrack.Ignore;
+
+        [HarmonyPostfix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.GetProductNo))]
+        [HarmonyPatch(typeof(Localize.Translate.Manager), nameof(Localize.Translate.Manager.CreateCoordinateInfo), typeof(byte), typeof(bool))]
+        [HarmonyPatch(typeof(Localize.Translate.Manager), nameof(Localize.Translate.Manager.CreateCoordinateInfo), typeof(byte), typeof(bool), typeof(HumanDataCoordinate.LoadFileInfo.Flags))]
+        static void CoordinateLoadAware() => CoordLoadTrack.Mode = CoordLoadTrack.Aware;
+    }
+    #endregion
+
+    #region Change Coordinate
+    static partial class Hooks
+    {
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(CoordinateTypeChange), nameof(CoordinateTypeChange.ChangeType), typeof(int))]
+        static void CoordinateTypeChangeChangeTypePrefix(CoordinateTypeChange __instance, int type) =>
+            ChangeCustomCoordinate.OnNext((__instance._human, type));
+
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(HumanCoordinate), nameof(HumanCoordinate.ChangeCoordinateType), typeof(ChaFileDefine.CoordinateType), typeof(bool))]
+        static void HumanCoordinateChangeCoordinateTypePostfix(HumanCoordinate __instance, ChaFileDefine.CoordinateType type, bool changeBackCoordinateType) =>
+            (changeBackCoordinateType || __instance.human.data.Status.coordinateType != (int)type)
+                .Maybe(F.Apply(ChangeActorCoordinate.OnNext, (__instance.human, (int)type)));
+    }
+    #endregion
+
+    #region Conversion
+    static partial class Hooks
+    {
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(SV.ConvertHumanDataScene), nameof(SV.ConvertHumanDataScene.ConvertAsync))]
+        static void ConvertHumanDataSceneConvertAsyncPrefix() => EnterConversion.OnNext(Unit.Default);
+
+        [HarmonyPostfix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(SV.ConvertHumanDataScene), nameof(SV.ConvertHumanDataScene.ConvertAsync))]
+        static void ConvertHumanDataSceneConvertAsyncPostfix(ref UniTask __result) =>
+            __result = __result.ContinueWith(F.Apply(LeaveConversion.OnNext, Unit.Default));
     }
     #endregion
 }

@@ -1,5 +1,7 @@
 using System;
 using System.IO.Compression;
+using System.Reactive;
+using System.Reactive.Linq;
 using AC.User;
 using Character;
 using CharacterCreation;
@@ -11,26 +13,27 @@ namespace Fishbone
 {
     public static partial class Extension
     {
-        public static event Action PrepareSaveChara =
-            F.Apply(Plugin.Instance.Log.LogDebug, "Custom character save.");
-        public static event Action<ZipArchive> OnSaveChara =
-            archive => PrepareSaveChara.Try(Plugin.Instance.Log.LogError);
-        public static event Action PrepareSaveCoord =
-            F.Apply(Plugin.Instance.Log.LogDebug, "Custom coordinate save.");
-        public static event Action<ZipArchive> OnSaveCoord =
-            archive => PrepareSaveCoord.Try(Plugin.Instance.Log.LogError);
-        public static event Action<ActorData> PrepareSaveActor = actor =>
-            Plugin.Instance.Log.LogDebug($"Simulation actor{actor.ToIndex()} save.");
-        public static event Action<ActorData, ZipArchive> OnSaveActor =
-            (actor, _) => PrepareSaveActor.Apply(actor).Try(Plugin.Instance.Log.LogError);
-
-        public static event Action<Human> OnLoadCustomChara = delegate { };
-        public static event Action<Human> OnLoadCustomCoord = delegate { };
-
-        public static event Action<ActorData> OnLoadActor = delegate { };
-        public static event Action<ActorData, Human> OnLoadActorChara = delegate { };
-        public static event Action<ActorData, Human> OnLoadActorCoord = delegate { };
-
+        public static IObservable<Unit> OnPrepareSaveChara =>
+            OnSaveCustomChara.Select(_ => Unit.Default).Concat(OnCopyCustomToActor.Select(_ => Unit.Default));
+        public static IObservable<Unit> OnPrepareSaveCoord =>
+            Hooks.OnChangeCustomCoord.Select(_ => Unit.Default);
+        public static IObservable<ZipArchive> OnSaveCustomChara =>
+            Observable.Create<ZipArchive>(observer => Hooks.OnSaveCustomChara.Subscribe(path => Save(path, observer)));
+        public static IObservable<ZipArchive> OnSaveCustomCoord =>
+            Observable.Create<ZipArchive>(observer => Hooks.OnSaveCustomCoord.Subscribe(path => Save(path, observer)));
+        public static IObservable<((int, int), ZipArchive)> OnSaveActor =
+            Observable.Create<((int, int), ZipArchive)>(observer => Hooks.OnSaveActor.Subscribe(actor => Save(actor, observer)));
+        public static IObservable<Human> OnLoadCustomChara =>
+            OnTrackCustom.SelectMany(tuple => tuple.Item1.OnResolve.Select(_ => HumanCustom.Instance.Human));
+        public static IObservable<(int, int)> OnLoadActorChara =>
+            OnTrackActor.SelectMany(tuple => tuple.Item1.OnResolve);
+        public static IObservable<Human> OnLoadCoord =>
+            OnTrackCoord.SelectMany(tuple => tuple.Item1.OnResolve.Select(pair => pair.Item1));
+        public static IObservable<Human> OnLoadCustomCoord =>
+            OnLoadCoord.Where(_ => CharaLoadTrack.Mode == CharaLoadTrack.FlagAware);
+        public static IObservable<Human> OnLoadActorCoord =>
+            OnLoadCoord.Where(_ => CharaLoadTrack.Mode != CharaLoadTrack.FlagAware);
+        public static IObservable<(Human, (int, int))> OnActorHumanize => OnActorHumanizeInternal;
         public static T Chara<T, U>(this Human human)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
@@ -101,25 +104,26 @@ namespace Fishbone
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new()
         {
-            RegisterInternal<T, U>();
-            OnSaveChara += HumanExtension<T, U>.SaveChara;
-            OnSaveCoord += HumanExtension<T, U>.SaveCoord;
-            OnSaveActor += ActorExtension<T, U>.Save;
-            OnCharaConversion += HumanExtension<T, U>.SaveChara;
-            OnCoordConversion += HumanExtension<T, U>.SaveCoord;
-            OnEnterConversion += HumanExtension<T, U>.EnterConversion;
-            OnLeaveConversion += HumanExtension<T, U>.EnterConversion;
-            OnEnterCustom += HumanExtension<T, U>.EnterCustom;
-            OnLeaveCustom += HumanExtension<T, U>.LeaveCustom;
-            OnEnterCustom += ActorExtension<T, U>.EnterCustom;
-            OnLeaveCustom += ActorExtension<T, U>.LeaveCustom;
-            OnCopyCustomToActor += ActorExtension<T, U>.Copy;
-            OnCopyActorToCustom += HumanExtension<T, U>.Copy;
-            OnCustomInitialize += HumanExtension<T, U>.Initialize;
-            OnSwapIndex = ActorExtension<T, U>.SwapIndex;
-            HumanExtension<T, U>.LeaveCustom();
-            ActorExtension<T, U>.LeaveCustom();
             ActorExtension<T, U>.Initialize();
+            OnSaveCustomChara.Subscribe(archive => Extension<T, U>.SaveChara(archive, HumanExtension<T, U>.Chara()));
+            OnSaveCustomCoord.Subscribe(archive => Extension<T, U>.SaveCoord(archive, HumanExtension<T, U>.Coord()));
+            OnConvertChara.Subscribe(archive => Extension<T, U>.SaveChara(archive, HumanExtension<T, U>.Chara()));
+            OnConvertCoord.Subscribe(archive => Extension<T, U>.SaveChara(archive, HumanExtension<T, U>.Chara()));
+            OnSaveActor.Subscribe(tuple => Extension<T, U>.SaveChara(tuple.Item2, ActorExtension<T, U>.Chara(tuple.Item1)));
+            Hooks.OnSwapActor.Subscribe(ActorExtension<T, U>.SwapChara);
+            Hooks.OnSwapActor.Subscribe(ActorExtension<T, U>.SwapCoord);
+
+            Extension<T, U>.OnLoadCustomChara.Subscribe(tuple => HumanExtension<T, U>.LoadChara(tuple.Item1, tuple.Item2));
+            Extension<T, U>.OnLoadActorChara.Subscribe(tuple => ActorExtension<T, U>.LoadActor(tuple.Item1, tuple.Item2));
+            OnCustomInitialize.Subscribe(HumanExtension<T, U>.Initialize);
+            OnCopyCustomToActor.Subscribe(ActorExtension<T, U>.Copy);
+            OnCopyActorToCustom.Subscribe(HumanExtension<T, U>.Copy);
+
+            Extension<T, U>.OnLoadCoordInternal.Where(_ => CharaLoadTrack.Mode == CharaLoadTrack.FlagAware)
+                .Subscribe(tuple => HumanExtension<T, U>.Coord().Merge(tuple.Item2, tuple.Item3));
+            Extension<T, U>.OnLoadCoordInternal.Where(_ => CharaLoadTrack.Mode != CharaLoadTrack.FlagAware)
+                .Subscribe(tuple => ActorExtension<T, U>.LoadActorCoord(tuple.Item1, tuple.Item3, tuple.Item2));
+            OnChangeActorCoord.Subscribe(tuple => ActorExtension<T, U>.CoordinateChange(tuple.Item1, tuple.Item2));
             Plugin.Instance.Log.LogDebug($"ComplexExtension<{typeof(T)},{typeof(U)}> registered.");
         }
 
@@ -153,26 +157,36 @@ namespace Fishbone
         public static void Register<T>()
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
         {
-            RegisterInternal<T>();
-            OnSaveChara += HumanExtension<T>.SaveChara;
-            OnSaveActor += ActorExtension<T>.Save;
-            OnCharaConversion += HumanExtension<T>.SaveChara;
-            OnEnterConversion += HumanExtension<T>.EnterConversion;
-            OnLeaveConversion += HumanExtension<T>.EnterConversion;
-            OnEnterCustom += HumanExtension<T>.EnterCustom;
-            OnLeaveCustom += HumanExtension<T>.LeaveCustom;
-            OnEnterCustom += ActorExtension<T>.EnterCustom;
-            OnLeaveCustom += ActorExtension<T>.LeaveCustom;
-            OnCopyCustomToActor += ActorExtension<T>.Copy;
-            OnCopyActorToCustom += HumanExtension<T>.Copy;
-            OnCustomInitialize += HumanExtension<T>.Initialize;
-            OnSwapIndex = ActorExtension<T>.SwapIndex;
-            HumanExtension<T>.LeaveCustom();
-            ActorExtension<T>.LeaveCustom();
             ActorExtension<T>.Initialize();
+            OnSaveCustomChara.Subscribe(archive => Extension<T>.SaveChara(archive, HumanExtension<T>.Chara()));
+            OnConvertChara.Subscribe(archive => Extension<T>.SaveChara(archive, HumanExtension<T>.Chara()));
+            OnConvertCoord.Subscribe(archive => Extension<T>.SaveChara(archive, HumanExtension<T>.Chara()));
+            OnSaveActor.Subscribe(tuple => Extension<T>.SaveChara(tuple.Item2, ActorExtension<T>.Chara(tuple.Item1)));
+            Hooks.OnSwapActor.Subscribe(ActorExtension<T>.Swap);
+
+            Extension<T>.OnLoadCustomChara.Subscribe(tuple => HumanExtension<T>.LoadChara(tuple.Item1, tuple.Item2));
+            Extension<T>.OnLoadActorChara.Subscribe(tuple => ActorExtension<T>.LoadActor(tuple.Item1, tuple.Item2));
+            OnCustomInitialize.Subscribe(HumanExtension<T>.Initialize);
+            OnCopyCustomToActor.Subscribe(ActorExtension<T>.Copy);
+            OnCopyActorToCustom.Subscribe(HumanExtension<T>.Copy);
+
             Plugin.Instance.Log.LogDebug($"SimpleExtension<{typeof(T)}> registered.");
         }
         public static void HumanCustomReload() => HumanCustomReload(HumanCustom.Instance);
+    }
+    public static partial class Extension<T, U>
+    {
+        public static IObservable<(HumanData, T)> OnPreprocessChara =>
+            OnTrackCustom.Select(tuple => (tuple.Item2, tuple.Item3))
+                .Merge(OnTrackActor.Select(tuple => (tuple.Item2, tuple.Item3)));
+        public static IObservable<(HumanDataCoordinate, U)> OnPreprocessCoord =>
+            OnCoordLimitTrack.Select(tuple => (tuple.Item2, tuple.Item3));
+    }
+    public static partial class Extension<T>
+    {
+        public static IObservable<(HumanData, T)> OnPreprocessChara =>
+            OnTrackCustom.Select(tuple => (tuple.Item2, tuple.Item3))
+                .Merge(OnTrackActor.Select(tuple => (tuple.Item2, tuple.Item3)));
     }
     public partial class Plugin : BasePlugin
     {
@@ -182,6 +196,10 @@ namespace Fishbone
             Instance = this;
             Patch = Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks");
             Extension.Initialize();
+            Util<HumanCustom>.OnStartup
+                .Subscribe(_ => CharaLoadTrack.Mode = CharaLoadTrack.FlagAware);
+            Util<HumanCustom>.OnDestroy
+                .Subscribe(_ => CharaLoadTrack.Mode = CharaLoadTrack.Ignore);
         }
     }
 }

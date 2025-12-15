@@ -26,56 +26,9 @@
             <Private>False</Private>
             <ExcludeAssets>all</ExcludeAssets>
         </ProjectReference>
-        <Reference Include="0Harmony">
-            <HintPath>$(GamePath)\BepInEx\core\0Harmony.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="BepInEx.Core">
-            <HintPath>$(GamePath)\BepInEx\core\BepInEx.Core.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="BepInEx.Unity.IL2CPP">
-            <HintPath>$(GamePath)\BepInEx\core\BepInEx.Unity.IL2CPP.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="Il2CppInterop.Runtime">
-            <HintPath>$(GamePath)\BepInEx\core\Il2CppInterop.Runtime.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="Il2Cppmscorlib">
-            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\Il2Cppmscorlib.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="UnityEngine.CoreModule">
-            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UnityEngine.CoreModule.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="UniRx">
-            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UniRx.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="UniTask">
-            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UniTask.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="Assembly-CSharp">
-            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\Assembly-CSharp.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="IL">
-            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\IL.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
+        <PackageReference Include="System.Reactive" Version="6.1.0"/>
+        <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.738"/>
+        <PackageReference Include="IllusionLibs.SamabakeScramble.AllPackages" Version="2024.08.30.1"/>
     </ItemGroup>
-    <Target Name="Deploy" AfterTargets="Build">
-        <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="$(GamePath)\BepInEx\plugins\" />
-    </Target>
-    <Target Name="Release" AfterTargets="Build">
-        <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="..\..\Release\$(GameName)\BepinEx\plugins"/>
-        <ZipDirectory SourceDirectory="..\..\Release\$(GameName)" Overwrite="true" DestinationFile="..\..\$(AssemblyName).zip"/>
-    </Target>
-	<Target Name="CleanRelease" AfterTargets="Clean">
-		<RemoveDir Directories="..\..\Release\$(GameName)"/>
-		<Delete Files="..\..\$(AssemblyName).zip"/>
-	</Target>
+    <Import Project="../Tasks.xml"/>
 </Project>

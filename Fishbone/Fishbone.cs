@@ -1,12 +1,13 @@
-using BepInEx;
-using BepInEx.Unity.IL2CPP;
 using System;
 using System.IO;
 using System.Linq;
+using System.Reactive.Linq;
 using System.IO.Compression;
 using System.Collections.Generic;
 using Character;
 using HarmonyLib;
+using BepInEx;
+using BepInEx.Unity.IL2CPP;
 using CoastalSmell;
 using CharaLimit = Character.HumanData.LoadLimited.Flags;
 using CoordLimit = Character.HumanDataCoordinate.LoadLimited.Flags;
@@ -16,16 +17,8 @@ namespace Fishbone
     // Extension events and helpers
     public static partial class Extension
     {
-        public static event Action<HumanData, ZipArchive> OnPreprocessChara =
-            (data, archive) => Plugin.Instance.Log.LogDebug($"Character preprocess:{data.Pointer},{archive.Entries.Count}");
-
-        public static event Action<HumanDataCoordinate, ZipArchive> OnPreprocessCoord =
-            (data, archive) => Plugin.Instance.Log.LogDebug($"Coordinate preprocess:{data.Pointer},{archive.Entries.Count}");
-
-        public static event Action<Human> OnLoadChara = delegate { };
-
-        public static event Action<Human> OnLoadCoord = delegate { };
-
+        public static IObservable<(HumanData, ZipArchive)> OnPreprocessChara => CharaLoadTrack.OnLoadComplete;
+        public static IObservable<(HumanDataCoordinate, ZipArchive)> OnPreprocessCoord => CoordLoadTrack.OnLoadComplete;
         public static Dictionary<K, V> Merge<K, V>(this Dictionary<K, V> mods, K index, V mod) =>
             mods == null ? new() { [index] = mod } :
                 mods.Where(entry => !index.Equals(entry.Key))
@@ -50,7 +43,6 @@ namespace Fishbone
     {
         U Get(int coordinateType);
         T Merge(int coordinateType, U mods);
-
         virtual T Merge(int coordinateType, CoordLimit limit, U coord) =>
             Merge(coordinateType, Get(coordinateType).Merge(limit, coord));
     }
@@ -59,7 +51,6 @@ namespace Fishbone
         where T : ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
         T Get();
-
         virtual T Get(int coordinateType) => Get();
         virtual T Merge(int coordinateType, T mods) => Get();
         virtual T Merge(CoordLimit limit, T mods) => Get();
@@ -81,8 +72,6 @@ namespace Fishbone
         where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
         where U : CoordinateExtension<U>, new()
     {
-        public static event Action<HumanData, T> OnPreprocessChara = delegate { };
-        public static event Action<HumanDataCoordinate, U> OnPreprocessCoord = delegate { };
         public static Action<Stream, T> SerializeChara =
             Json<T>.Save.Apply(Plugin.Instance.Log.LogError);
         public static Action<Stream, U> SerializeCoord =
@@ -91,10 +80,12 @@ namespace Fishbone
             Json<T>.Load.Apply(Plugin.Instance.Log.LogError);
         public static Func<Stream, U> DeserializeCoord =
             Json<U>.Load.Apply(Plugin.Instance.Log.LogError);
-        public static Action<HumanData, ZipArchive> Translate<V>(string path, Func<V, T> map) where V : new() =>
-            (_, archive) => TryGetEntry(archive, path, out var entry).Maybe(F.Apply(Translate, map, archive, entry));
-        public static Action<HumanDataCoordinate, ZipArchive> Translate<V>(string path, Func<V, U> map) where V : new() =>
-            (_, archive) => TryGetEntry(archive, path, out var entry).Maybe(F.Apply(Translate, map, archive, entry));
+        public static IDisposable Translate<V>(string path, Func<V, T> map) where V : new() =>
+            Extension.OnPreprocessChara
+                .Subscribe(tuple => TryGetEntry(tuple.Item2, path, out var entry).Maybe(F.Apply(Translate, map, tuple.Item2, entry)));
+        public static IDisposable Translate<V>(string path, Func<V, U> map) where V : new() =>
+            Extension.OnPreprocessCoord
+                .Subscribe(tuple => TryGetEntry(tuple.Item2, path, out var entry).Maybe(F.Apply(Translate, map, tuple.Item2, entry)));
     }
 
     // Attribute for simple extensions
@@ -111,14 +102,13 @@ namespace Fishbone
     public static partial class Extension<T>
         where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
-        public static event Action<HumanData, T> OnPreprocessChara = delegate { };
-
         public static Action<Stream, T> SerializeChara =
             Json<T>.Save.Apply(Plugin.Instance.Log.LogError);
         public static Func<Stream, T> DeserializeChara =
             Json<T>.Load.Apply(Plugin.Instance.Log.LogError);
-        public static Action<HumanData, ZipArchive> Translate<V>(string path, Func<V, T> map) where V : new() =>
-            (_, archive) => TryGetEntry(archive, path, out var entry).Maybe(F.Apply(Translate, map, archive, entry));
+        public static IDisposable Translate<V>(string path, Func<V, T> map) where V : new() =>
+            Extension.OnPreprocessChara
+                .Subscribe(tuple => TryGetEntry(tuple.Item2, path, out var entry).Maybe(F.Apply(Translate, map, tuple.Item2, entry)));
     }
 
     // Main plugin class
@@ -129,7 +119,7 @@ namespace Fishbone
     {
         public const string Guid = $"{Process}.{Name}";
         public const string Name = "Fishbone";
-        public const string Version = "3.1.5";
+        public const string Version = "4.0.0";
         internal static Plugin Instance;
         private Harmony Patch;
         public override bool Unload() =>

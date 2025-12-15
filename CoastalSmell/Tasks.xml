@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <ItemGroup>
+        <UITexture Include="Resource\*.*"/>
+    </ItemGroup>
+    <Target Name="Deploy" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">
+        <Copy SourceFiles="@(UITexture)" DestinationFolder="$(GamePath)\UserData\plugins\CoastalSmell"/>
+        <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="$(GamePath)\BepInEx\plugins\" />
+    </Target>
+    <Target Name="Release" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+        <Copy SourceFiles="@(UITexture)" DestinationFolder="..\..\Release\$(GameName)\UserData\plugins\CoastalSmell"/>
+        <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="..\..\Release\$(GameName)\BepinEx\plugins"/>
+    </Target>
+</Project>

@@ -3,13 +3,15 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Collections.Generic;
+using System.Reactive;
+using System.Reactive.Subjects;
+using System.Reactive.Linq;
+using System.Reactive.Disposables;
 using Cysharp.Threading.Tasks;
 using Manager;
 using Character;
 using CharacterCreation;
 #if Aicomi
-using R3;
-using R3.Triggers;
 using ILLGAMES.Rigging;
 using ILLGAMES.Extensions;
 using AC.User;
@@ -17,8 +19,6 @@ using AC.Scene.FreeH;
 using Actor = AC.User.ActorData;
 using ActorIndex = (int, int);
 #else
-using UniRx;
-using UniRx.Triggers;
 using ILLGames.Rigging;
 using ILLGames.Extensions;
 using Actor = SaveData.Actor;
@@ -27,7 +27,6 @@ using ActorIndex = int;
 using CharaLimit = Character.HumanData.LoadLimited.Flags;
 using CoordLimit = Character.HumanDataCoordinate.LoadLimited.Flags;
 using CoastalSmell;
-using System.Data;
 
 namespace Fishbone
 {
@@ -44,6 +43,7 @@ namespace Fishbone
                 var (group, index) when group is -3 => FreeHScene.Instance._receiveList[index].ActorData,
                 var (group, index) => Game.Instance.SaveData[group, index],
             };
+
         internal static ActorIndex ToIndex(this Actor actor) =>
             (actor, actor.Guid, FreeHScene.Instance) switch
             {
@@ -52,6 +52,7 @@ namespace Fishbone
                 (_, (-1, -1), null) => ToUniqueNPCIndex(actor.With(actor.SolveCharaFileName)),
                 (_, _, _) => (actor.Guid.Group, actor.Guid.Index)
             };
+
         static ActorIndex ToUniqueNPCIndex(Actor actor) =>
             Path.GetFileName(actor.CharaFileName) switch
             {
@@ -60,21 +61,25 @@ namespace Fishbone
                 "AC_F_-3" => (-1, 2),
                 _ => (-1, -1)
             };
+
         static ActorIndex ToFreeHSceneIndex(Actor actor) =>
             IndexInList(actor, -2, FreeHScene.Instance._attackList)
                 .Concat(IndexInList(actor, -3, FreeHScene.Instance._receiveList))
                 .FirstOrDefault((-1, -1));
+
         static IEnumerable<ActorIndex> IndexInList(Actor actor, int group,
             Il2CppSystem.Collections.Generic.List<FreeHScene.CharaInfo> infos) =>
             Enumerable.Range(0, infos.Count)
                 .Where(index => actor == infos[index].ActorData)
                 .Select(index => (group, index));
+
         internal static IEnumerable<Actor> CurrentActors() =>
             FreeHScene.Instance is null ? Game.Instance?.SaveData?.AllActors() ?? []
                 : FreeHScene.Instance._attackList.ToArray()
                     .Concat(FreeHScene.Instance._receiveList.ToArray())
                     .Select(info => info.ActorData)
                     .Where(actor => actor.HumanData != null); 
+
         internal static IEnumerable<Actor> AllActors(this SaveData input) =>
             [.. input.Actors.ToArray().SelectMany(group => group.ToArray() ?? []), ..input.UniqueNPCList.Values];
     }
@@ -130,87 +135,25 @@ namespace Fishbone
     #endregion
 
     #region Save
+    static partial class Hooks
+    {
+        static Subject<string> SaveCustomChara = new();
+        static Subject<string> SaveCustomCoord = new();
+        static Subject<Actor> SaveActor = new();
+        internal static IObservable<string> OnSaveCustomChara => SaveCustomChara.AsObservable();
+        internal static IObservable<string> OnSaveCustomCoord => SaveCustomCoord.AsObservable();
+        internal static IObservable<Actor> OnSaveActor => SaveActor.AsObservable();
+    }
     public static partial class Extension
     {
-        static void Save(string path, Action<ZipArchive> actions) =>
-            File.WriteAllBytes(path, Encode.Implant(File.ReadAllBytes(path), ToBinary(actions)));
-        internal static Action<string> SaveChara = SaveCustomChara;
-        internal static Action<string> SaveCoord = SaveCustomCoord;
-        internal static void SaveCustomChara(string path) => Save(path, OnSaveChara);
-        internal static void SaveCustomCoord(string path) => Save(path, OnSaveCoord);
-        internal static event Action<ZipArchive> OnCharaConversion =
-            _ => Plugin.Instance.Log.LogDebug("Character Conversion"); 
-        internal static event Action<ZipArchive> OnCoordConversion =
-            _ => Plugin.Instance.Log.LogDebug("Coordinate Conversion"); 
-        internal static void SaveConversionChara(string path) =>
-             Save(path.With(Plugin.Instance.Log.LogInfo), OnCharaConversion);
-        internal static void SaveConversionCoord(string path) =>
-            Save(path.With(Plugin.Instance.Log.LogInfo), OnCoordConversion);
-        internal static void SaveActor(Actor actor) =>
-            Implant(actor.ToHumanData(), ToBinary(OnSaveActor.Apply(actor)));
-        internal static event Action OnEnterConversion;
-        internal static event Action OnLeaveConversion;
-        internal static void EnterConversion()
-        {
-            OnCustomInitialize();
-            CustomCoordinateType = 0;
-            SaveChara = SaveConversionChara;
-            SaveCoord = SaveConversionCoord;
-            OnEnterConversion();
-        }
-        internal static void LeaveConversion()
-        {
-            OnCustomInitialize();
-            CustomCoordinateType = 0;
-            SaveChara = SaveCustomChara;
-            SaveCoord = SaveCustomCoord;
-            OnLeaveConversion();
-        }
-    }
-    internal static partial class HumanExtension<T, U>
-    {
-        internal static void SaveChara(ZipArchive archive) =>
-            Extension<T, U>.SaveChara(archive, Chara());
-        internal static void SaveCoord(ZipArchive archive) =>
-            Extension<T, U>.SaveCoord(archive, Coord());
-        internal static void ResolveConversion(CopyTrack _, T value) =>
-            Current = value;
-        internal static void ResolveConversion(CoordTrack _, U value) =>
-            (Current = Current.Merge(Extension.CustomCoordinateType, value))
-                .With(() => Plugin.Instance.Log.LogInfo("Conversion Applied")); 
-
-        internal static void EnterConversion()
-        {
-            Extension<T, U>.OnCopyTrackStart += ResolveConversion;
-            Extension<T, U>.OnCoordTrackStart += ResolveConversion;
-        }
-        internal static void LeaveConversion()
-        {
-            Extension<T, U>.OnCopyTrackStart -= ResolveConversion;
-            Extension<T, U>.OnCoordTrackStart -= ResolveConversion;
-        }
-    }
-    internal static partial class HumanExtension<T>
-    {
-        internal static void SaveChara(ZipArchive archive) =>
-            Extension<T>.SaveChara(archive, Chara());
-        internal static void ResolveConversion(CopyTrack _, T value) =>
-            Current = value;
-        internal static void EnterConversion() =>
-            Extension<T>.OnCopyTrackStart += ResolveConversion;
-        internal static void LeaveConversion() =>
-            Extension<T>.OnCopyTrackStart -= ResolveConversion;
-    }
-    internal static partial class ActorExtension<T, U>
-    {
-        internal static void Save(Actor actor, ZipArchive archive) =>
-            Extension<T, U>.SaveChara(archive, Charas.GetValueOrDefault(actor.ToIndex(), new()));
-    }
-    internal static partial class ActorExtension<T>
-        where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
-    {
-        internal static void Save(Actor actor, ZipArchive archive) =>
-            Extension<T>.SaveChara(archive, Charas.GetValueOrDefault(actor.ToIndex(), new()));
+        static void Save(Actor actor, IObserver<(ActorIndex, ZipArchive)> observer) =>
+            Implant(actor.ToHumanData(), ToBinary(Observer.Create<ZipArchive>(archive => observer.OnNext((actor.ToIndex(), archive)))));
+        static void Save(string path, IObserver<ZipArchive> observer) =>
+            File.WriteAllBytes(path, Encode.Implant(File.ReadAllBytes(path), ToBinary(observer)));
+        static Subject<ZipArchive> ConvertChara = new();
+        static Subject<ZipArchive> ConvertCoord = new();
+        internal static IObservable<ZipArchive> OnConvertChara => ConvertChara.AsObservable();
+        internal static IObservable<ZipArchive> OnConvertCoord => ConvertCoord.AsObservable();
     }
     #endregion
 
@@ -232,104 +175,142 @@ namespace Fishbone
     #endregion
 
     #region Custom and Actor switch
+    static partial class Hooks
+    {
+        internal static IObservable<Actor> OnActorResolve => ActorResolve.AsObservable();
+        static Subject<Actor> ActorResolve = new();
+        static Subject<Unit> EnterConversion = new();
+        static Subject<Unit> LeaveConversion = new();
+        internal static IObservable<Unit> OnEnterConversion => EnterConversion.AsObservable();
+        internal static IObservable<Unit> OnLeaveConversion => LeaveConversion.AsObservable();
+    }
+
+    class CharaCopyTrack : IDisposable
+    {
+        protected CompositeDisposable Subscription;
+        protected IObservable<HumanData> OnDataUpdate;
+        protected IObservable<CharaLimit> OnLimitUpdate;
+        protected IObservable<Human> OnResolveHuman;
+        protected IObservable<Actor> OnResolveActor;
+        HumanData Data;
+        CharaCopyTrack() =>
+            (OnDataUpdate, OnLimitUpdate, OnResolveHuman, OnResolveActor) = (
+                Hooks.OnHumanDataCopy.Where(Match).Select(tuple => tuple.Item2),
+                Hooks.OnHumanDataLimit.Where(Match).Select(tuple => tuple.Item2),
+                Hooks.OnHumanResolve.Where(Match).FirstAsync(),
+                Hooks.OnActorResolve.Where(Match).FirstAsync());
+        protected CharaCopyTrack(HumanData data) : this() =>
+            (Data, Subscription) = (data, [
+                OnResolveHuman.Subscribe(F.Ignoring<Human>(F.DoNothing), Dispose),
+                OnResolveActor.Subscribe(F.Ignoring<Actor>(F.DoNothing), Dispose),
+                OnDataUpdate.Subscribe(Resolve),
+            ]);
+        bool Match<T>((HumanData, T) tuple) => Data == tuple.Item1;
+        bool Match(Human human) => Data == human.data; 
+        bool Match(Actor actor) => Data == actor.ToHumanData();
+        void Resolve(HumanData value) => Data = value;
+        public void Dispose() => Subscription.Dispose();
+    }
+    class CustomTrack : CharaCopyTrack
+    {
+        internal IObservable<CharaLimit> OnResolve { init; get; }
+        CharaLimit Limit;
+        CustomTrack(HumanData data, CharaLimit limit) : base(data) =>
+            (Limit, OnResolve) = (limit, OnResolveHuman.Select(_ => Limit));
+        internal CustomTrack(HumanData data) : this(data, CharaLimit.None) =>
+            Subscription.Append(OnLimitUpdate.Subscribe(Resolve))
+                .Append(CharaLoadTrack.OnModeUpdate.Subscribe(_ => Dispose()));
+        void Resolve(CharaLimit value) => Limit = value;
+    }
     public static partial class Extension
     {
-        internal static event Action OnEnterCustom = delegate
-        {
-            Hooks.OnEnterCustom();
-            OnCustomInitialize();
-            CustomCoordinateType = 0;
-            ClearCopyTrack();
-            ClearHumanToActors();
-
-            OnCopy += CheckCustomCopy;
-            OnLoadChara += LoadCustomChara;
-            OnLoadCoord += LoadCustomCoord;
-
-            OnCopy -= CheckActorCopy;
-            OnLoadCoord -= LoadActorCoord;
-        };
-        internal static event Action OnLeaveCustom = delegate
-        {
-            Hooks.OnLeaveCustom();
-            OnCustomInitialize();
-            CustomCoordinateType = 0;
-            ClearCopyTrack();
-            ClearHumanToActors();
-
-            OnCopy -= CheckCustomCopy;
-            OnLoadChara -= LoadCustomChara;
-            OnLoadCoord -= LoadCustomCoord;
-
-            OnCopy += CheckActorCopy;
-            OnLoadCoord += LoadActorCoord;
-        };
-        internal static void Initialize()
-        {
-            OnLeaveCustom();
-            Util<HumanCustom>.Hook(() => OnEnterCustom(), () => OnLeaveCustom());
-        }
+        internal static IObservable<(CustomTrack, HumanData, ZipArchive)> OnTrackCustom =>
+            OnPreprocessChara.Where(_ => CharaLoadTrack.Mode == CharaLoadTrack.FlagAware)
+                .Select(tuple => (new CustomTrack(tuple.Item1), tuple.Item1, tuple.Item2));
+    }
+    public static partial class Extension<T, U>
+    {
+        static IObservable<(CustomTrack, HumanData, T)> OnTrackCustom =>
+            Extension.OnTrackCustom.Select(tuple => (tuple.Item1, tuple.Item2, LoadChara(tuple.Item3)));
+        internal static IObservable<(CharaLimit, T)> OnLoadCustomChara =>
+            OnTrackCustom.SelectMany(tuple => tuple.Item1.OnResolve.Select(limit => (limit, tuple.Item3)));
+    }
+    public static partial class Extension<T>
+    {
+        static IObservable<(CustomTrack, HumanData, T)> OnTrackCustom =>
+            Extension.OnTrackCustom.Select(tuple => (tuple.Item1, tuple.Item2, LoadChara(tuple.Item3)));
+        internal static IObservable<(CharaLimit, T)> OnLoadCustomChara =>
+            OnTrackCustom.SelectMany(tuple => tuple.Item1.OnResolve.Select(limit => (limit, tuple.Item3)));
+    }
+    class ActorTrack : CharaCopyTrack
+    {
+        internal IObservable<ActorIndex> OnResolve { init; get; }
+        internal ActorTrack(HumanData data) : base(data) => OnResolve = OnResolveActor.Select(actor => actor.ToIndex());
+    }
+    public static partial class Extension
+    {
+        internal static IObservable<(ActorTrack, HumanData, ZipArchive)> OnTrackActor =>
+            OnPreprocessChara.Where(_ => CharaLoadTrack.Mode == CharaLoadTrack.FlagIgnore)
+                .Select(tuple => (new ActorTrack(tuple.Item1), tuple.Item1, tuple.Item2));
+        internal static IObservable<(ActorIndex, HumanData)> OnLoadActorCharaInternal =>
+            OnTrackActor.SelectMany(tuple => tuple.Item1.OnResolve.Select(actor => (actor, tuple.Item2)));
+    }
+    public static partial class Extension<T, U>
+    {
+        internal static IObservable<(ActorTrack, HumanData, T)> OnTrackActor =>
+            Extension.OnTrackActor.Select(tuple => (tuple.Item1, tuple.Item2, LoadChara(tuple.Item3)));
+        internal static IObservable<(ActorIndex, T)> OnLoadActorChara =>
+            OnTrackActor.SelectMany(tuple => tuple.Item1.OnResolve.Select(actor => (actor, tuple.Item3)));
+    }
+    public static partial class Extension<T>
+    {
+        internal static IObservable<(ActorTrack, HumanData, T)> OnTrackActor =>
+            Extension.OnTrackActor.Select(tuple => (tuple.Item1, tuple.Item2, LoadChara(tuple.Item3)));
+        internal static IObservable<(ActorIndex, T)> OnLoadActorChara =>
+            OnTrackActor.SelectMany(tuple => tuple.Item1.OnResolve.Select(actor => (actor, tuple.Item3)));
+    }
+    class HumanTrack : CharaCopyTrack
+    {
+        internal IObservable<(Human, ActorIndex)> OnResolve { init; get; }
+        ActorIndex Actor;
+        internal HumanTrack(ActorIndex actor, HumanData data) : base(data) =>
+            (Actor, OnResolve) = (actor, OnResolveHuman.Select(human => (human, Actor)));
+    }
+    public static partial class Extension
+    {
+        internal static bool ToActorIndex(Human human, out ActorIndex index) =>
+            HumanToActors.TryGetValue(human, out index);
+        static Dictionary<Human, ActorIndex> HumanToActors = new();
+        static IObservable<(Human, ActorIndex)> OnActorHumanizeInternal =>
+            Hooks.OnHumanDataCopy
+                .Where(_ => CharaLoadTrack.Mode == CharaLoadTrack.Ignore)
+                .SelectMany(tuple => HumanToActors
+                    .Where(entry => tuple.Item1 == entry.Key.data)
+                    .Select(entry => (entry.Value, tuple.Item2)).ToObservable())
+                .Merge(OnLoadActorCharaInternal)
+            .SelectMany(tuple => new HumanTrack(tuple.Item1, tuple.Item2).OnResolve);
     }
     #endregion
 
     #region Load Custom
-    public static partial class Extension
-    {
-        internal static void LoadCustomChara(Human human) =>
-            OnLoadCustomChara.Apply(human).Try(Plugin.Instance.Log.LogError);
-        internal static void LoadCustomCoord(Human human) =>
-            OnLoadCustomCoord.Apply(human).Try(Plugin.Instance.Log.LogError);
-    }
     internal static partial class HumanExtension<T, U>
     {
-        internal static void JoinCopyTrack(CopyTrack track, T value) =>
-            track.OnResolveHuman += (human, limit) => Current = Current.Merge(limit, value);
-        internal static void JoinCoordTrack(CoordTrack track, U value) =>
-            track.OnResolve += (human, limit) =>
-                Current = Current.Merge(human.data.Status.coordinateType, limit, value);
-        internal static void Initialize() =>
-            Current = new();
-        internal static void EnterCustom()
-        {
-            Extension<T, U>.OnCopyTrackStart += JoinCopyTrack;
-            Extension<T, U>.OnCoordTrackStart += JoinCoordTrack;
-        }
-        internal static void LeaveCustom()
-        {
-            Extension<T, U>.OnCopyTrackStart -= JoinCopyTrack;
-            Extension<T, U>.OnCoordTrackStart -= JoinCoordTrack;
-        }
+        internal static void LoadChara(CharaLimit limit, T value) =>
+            Current = Current.Merge(limit, value);
     }
     internal static partial class HumanExtension<T>
     {
-        internal static void LoadChara(Human _, CharaLimit limit, T value) =>
+        internal static void LoadChara(CharaLimit limit, T value) =>
             Current = Current.Merge(limit, value);
-        internal static void JoinCopyTrack(CopyTrack track, T value) =>
-            track.OnResolveHuman += (human, limit) => LoadChara(human, limit, value);
-        internal static void Initialize() =>
-            Current = new();
-        internal static void EnterCustom() =>
-            Extension<T>.OnCopyTrackStart += JoinCopyTrack;
-        internal static void LeaveCustom() =>
-            Extension<T>.OnCopyTrackStart -= JoinCopyTrack;
     }
     #endregion
 
     #region Load Actor
-    public static partial class Extension
-    {
-        internal static void ResolveCopy(Actor actor) =>
-            CopyTracks.Remove(actor.ToHumanData(), out var track).Maybe(() => track.Resolve(actor));
-        internal static void LoadActor(Actor actor) =>
-            OnLoadActor.Apply(actor).Try(Plugin.Instance.Log.LogError);
-        internal static void LoadActorCoord(Human human) =>
-            ToActorIndex(human, out var index)
-                .Maybe(() => OnLoadActorCoord.Apply(index.ToActor()).Apply(human).Try(Plugin.Instance.Log.LogError));
-    }
+
     internal static partial class ActorExtension<T, U>
     {
-        internal static void LoadActor(Actor actor, T value) =>
-            Charas[actor.ToIndex()] = value;
+        internal static void LoadActor(ActorIndex index, T value) =>
+            Charas[index] = value;
         internal static void LoadActorChara(Human human, ActorIndex index) =>
             Coords[index] = Charas[index].Get(human.data.Status.coordinateType);
         internal static void LoadActorCoord(ActorIndex index, U value, CoordLimit limit) =>
@@ -337,113 +318,49 @@ namespace Fishbone
         internal static void LoadActorCoord(Human human, U value, CoordLimit limit) =>
             Extension.ToActorIndex(human, out var index)
                 .Maybe(F.Apply(LoadActorCoord, index, value, limit));
-        internal static void JoinCopyTrack(CopyTrack track, T value) =>
-            track.OnResolveActor += actor => LoadActor(actor, value);
-        internal static void JoinCoordTrack(CoordTrack track, U value) =>
-            track.OnResolve += (human, limit) => LoadActorCoord(human, value, limit);
-        internal static void EnterCustom()
-        {
-            Extension<T, U>.OnCopyTrackStart -= JoinCopyTrack;
-            Extension<T, U>.OnCoordTrackStart -= JoinCoordTrack;
-            Extension.OnActorHumanize -= LoadActorChara;
-            Extension.OnActorCoordChange -= CoordinateChange;
-        }
-        internal static void LeaveCustom()
-        {
-            Extension<T, U>.OnCopyTrackStart += JoinCopyTrack;
-            Extension<T, U>.OnCoordTrackStart += JoinCoordTrack;
-            Extension.OnActorHumanize += LoadActorChara;
-            Extension.OnActorCoordChange += CoordinateChange;
-        }
     }
     internal static partial class ActorExtension<T>
     {
-        internal static void LoadActor(Actor actor, T value) =>
-            Charas[actor.ToIndex()] = value;
-        internal static void JoinCopyTrack(CopyTrack track, T value) =>
-            track.OnResolveActor += actor => LoadActor(actor, value);
-        internal static void EnterCustom() =>
-            Extension<T>.OnCopyTrackStart -= JoinCopyTrack;
-        internal static void LeaveCustom() =>
-            Extension<T>.OnCopyTrackStart += JoinCopyTrack;
+        internal static void LoadActor(ActorIndex index, T value) =>
+            Charas[index] = value;
     }
     #endregion
 
     #region Complex Definition For Actor To Human Copy
-    internal partial class CopyTrack
-    {
-        internal event Action<Actor> OnResolveActor =
-            actor => Plugin.Instance.Log.LogDebug($"Actor{actor.ToIndex()} loaded: {actor.ToHumanData().Pointer}");
-        internal void Resolve(Actor actor) =>
-            (F.Apply(OnResolveActor, actor) + F.Apply(Extension.LoadActor, actor)).Try(Plugin.Instance.Log.LogError);
-    }
-    public static partial class Extension
-    {
-        static Dictionary<Human, ActorIndex> HumanToActors = new();
-        internal static event Action<Human, ActorIndex> OnActorHumanize = UpdateHumanToActor;
-        internal static bool ToActorIndex(HumanData data, out ActorIndex index) =>
-            (index = CurrentActors()
-                .Where(actor => data == actor.ToHumanData())
-                .Select(actor => actor.ToIndex())
-                .FirstOrDefault(
-                    HumanToActors
-                        .Where(entry => entry.Key.data == data)
-                        .Select(entry => entry.Value)
-                        .FirstOrDefault(NotFound))) != NotFound;
-        internal static bool ToActorIndex(Human human, out ActorIndex index) =>
-            HumanToActors.TryGetValue(human, out index);
-        static void CheckActorCopy(HumanData src, HumanData dst, CharaLimit limit) =>
-            ToActorIndex(src, out var index).Maybe(F.Apply(StartActorTrack, dst, index));
-        static void StartActorTrack(HumanData data, ActorIndex index) =>
-            StartCopyTrack(data).OnResolveHuman += (human, _) => ResolveHumanToActor(human, index);
-        internal static void ResolveHumanToActor(Human human, ActorIndex index) =>
-            (OnActorHumanize.Apply(human).Apply(index) + OnLoadChara.Apply(human) +
-                OnLoadActorChara.Apply(index.ToActor()).Apply(human)).Try(Plugin.Instance.Log.LogError);
-        static void UpdateHumanToActor(Human human, ActorIndex index) =>
-            HumanToActors.ContainsKey(human).Either(
-                F.Apply(ObserveOnDestroy, human) +
-                F.Apply(AssignHumanToActor, human, index),
-                F.Apply(AssignHumanToActor, human, index));
-        static void AssignHumanToActor(Human human, ActorIndex index) =>
-            HumanToActors[human] = index;
-        static void ObserveOnDestroy(Human human) =>
-            human.gameObject.GetComponent<ObservableDestroyTrigger>()
-                .OnDestroyAsObservable().Subscribe(Dispose(human));
-        static Action<Unit> Dispose(Human human) => _ => HumanToActors.Remove(human);
-        static void ClearHumanToActors() => HumanToActors.Clear();
-    }
     #endregion
 
     #region Copy Between Actor And Custom
     public static partial class Extension
     {
-        static void CheckCustomCopy(HumanData src, HumanData dst, CharaLimit limit) =>
-            (HumanCustom.Instance == null ? F.DoNothing :
-                src == HumanCustom.Instance.DefaultData ?
-                    OnCustomInitialize + TrackSpecial(dst):
-                src == HumanCustom.Instance.Received.HumanData &&
-                    ToActorIndex(src, out var srcIndex) ?
-                    OnCopyActorToCustom.Apply(srcIndex) + TrackSpecial(dst) :
-                dst == HumanCustom.Instance.EditHumanData &&
-                    ToActorIndex(HumanCustom.Instance.Received.HumanData, out var dstIndex) ?
-                    PrepareSaveChara + OnCopyCustomToActor.Apply(dstIndex) : F.DoNothing).Try(Plugin.Instance.Log.LogError);
-
-        static Action TrackSpecial(HumanData data) =>
-            () => StartCopyTrack(data).OnResolveHuman += (human, _) => LoadChara(human);
-        internal static event Action<ActorIndex> OnCopyActorToCustom =
-            index => Plugin.Instance.Log.LogDebug($"Simulation actor{index} copied to custom.");
-        internal static event Action<ActorIndex> OnCopyCustomToActor =
-            index => Plugin.Instance.Log.LogDebug($"Custom copied to simulation actor{index}.");
-        internal static event Action OnCustomInitialize =
-            F.Apply(Plugin.Instance.Log.LogDebug, "Custom initialized.");
+        internal static bool ToActorIndex(HumanData data, out ActorIndex index) =>
+            (index = CurrentActors()
+                .Where(actor => data == actor.ToHumanData())
+                .Select(actor => actor.ToIndex())
+                .FirstOrDefault(NotFound)) != NotFound;
+        static IObservable<(HumanData, HumanData)> OnCopyCustomChara =>
+            Hooks.OnHumanDataCopy.Where(_ => CharaLoadTrack.Mode == CharaLoadTrack.FlagAware);
+        internal static IObservable<HumanData> OnCustomInitialize =>
+            OnCopyCustomChara.Where(tuple => tuple.Item1 == HumanCustom.Instance?.DefaultData).Select(tuple => tuple.Item2);
+        internal static IObservable<ActorIndex> OnCopyActorToCustom =>
+            OnCopyCustomChara.Select(tuple => tuple.Item1)
+                .Where(data => data == HumanCustom.Instance?.Received?.HumanData)
+                .SelectMany(data => ToActorIndex(data, out var index)
+                    ? Observable.Return(index) : Observable.Empty<ActorIndex>());
+        internal static IObservable<ActorIndex> OnCopyCustomToActor =>
+            OnCopyCustomChara.Select(tuple => tuple.Item2)
+                .Where(data => data == HumanCustom.Instance?.EditHumanData)
+                .SelectMany(data => ToActorIndex(HumanCustom.Instance?.Received?.HumanData, out var index)
+                    ? Observable.Return(index) : Observable.Empty<ActorIndex>());
     }
     internal static partial class HumanExtension<T, U>
     {
+        internal static void Initialize(HumanData _) => Current = new();
         internal static void Copy(ActorIndex index) =>
             Current = Current.Merge(CharaLimit.All, ActorExtension<T, U>.Chara(index));
     }
     internal static partial class HumanExtension<T>
     {
+        internal static void Initialize(HumanData _) => Current = new();
         internal static void Copy(ActorIndex index) =>
             Current = Current.Merge(CharaLimit.All, ActorExtension<T>.Chara(index));
     }
@@ -460,24 +377,64 @@ namespace Fishbone
     #endregion
 
     #region Coordinate Change
-    static partial class Extension
+    static partial class Hooks
     {
-        internal static int CustomCoordinateType { get; set; } = 0;
-        internal static void CustomChangeCoord(Human human, int coordinateType) =>
-            (PrepareSaveCoord + F.Apply(CustomChangeCoord, coordinateType) + OnLoadCoord.Apply(human)).Try(Plugin.Instance.Log.LogError);
-        static void CustomChangeCoord(int coordinateType) =>
-            CustomCoordinateType = coordinateType;
-
-        internal static event Action<ActorIndex, int> OnActorCoordChange = delegate { };
-        internal static void ActorChangeCoord(Human human, int coordinateType) =>
-            HumanToActors.TryGetValue(human, out var actor).Maybe(F.Apply(ActorChangeCoord, actor, human, coordinateType));
-        static void ActorChangeCoord(ActorIndex actor, Human human, int coordinateType) =>
-            (OnActorCoordChange.Apply(actor).Apply(coordinateType) + OnLoadCoord.Apply(human)).Try(Plugin.Instance.Log.LogError);
+        static Subject<(Human, int)> ChangeCustomCoordinate = new();
+        static Subject<(Human, int)> ChangeActorCoordinate = new();
+        internal static IObservable<(Human, int)> OnChangeCustomCoord => ChangeCustomCoordinate.AsObservable();
+        internal static IObservable<(Human, int)> OnChangeActorCoord => ChangeActorCoordinate.AsObservable();
+    }
+    public static partial class Extension
+    {
+        static void InitializeCustom(HumanData data) =>
+           (CustomCoordinateType = 0).With(HumanToActors.Clear);
+        static IObservable<int> OChangeCustomCoord =>
+            Hooks.OnChangeCustomCoord.Select(tuple => tuple.Item2);
+        static IObservable<(ActorIndex, int)> OnChangeActorCoord =>
+            Hooks.OnChangeActorCoord.SelectMany(tuple => ToActorIndex(tuple.Item1, out var index)
+                ? Observable.Return((index, tuple.Item2)) : Observable.Empty<(ActorIndex, int)>());
     }
     internal static partial class ActorExtension<T, U>
     {
         internal static void CoordinateChange(ActorIndex actor, int coordinateType) =>
             Coords[actor] = Charas[actor].Get(coordinateType);
     }
+    public static partial class Extension
+    {
+        internal static int CustomCoordinateType { get; set; } = 0;
+        internal static void Initialize()
+        {
+            OnCustomInitialize.Subscribe(InitializeCustom);
+            OnCustomInitialize.Subscribe(CharaLoadTrack.OnDefault);
+            OChangeCustomCoord.Subscribe(coordinateType => CustomCoordinateType = coordinateType);
+
+            OnTrackActor.Subscribe(_ => Plugin.Instance.Log.LogInfo("actor tracking start"));
+            OnActorHumanizeInternal.Select(tuple => tuple.Item1)
+               .Where(human => !HumanToActors.ContainsKey(human))
+               .Subscribe(human => human.component
+                   .OnDestroyAsObservable()
+                   .Subscribe(_ => HumanToActors.Remove(human)));
+            OnActorHumanizeInternal.Subscribe(tuple => HumanToActors[tuple.Item1] = tuple.Item2);
+#if DEBUG
+            OnCopyActorToCustom.Subscribe(_ => Plugin.Instance.Log.LogDebug("copy actor to custom"));
+            OnCopyCustomToActor.Subscribe(_ => Plugin.Instance.Log.LogDebug("copy custom to actor"));
+            OnPrepareSaveChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("prepare save chara"));
+            OnPrepareSaveCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("prepare save coord"));
+            OnSaveCustomChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("save chara"));
+            OnSaveCustomCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("save coord"));
+            OnSaveActor.Subscribe(_ => Plugin.Instance.Log.LogDebug("save actor"));
+            OnPreprocessChara.Subscribe(_ => Plugin.Instance.Log.LogDebug($"preprocess chara:{CharaLoadTrack.Mode.ToString()}"));
+            OnPreprocessCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("preprocess coord"));
+            OnCustomInitialize.Subscribe(_ => Plugin.Instance.Log.LogDebug("custom initialized"));
+            OnLoadCustomChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("custom chara load"));
+            OnLoadCustomCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("custom coord load"));
+            OnLoadActorChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("actor chara load"));
+            OnLoadActorCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("actor coord load"));
+            OnActorHumanize.Subscribe(_ => Plugin.Instance.Log.LogDebug("actor humanized"));
+            OChangeCustomCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("custom coordinate change"));
+#endif
+        }
+    }
+
     #endregion
 }

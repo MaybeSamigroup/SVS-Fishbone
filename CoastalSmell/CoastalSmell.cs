@@ -1,24 +1,22 @@
 using System;
 using System.Linq;
+using System.Reactive;
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using System.Collections.Generic;
 using Il2CppSystem.Threading;
 #if Aicomi
-using R3;
-using R3.Triggers;
 using ILLGAMES.Unity.Component;
 #else
-using UniRx;
 using UniRx.Triggers;
 using ILLGames.Unity.Component;
 #endif
-using BepInEx;
-using BepInEx.Unity.IL2CPP;
 using Cysharp.Threading.Tasks;
+using BepInEx;
 
 namespace CoastalSmell
 {
     #region Utilities
-
     public static partial class Util
     {
 #if DigitalCraft        
@@ -26,30 +24,35 @@ namespace CoastalSmell
             (predicate, action) => predicate()
                 .Either(DoNextFrame.Apply(DoOnCondition.Apply(predicate).Apply(action)), action);
 #else
+        public static Action<Action> DoNextFrame = action => UniTask.NextFrame().ContinueWith(action);
         public static Func<Func<bool>, Action, Action> DoOnCondition =
             (predicate, action) => new CancellationTokenSource()
                 .With(DoOnConditionAndToken.Apply(predicate).Apply(action)).Cancel;
         static Action<Func<bool>, Action, CancellationTokenSource> DoOnConditionAndToken =
-            (predicate, action, source) => UniTask.WaitUntil(predicate,
-                Cysharp.Threading.Tasks.PlayerLoopTiming.Update, source.Token).ContinueWith(action);
+            (predicate, action, source) => UniTask.WaitUntil(predicate, PlayerLoopTiming.Update, source.Token).ContinueWith(action);
 #endif
     }
 
     public static class Util<T> where T : SingletonInitializer<T>
     {
-        static Action<Action, Action> AwaitStartup = (onStartup, onDestroy) =>
-            Util.DoNextFrame.With(onDestroy)(Hook.Apply(onStartup).Apply(onDestroy));
-
-        static Action<Action, Action> AwaitDestroy = (onStartup, onDestroy) =>
-            SingletonInitializer<T>.Instance.With(onStartup).OnDestroyAsObservable()
-                .Subscribe(AwaitStartup.Apply(onStartup).Apply(onDestroy).Ignoring<Unit>());
-
-        public static Action<Action, Action> Hook = (onStartup, onDestroy) =>
-            SingletonInitializer<T>.WaitUntilSetup(CancellationToken.None)
-                .ContinueWith(AwaitDestroy.Apply(onStartup).Apply(onDestroy));
+        public static IObservable<T> OnStartup =>
+            Startup.AsObservable().Select(_ => SingletonInitializer<T>.Instance);
+        public static IObservable<Unit> OnDestroy => Destroy.AsObservable();
+        static Subject<Unit> Startup = new();
+        static Subject<Unit> Destroy = new();
+        static Action Wait = () =>
+            SingletonInitializer<T>
+                .WaitUntilSetup(CancellationToken.None)
+                .ContinueWith(F.Apply(Startup.OnNext, Unit.Default));
+        static Util() {
+            OnDestroy.Subscribe(_ => UniTask.NextFrame().ContinueWith(Wait));
+            OnStartup.Subscribe(cmp => cmp.OnDestroyAsObservable().Subscribe(Destroy.OnNext));
+            Wait();
+        }
     }
 
     #endregion
+
 
     /// <summary>
     /// Functional utilities for favor.
@@ -164,7 +167,7 @@ namespace CoastalSmell
         #endregion
 
         #region Misc
-
+        
         public static Func<I, O> Constant<I, O>(this Action<I> f, O value) => i => value.With(f.Apply(i));
         public static Action DoNothing = () => { };
 
@@ -215,15 +218,13 @@ namespace CoastalSmell
 
     [BepInProcess(Process)]
     [BepInPlugin(Guid, Name, Version)]
-    public partial class Plugin : BasePlugin
+    public partial class Plugin
     {
         internal static BepInEx.Logging.ManualLogSource Logger;
         public const string Guid = $"{Process}.{Name}";
         public const string Name = "CoastalSmell";
-        public const string Version = "1.1.9";
-        public override void Load() =>
-            (Logger = Log).With(Sprites.Initialize).With(UGUI.Initialize);
+        public const string Version = "2.0.0";
     }
-
     #endregion
+
 }
