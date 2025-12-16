@@ -124,6 +124,7 @@ namespace Fishbone
             Coords.GetValueOrDefault(index, new());
         internal static void Chara(ActorIndex index, T mods) => Charas[index] = mods;
         internal static void Coord(ActorIndex index, U mods) => Coords[index] = mods;
+        internal static void Clear() => Charas.With(Coords.Clear).Clear();
     }
     internal static partial class ActorExtension<T>
         where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
@@ -131,6 +132,7 @@ namespace Fishbone
         static readonly Dictionary<ActorIndex, T> Charas = new();
         internal static T Chara(ActorIndex index) => Charas.GetValueOrDefault(index, new());
         internal static void Chara(ActorIndex index, T mods) => Charas[index] = mods;
+        internal static void Clear() => Charas.Clear();
     }
     #endregion
 
@@ -339,7 +341,7 @@ namespace Fishbone
                 .FirstOrDefault(NotFound)) != NotFound;
         static IObservable<(HumanData, HumanData)> OnCopyCustomChara =>
             Hooks.OnHumanDataCopy.Where(_ => CharaLoadTrack.Mode == CharaLoadTrack.FlagAware);
-        internal static IObservable<HumanData> OnCustomInitialize =>
+        internal static IObservable<HumanData> OnInitializeCustom =>
             OnCopyCustomChara.Where(tuple => tuple.Item1 == HumanCustom.Instance?.DefaultData).Select(tuple => tuple.Item2);
         internal static IObservable<ActorIndex> OnCopyActorToCustom =>
             OnCopyCustomChara.Select(tuple => tuple.Item1)
@@ -387,13 +389,15 @@ namespace Fishbone
     public static partial class Extension
     {
         static void InitializeCustom(HumanData data) =>
-           (CustomCoordinateType = 0).With(HumanToActors.Clear);
-        static IObservable<int> OChangeCustomCoord =>
+           CustomCoordinateType = 0;
+        static void InitializeActors(Unit _) => HumanToActors.Clear();
+        static IObservable<int> OnChangeCustomCoord =>
             Hooks.OnChangeCustomCoord.Select(tuple => tuple.Item2);
         static IObservable<(ActorIndex, int)> OnChangeActorCoord =>
             Hooks.OnChangeActorCoord.SelectMany(tuple => ToActorIndex(tuple.Item1, out var index)
                 ? Observable.Return((index, tuple.Item2)) : Observable.Empty<(ActorIndex, int)>());
     }
+
     internal static partial class ActorExtension<T, U>
     {
         internal static void CoordinateChange(ActorIndex actor, int coordinateType) =>
@@ -402,38 +406,40 @@ namespace Fishbone
     public static partial class Extension
     {
         internal static int CustomCoordinateType { get; set; } = 0;
-        internal static void Initialize()
-        {
-            OnCustomInitialize.Subscribe(InitializeCustom);
-            OnCustomInitialize.Subscribe(CharaLoadTrack.OnDefault);
-            OChangeCustomCoord.Subscribe(coordinateType => CustomCoordinateType = coordinateType);
-
-            OnTrackActor.Subscribe(_ => Plugin.Instance.Log.LogInfo("actor tracking start"));
+        internal static IDisposable[] Initialize() => [
+            SingletonInitializerExtension<HumanCustom>.OnStartup.Subscribe(_ => CharaLoadTrack.Mode = CharaLoadTrack.FlagAware),
+            SingletonInitializerExtension<HumanCustom>.OnDestroy.Subscribe(_ => CharaLoadTrack.Mode = CharaLoadTrack.Ignore),
+            OnInitializeCustom.Subscribe(CharaLoadTrack.OnDefault),
+            OnInitializeCustom.Subscribe(InitializeCustom),
+            Hooks.OnInitializeActors.Subscribe(InitializeActors),
+            OnChangeCustomCoord.Subscribe(coordinateType => CustomCoordinateType = coordinateType),
             OnActorHumanizeInternal.Select(tuple => tuple.Item1)
                .Where(human => !HumanToActors.ContainsKey(human))
                .Subscribe(human => human.component
                    .OnDestroyAsObservable()
-                   .Subscribe(_ => HumanToActors.Remove(human)));
-            OnActorHumanizeInternal.Subscribe(tuple => HumanToActors[tuple.Item1] = tuple.Item2);
+                   .Subscribe(_ => HumanToActors.Remove(human))),
+            OnActorHumanizeInternal.Subscribe(tuple => HumanToActors[tuple.Item1] = tuple.Item2),
 #if DEBUG
-            OnCopyActorToCustom.Subscribe(_ => Plugin.Instance.Log.LogDebug("copy actor to custom"));
-            OnCopyCustomToActor.Subscribe(_ => Plugin.Instance.Log.LogDebug("copy custom to actor"));
-            OnPrepareSaveChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("prepare save chara"));
-            OnPrepareSaveCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("prepare save coord"));
-            OnSaveCustomChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("save chara"));
-            OnSaveCustomCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("save coord"));
-            OnSaveActor.Subscribe(_ => Plugin.Instance.Log.LogDebug("save actor"));
-            OnPreprocessChara.Subscribe(_ => Plugin.Instance.Log.LogDebug($"preprocess chara:{CharaLoadTrack.Mode.ToString()}"));
-            OnPreprocessCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("preprocess coord"));
-            OnCustomInitialize.Subscribe(_ => Plugin.Instance.Log.LogDebug("custom initialized"));
-            OnLoadCustomChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("custom chara load"));
-            OnLoadCustomCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("custom coord load"));
-            OnLoadActorChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("actor chara load"));
-            OnLoadActorCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("actor coord load"));
-            OnActorHumanize.Subscribe(_ => Plugin.Instance.Log.LogDebug("actor humanized"));
-            OChangeCustomCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("custom coordinate change"));
+            OnCopyActorToCustom.Subscribe(_ => Plugin.Instance.Log.LogDebug("copy actor to custom")),
+            OnCopyCustomToActor.Subscribe(_ => Plugin.Instance.Log.LogDebug("copy custom to actor")),
+            OnPrepareSaveChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("prepare save chara")),
+            OnPrepareSaveCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("prepare save coord")),
+            OnSaveCustomChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("save chara")),
+            OnSaveCustomCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("save coord")),
+            OnSaveActor.Subscribe(_ => Plugin.Instance.Log.LogDebug("save actor")),
+            Hooks.OnInitializeActors.Subscribe(_ => Plugin.Instance.Log.LogDebug("actors initialized")),
+            OnInitializeCustom.Subscribe(_ => Plugin.Instance.Log.LogDebug("custom initialized")),
+            OnPreprocessChara.Subscribe(_ => Plugin.Instance.Log.LogDebug($"preprocess chara:{CharaLoadTrack.Mode.ToString()}")),
+            OnPreprocessCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("preprocess coord")),
+            OnLoadCustomChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("custom chara load")),
+            OnLoadCustomCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("custom coord load")),
+            OnLoadActorChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("actor chara load")),
+            OnLoadActorCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("actor coord load")),
+            OnActorHumanize.Subscribe(_ => Plugin.Instance.Log.LogDebug("actor humanized")),
+            OnChangeCustomCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("custom coordinate change")),
+            OnChangeActorCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("actor coordinate change"))
 #endif
-        }
+        ];
     }
 
     #endregion

@@ -5,7 +5,6 @@ using System.Reactive.Linq;
 using AC.User;
 using Character;
 using CharacterCreation;
-using HarmonyLib;
 using BepInEx.Unity.IL2CPP;
 using CoastalSmell;
 
@@ -100,32 +99,29 @@ namespace Fishbone
             where U : CoordinateExtension<U>, new() =>
             HumanExtension<T, U>.Coord(mods);
 
-        public static void Register<T, U>()
+        public static IDisposable[] Register<T, U>()
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
-            where U : CoordinateExtension<U>, new()
-        {
-            ActorExtension<T, U>.Initialize();
-            OnSaveCustomChara.Subscribe(archive => Extension<T, U>.SaveChara(archive, HumanExtension<T, U>.Chara()));
-            OnSaveCustomCoord.Subscribe(archive => Extension<T, U>.SaveCoord(archive, HumanExtension<T, U>.Coord()));
-            OnConvertChara.Subscribe(archive => Extension<T, U>.SaveChara(archive, HumanExtension<T, U>.Chara()));
-            OnConvertCoord.Subscribe(archive => Extension<T, U>.SaveChara(archive, HumanExtension<T, U>.Chara()));
-            OnSaveActor.Subscribe(tuple => Extension<T, U>.SaveChara(tuple.Item2, ActorExtension<T, U>.Chara(tuple.Item1)));
-            Hooks.OnSwapActor.Subscribe(ActorExtension<T, U>.SwapChara);
-            Hooks.OnSwapActor.Subscribe(ActorExtension<T, U>.SwapCoord);
-
-            Extension<T, U>.OnLoadCustomChara.Subscribe(tuple => HumanExtension<T, U>.LoadChara(tuple.Item1, tuple.Item2));
-            Extension<T, U>.OnLoadActorChara.Subscribe(tuple => ActorExtension<T, U>.LoadActor(tuple.Item1, tuple.Item2));
-            OnCustomInitialize.Subscribe(HumanExtension<T, U>.Initialize);
-            OnCopyCustomToActor.Subscribe(ActorExtension<T, U>.Copy);
-            OnCopyActorToCustom.Subscribe(HumanExtension<T, U>.Copy);
-
+            where U : CoordinateExtension<U>, new() => [
+            OnSaveCustomChara.Subscribe(archive => Extension<T, U>.SaveChara(archive, HumanExtension<T, U>.Chara())),
+            OnSaveCustomCoord.Subscribe(archive => Extension<T, U>.SaveCoord(archive, HumanExtension<T, U>.Coord())),
+            OnConvertChara.Subscribe(archive => Extension<T, U>.SaveChara(archive, HumanExtension<T, U>.Chara())),
+            OnConvertCoord.Subscribe(archive => Extension<T, U>.SaveChara(archive, HumanExtension<T, U>.Chara())),
+            OnSaveActor.Subscribe(tuple => Extension<T, U>.SaveChara(tuple.Item2, ActorExtension<T, U>.Chara(tuple.Item1))),
+            Hooks.OnSwapActor.Subscribe(ActorExtension<T, U>.SwapChara),
+            Hooks.OnSwapActor.Subscribe(ActorExtension<T, U>.SwapCoord),
+            Hooks.OnInitializeActors.Subscribe(_ => ActorExtension<T, U>.Clear()),
+            Hooks.OnInitializeActors.Subscribe(_ => ActorExtension<T, U>.Initialize()),
+            OnInitializeCustom.Subscribe(HumanExtension<T, U>.Initialize),
+            Extension<T, U>.OnLoadCustomChara.Subscribe(tuple => HumanExtension<T, U>.LoadChara(tuple.Item1, tuple.Item2)),
+            Extension<T, U>.OnLoadActorChara.Subscribe(tuple => ActorExtension<T, U>.LoadActor(tuple.Item1, tuple.Item2)),
+            OnCopyCustomToActor.Subscribe(ActorExtension<T, U>.Copy),
+            OnCopyActorToCustom.Subscribe(HumanExtension<T, U>.Copy),
             Extension<T, U>.OnLoadCoordInternal.Where(_ => CharaLoadTrack.Mode == CharaLoadTrack.FlagAware)
-                .Subscribe(tuple => HumanExtension<T, U>.Coord().Merge(tuple.Item2, tuple.Item3));
+                .Subscribe(tuple => HumanExtension<T, U>.Coord().Merge(tuple.Item2, tuple.Item3)),
             Extension<T, U>.OnLoadCoordInternal.Where(_ => CharaLoadTrack.Mode != CharaLoadTrack.FlagAware)
-                .Subscribe(tuple => ActorExtension<T, U>.LoadActorCoord(tuple.Item1, tuple.Item3, tuple.Item2));
-            OnChangeActorCoord.Subscribe(tuple => ActorExtension<T, U>.CoordinateChange(tuple.Item1, tuple.Item2));
-            Plugin.Instance.Log.LogDebug($"ComplexExtension<{typeof(T)},{typeof(U)}> registered.");
-        }
+                .Subscribe(tuple => ActorExtension<T, U>.LoadActorCoord(tuple.Item1, tuple.Item3, tuple.Item2)),
+            OnChangeActorCoord.Subscribe(tuple => ActorExtension<T, U>.CoordinateChange(tuple.Item1, tuple.Item2))
+        ];
 
         public static T Chara<T>(this Human human)
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
@@ -154,24 +150,22 @@ namespace Fishbone
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
             HumanExtension<T>.Chara(mods);
 
-        public static void Register<T>()
-            where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
-        {
-            ActorExtension<T>.Initialize();
-            OnSaveCustomChara.Subscribe(archive => Extension<T>.SaveChara(archive, HumanExtension<T>.Chara()));
-            OnConvertChara.Subscribe(archive => Extension<T>.SaveChara(archive, HumanExtension<T>.Chara()));
-            OnConvertCoord.Subscribe(archive => Extension<T>.SaveChara(archive, HumanExtension<T>.Chara()));
-            OnSaveActor.Subscribe(tuple => Extension<T>.SaveChara(tuple.Item2, ActorExtension<T>.Chara(tuple.Item1)));
-            Hooks.OnSwapActor.Subscribe(ActorExtension<T>.Swap);
+        public static IDisposable[] Register<T>()
+            where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() => [
+            OnSaveCustomChara.Subscribe(archive => Extension<T>.SaveChara(archive, HumanExtension<T>.Chara())),
+            OnConvertChara.Subscribe(archive => Extension<T>.SaveChara(archive, HumanExtension<T>.Chara())),
+            OnConvertCoord.Subscribe(archive => Extension<T>.SaveChara(archive, HumanExtension<T>.Chara())),
+            OnSaveActor.Subscribe(tuple => Extension<T>.SaveChara(tuple.Item2, ActorExtension<T>.Chara(tuple.Item1))),
+            Hooks.OnSwapActor.Subscribe(ActorExtension<T>.Swap),
+            Hooks.OnInitializeActors.Subscribe(_ => ActorExtension<T>.Clear()),
+            Hooks.OnInitializeActors.Subscribe(_ => ActorExtension<T>.Initialize()),
+            Extension<T>.OnLoadCustomChara.Subscribe(tuple => HumanExtension<T>.LoadChara(tuple.Item1, tuple.Item2)),
+            Extension<T>.OnLoadActorChara.Subscribe(tuple => ActorExtension<T>.LoadActor(tuple.Item1, tuple.Item2)),
+            OnInitializeCustom.Subscribe(HumanExtension<T>.Initialize),
+            OnCopyCustomToActor.Subscribe(ActorExtension<T>.Copy),
+            OnCopyActorToCustom.Subscribe(HumanExtension<T>.Copy),
+        ];
 
-            Extension<T>.OnLoadCustomChara.Subscribe(tuple => HumanExtension<T>.LoadChara(tuple.Item1, tuple.Item2));
-            Extension<T>.OnLoadActorChara.Subscribe(tuple => ActorExtension<T>.LoadActor(tuple.Item1, tuple.Item2));
-            OnCustomInitialize.Subscribe(HumanExtension<T>.Initialize);
-            OnCopyCustomToActor.Subscribe(ActorExtension<T>.Copy);
-            OnCopyActorToCustom.Subscribe(HumanExtension<T>.Copy);
-
-            Plugin.Instance.Log.LogDebug($"SimpleExtension<{typeof(T)}> registered.");
-        }
         public static void HumanCustomReload() => HumanCustomReload(HumanCustom.Instance);
     }
     public static partial class Extension<T, U>
@@ -191,15 +185,5 @@ namespace Fishbone
     public partial class Plugin : BasePlugin
     {
         public const string Process = "Aicomi";
-        public override void Load()
-        {
-            Instance = this;
-            Patch = Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks");
-            Extension.Initialize();
-            Util<HumanCustom>.OnStartup
-                .Subscribe(_ => CharaLoadTrack.Mode = CharaLoadTrack.FlagAware);
-            Util<HumanCustom>.OnDestroy
-                .Subscribe(_ => CharaLoadTrack.Mode = CharaLoadTrack.Ignore);
-        }
     }
 }

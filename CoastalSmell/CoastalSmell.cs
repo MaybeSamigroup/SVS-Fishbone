@@ -8,7 +8,6 @@ using Il2CppSystem.Threading;
 #if Aicomi
 using ILLGAMES.Unity.Component;
 #else
-using UniRx.Triggers;
 using ILLGames.Unity.Component;
 #endif
 using Cysharp.Threading.Tasks;
@@ -33,7 +32,7 @@ namespace CoastalSmell
 #endif
     }
 
-    public static class Util<T> where T : SingletonInitializer<T>
+    public static class SingletonInitializerExtension<T> where T : SingletonInitializer<T>
     {
         public static IObservable<T> OnStartup =>
             Startup.AsObservable().Select(_ => SingletonInitializer<T>.Instance);
@@ -44,7 +43,7 @@ namespace CoastalSmell
             SingletonInitializer<T>
                 .WaitUntilSetup(CancellationToken.None)
                 .ContinueWith(F.Apply(Startup.OnNext, Unit.Default));
-        static Util() {
+        static SingletonInitializerExtension() {
             OnDestroy.Subscribe(_ => UniTask.NextFrame().ContinueWith(Wait));
             OnStartup.Subscribe(cmp => cmp.OnDestroyAsObservable().Subscribe(Destroy.OnNext));
             Wait();

@@ -1,7 +1,10 @@
+using System;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using Cysharp.Threading.Tasks;
+using SV.Title;
 using SaveData;
 using Character;
 using CharacterCreation;
@@ -33,14 +36,13 @@ namespace Fishbone
     #region Load Chara
     static partial class Hooks
     {
+        static Subject<Unit> InitializeActors = new();
+        internal static IObservable<Unit> OnInitializeActors => InitializeActors.AsObservable();
 
         [HarmonyPrefix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(SV.EntryScene.EntryFileListSelecter), nameof(SV.EntryScene.EntryFileListSelecter.Initialize))]
-        static void EntryFileListSelecterInitializePrefix() => CharaLoadTrack.Mode = CharaLoadTrack.Ignore;
-
-        [HarmonyPostfix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(SV.EntryScene.EntryFileListSelecter), nameof(SV.EntryScene.EntryFileListSelecter.Initialize))]
-        static void EntryFileListSelecterInitializePostfix() => CharaLoadTrack.Mode = CharaLoadTrack.FlagIgnore;
+        [HarmonyPatch(typeof(TitleScene), nameof(TitleScene.OnStart))]
+        [HarmonyPatch(typeof(WorldData), nameof(WorldData.Load), typeof(string))]
+        static void NotifyInitializeActors() => InitializeActors.OnNext(Unit.Default); 
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(WorldData), nameof(WorldData.Load), typeof(string))]
@@ -51,6 +53,14 @@ namespace Fishbone
         [HarmonyPatch(typeof(WorldData), nameof(WorldData.Load), typeof(string))]
         [HarmonyPatch(typeof(SV.EntryScene.EntryFileListSelecter), nameof(SV.EntryScene.EntryFileListSelecter.Execute))]
         static void SaveDataWorldDataLoadPostfix() => CharaLoadTrack.Mode = CharaLoadTrack.Ignore;
+
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(SV.EntryScene.EntryFileListSelecter), nameof(SV.EntryScene.EntryFileListSelecter.Initialize))]
+        static void EntryFileListSelecterInitializePrefix() => CharaLoadTrack.Mode = CharaLoadTrack.Ignore;
+
+        [HarmonyPostfix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(SV.EntryScene.EntryFileListSelecter), nameof(SV.EntryScene.EntryFileListSelecter.Initialize))]
+        static void EntryFileListSelecterInitializePostfix() => CharaLoadTrack.Mode = CharaLoadTrack.FlagIgnore;
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(SV.EntryScene.CharaListView.SelectListUI.ListSelectController),

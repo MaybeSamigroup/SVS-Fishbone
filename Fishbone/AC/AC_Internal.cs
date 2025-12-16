@@ -5,7 +5,11 @@ using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using Cysharp.Threading.Tasks;
 using AC.User;
+using AC.Scene;
+using AC.Scene.FreeH;
 using AC.Scene.Home.UI;
+using AC.Dialog;
+using AC.Dialog.SaveAndLoad;
 using Character;
 using CharacterCreation;
 using HarmonyLib;
@@ -30,16 +34,42 @@ namespace Fishbone
     }
     #endregion
 
+    #region Load Game
+    static partial class Hooks
+    {
+        static Subject<string> SaveDataConvertFilePath = new();
+        internal static IObservable<Unit> OnInitializeActors =>
+            SaveDataConvertFilePath.AsObservable()
+                .Where(_ => ConvertFilePathAware).Select(_ => Unit.Default)
+                .Merge(SceneSingletonExtension<FreeHScene>.OnStartup.Select(_ => Unit.Default))
+                .Merge(SceneSingletonExtension<FreeHScene>.OnDestroy)
+                .Merge(SceneSingletonExtension<PrologueScene>.OnStartup
+                    .Where(scene => scene.SaveData.TutorialProgress is 0).Select(_ => Unit.Default));
+                
+        static bool ConvertFilePathAware = false;
+
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(FileControlDialog), nameof(FileControlDialog.Confirm))]
+        static void FileControlDialogConfirmPrefix(FileControlDialog.Modes mode) =>
+            ConvertFilePathAware = mode is FileControlDialog.Modes.Load;
+
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(SaveDataManagementWindow), nameof(SaveDataManagementWindow.Close))]
+        static void SaveDataManagementWindowClosePrefix() =>
+            ConvertFilePathAware = false;
+
+        [HarmonyPostfix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(SaveData), nameof(SaveData.ConvertFilePath))]
+        static void SaveDataConvertFilePathPostfix(string fileName) => SaveDataConvertFilePath.OnNext(fileName);
+    }
+    #endregion
+
     #region Load Chara
     static partial class Hooks
     {
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(Human), nameof(Human.Load))]
         static void HumanLoadPrefix(Human __instance) => HumanResolve.OnNext(__instance);
-
-        [HarmonyPrefix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(SaveData), nameof(SaveData.Load))]
-        static void SaveDataLoadPrefix() => Plugin.Instance.Log.LogInfo("save data load");
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(ActorData), nameof(ActorData.DeserializeHumanData))]

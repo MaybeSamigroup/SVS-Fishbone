@@ -94,24 +94,22 @@ namespace Fishbone
     partial class CharaLoadTrack
     {
         protected static Subject<(HumanData, ZipArchive)> LoadComplete = new();
-        internal static IObservable<(HumanData, ZipArchive)> OnLoadComplete => LoadComplete.AsObservable();
-        internal static void OnDefault(HumanData data) =>
-            Current.Complete(data, new MemoryStream());
-
+        protected virtual void Complete(HumanData data, MemoryStream stream) =>
+            LoadComplete.OnNext((data, new ZipArchive(stream, ZipArchiveMode.Update)));
         CharaLoadTrack Track;
         protected CharaLoadTrack() => Track = this;
         protected CharaLoadTrack(CharaLoadTrack track) => Track = track;
         protected virtual CharaLoadTrack Process(LoadFlags flags) => Track;
         protected virtual CharaLoadTrack Process(Il2CppStream stream, long offset, long length) => Current = this;
         protected virtual CharaLoadTrack Process(HumanData data) => Current = this;
-        protected virtual void Complete(HumanData data, MemoryStream stream) =>
-            LoadComplete.OnNext((data, new ZipArchive(stream, ZipArchiveMode.Update)));
         internal static readonly CharaLoadTrack Ignore = new CharaLoadTrack();
         internal static readonly CharaLoadTrack FlagAware = new CharaLoadFlagAware();
         internal static readonly CharaLoadTrack FlagIgnore = new CharaLoadFlagIgnore();
         protected static readonly CharaLoadTrack GetPngSizeAware = new CharaLoadGetPngSizeAware() { Track = FlagAware };
         protected static readonly CharaLoadTrack GetPngSizeIgnore = new CharaLoadGetPngSizeIgnore() { Track = FlagIgnore };
         protected static readonly CharaLoadTrack WithPng = new CharaLoadWithPng() { Track = FlagIgnore };
+        internal static IObservable<(HumanData, ZipArchive)> OnLoadComplete => LoadComplete.AsObservable();
+        internal static void OnDefault(HumanData data) => Current.Complete(data, new MemoryStream());
     }
     class CharaLoadFlagAware : CharaLoadTrack
     {
@@ -173,7 +171,11 @@ namespace Fishbone
         {
             get => Current.Track; set => ModeUpdate.OnNext(Current = value);
         }
+#if DigitalCraft
+        static CharaLoadTrack Current = FlagAware;
+#else
         static CharaLoadTrack Current = Ignore;
+#endif
         internal static void Resolve(LoadFlags flags) =>
             Current = Current.Process(flags);
         internal static void Resolve(Il2CppStream stream, long offset, long length) =>

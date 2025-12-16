@@ -154,18 +154,16 @@ namespace Fishbone
 
     public static partial class Extension
     {
-        internal static void Initialize()
-        {
-            CharaLoadTrack.Mode = CharaLoadTrack.FlagAware;
+        internal static IDisposable[] Initialize() => [
 #if DEBUG
-            OnPrepareSaveChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("prepare save chara"));
-            OnPreprocessChara.Subscribe(_ => Plugin.Instance.Log.LogDebug($"preprocess chara:{CharaLoadTrack.Mode.ToString()}"));
-            OnPreprocessCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("preprocess coord"));
-            OnLoadChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("chara load"));
-            OnLoadCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("coord load"));
-            OnChangeCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("coordinate change"));
+            OnPrepareSaveChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("prepare save chara")),
+            OnPreprocessChara.Subscribe(_ => Plugin.Instance.Log.LogDebug($"preprocess chara")),
+            OnPreprocessCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("preprocess coord")),
+            OnLoadChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("chara load")),
+            OnLoadCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("coord load")),
+            OnChangeCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("coordinate change"))
 #endif
-        }
+        ];
     }
 
 }

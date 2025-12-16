@@ -2,7 +2,6 @@ using System;
 using System.IO.Compression;
 using System.Reactive.Linq;
 using Character;
-using HarmonyLib;
 using BepInEx.Unity.IL2CPP;
 
 namespace Fishbone
@@ -43,29 +42,25 @@ namespace Fishbone
             where U : CoordinateExtension<U>, new() =>
             HumanExtension<T, U>.Coord(human, mods);
 
-        public static void Register<T, U>()
+        public static IDisposable[] Register<T, U>()
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
-            where U : CoordinateExtension<U>, new()
-        {
-            OnSaveChara.Subscribe(tuple => Extension<T, U>.SaveChara(tuple.Item2, HumanExtension<T, U>.Chara(tuple.Item1)));
-            Extension<T, U>.OnLoadChara.Subscribe(tuple => HumanExtension<T, U>.Chara(tuple.Item1, tuple.Item2));
-            Extension<T, U>.OnLoadChara.Subscribe(tuple => HumanExtension<T, U>.Prepare(tuple.Item1));
-            Extension<T, U>.OnLoadCoordInternal.Subscribe(tuple => HumanExtension<T, U>.Coord(tuple.Item1).Merge(tuple.Item2, tuple.Item3));
-            Plugin.Instance.Log.LogDebug($"ComplexExtension<{typeof(T)},{typeof(U)}> registered.");
-        }
+            where U : CoordinateExtension<U>, new() => [
+            OnSaveChara.Subscribe(tuple => Extension<T, U>.SaveChara(tuple.Item2, HumanExtension<T, U>.Chara(tuple.Item1))),
+            Extension<T, U>.OnLoadChara.Subscribe(tuple => HumanExtension<T, U>.Chara(tuple.Item1, tuple.Item2)),
+            Extension<T, U>.OnLoadChara.Subscribe(tuple => HumanExtension<T, U>.Prepare(tuple.Item1)),
+            Extension<T, U>.OnLoadCoordInternal.Subscribe(tuple => HumanExtension<T, U>.Coord(tuple.Item1).Merge(tuple.Item2, tuple.Item3))
+        ];
 
         public static T Chara<T>(this Human human)
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
             HumanExtension<T>.Chara(human);
 
-        public static void Register<T>()
-            where T : SimpleExtension<T>, ComplexExtension<T,T>, CharacterExtension<T>, CoordinateExtension<T>, new()
-        {
-            OnSaveChara.Subscribe(tuple => Extension<T>.SaveChara(tuple.Item2, HumanExtension<T>.Chara(tuple.Item1)));
-            Extension<T>.OnLoadChara.Subscribe(tuple => HumanExtension<T>.Chara(tuple.Item1, tuple.Item2));
-            Extension<T>.OnLoadChara.Subscribe(tuple => HumanExtension<T>.Prepare(tuple.Item1));
-            Plugin.Instance.Log.LogDebug($"SimpleExtension<{typeof(T)}> registered.");
-        }
+        public static IDisposable[] Register<T>()
+            where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() => [
+            OnSaveChara.Subscribe(tuple => Extension<T>.SaveChara(tuple.Item2, HumanExtension<T>.Chara(tuple.Item1))),
+            Extension<T>.OnLoadChara.Subscribe(tuple => HumanExtension<T>.Chara(tuple.Item1, tuple.Item2)),
+            Extension<T>.OnLoadChara.Subscribe(tuple => HumanExtension<T>.Prepare(tuple.Item1))
+        ];
     }
     public static partial class Extension<T, U>
     {
@@ -82,11 +77,5 @@ namespace Fishbone
     public partial class Plugin : BasePlugin
     {
         public const string Process = "DigitalCraft";
-        public override void Load()
-        {
-            Instance = this;
-            Patch = Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks");
-            Extension.Initialize();
-        }
     }
 }

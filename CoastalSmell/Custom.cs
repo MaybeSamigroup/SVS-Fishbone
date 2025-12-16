@@ -38,7 +38,7 @@ namespace CoastalSmell
         public static IObservable<Human> Human => HumanSubject.AsObservable();
         static Subject<Human> HumanSubject = new();
         static HumanCustomExtension() =>
-            Util<HumanCustom>.OnStartup.Subscribe(custom =>
+            SingletonInitializerExtension<HumanCustom>.OnStartup.Subscribe(custom =>
                 UniTask.WaitUntil((Func<bool>)(() => custom.Human != null),
                     PlayerLoopTiming.Initialization,
                     Il2CppSystem.Threading.CancellationToken.None, false)

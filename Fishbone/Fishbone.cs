@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reactive.Linq;
+using System.Reactive.Disposables;
 using System.IO.Compression;
 using System.Collections.Generic;
 using Character;
@@ -121,8 +122,12 @@ namespace Fishbone
         public const string Name = "Fishbone";
         public const string Version = "4.0.0";
         internal static Plugin Instance;
-        private Harmony Patch;
+        CompositeDisposable Subscriptions;
+        IDisposable Initialize() =>
+            Disposable.Create(Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks").UnpatchSelf);
+        public override void Load() =>
+            (Instance, Subscriptions) = (this, [Initialize(), .. Extension.Initialize()]);
         public override bool Unload() =>
-            true.With(Patch.UnpatchSelf) && base.Unload();
+            true.With(Subscriptions.Dispose) && base.Unload();
     }
 }
