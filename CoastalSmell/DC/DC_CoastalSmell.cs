@@ -5,7 +5,6 @@ using UnityEngine;
 using ILLGames.Unity.UI.ColorPicker;
 using Il2CppInterop.Runtime.Runtime;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
-using BepInEx.Unity.IL2CPP;
 
 namespace CoastalSmell
 {
@@ -27,13 +26,9 @@ namespace CoastalSmell
     }
 
     #region Plugin
-    public partial class Plugin : BasePlugin
+    public partial class Plugin
     {
         public const string Process = "DigitalCraft";
-        public override void Load() =>
-            (Logger = Log).With(Sprites.Initialize).With(UGUI.Initialize);
     }
-
     #endregion
-
 }

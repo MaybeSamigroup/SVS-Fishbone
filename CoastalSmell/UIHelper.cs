@@ -1,23 +1,25 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Reactive;
+using System.Reactive.Linq;
+using System.Reactive.Disposables;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using Cysharp.Threading.Tasks;
 #if Aicomi
-using R3.Triggers;
 using ILLGAMES.Unity.UI;
 using ILLGAMES.Unity.UI.ColorPicker;
 #else
-using UniRx.Triggers;
 using ILLGames.Unity.UI;
 using ILLGames.Unity.UI.ColorPicker;
 #endif
 using ScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode;
 using ScreenMatchMode = UnityEngine.UI.CanvasScaler.ScreenMatchMode;
 using BepInEx;
+using BepInEx.Unity.IL2CPP;
+using BepInEx.Configuration;
 
 namespace CoastalSmell
 {
@@ -59,12 +61,77 @@ namespace CoastalSmell
                 Enum.GetValues<BorderSprites>()
                     .ToDictionary(item => item, item => UGUI.ToBorderSprite(new(6, 6, 6, 6), ToPath(item))
                         .With(new GameObject(item.ToString()).With(UGUI.Go(parent: parent)).RegisterSprite)));
-        static void Setup() =>
-            Setup(new GameObject(Plugin.Name).With(UGUI.Go(parent: Manager.Scene.CommonSpace.transform)).transform);
-        static bool Ready() =>
-            Manager.Scene.CommonSpace != null;
-        internal static void Initialize() =>
-            Util.DoOnCondition(Ready, Setup);
+        internal static IDisposable Initialize() =>
+            Hooks.OnCommonSpaceInitialize.Subscribe(Setup);
+    }
+    public class WindowConfig
+    {
+        public ConfigEntry<float> AnchorX { init; get; }
+        public ConfigEntry<float> AnchorY { init; get; }
+        public ConfigEntry<bool> State { init; get; }
+        public ConfigEntry<KeyboardShortcut> Shortcut { init; get; }
+        public WindowConfig(BasePlugin plugin, string prefix, Vector2 anchor, KeyboardShortcut shortcut, bool visible = false) =>
+            (AnchorX, AnchorY, Shortcut, State) = (
+                plugin.Config.Bind("UI", $"{prefix} window anchor X", anchor.x),
+                plugin.Config.Bind("UI", $"{prefix} window anchor Y", anchor.y),
+                plugin.Config.Bind("UI", $"{prefix} window toggle key", shortcut),
+                plugin.Config.Bind("UI", $"{prefix} window visibility", visible));
+        public void Update(Vector2 position) =>
+            (AnchorX.Value, AnchorY.Value) = (position.x, position.y);
+        public IObservable<bool> OnToggle =>
+            UGUI.RootCanvas.OnUpdateAsObservable()
+                .Where(_ => Shortcut.Value.IsDown())
+                .Select(_ => State.Value = !State.Value);
+        public Window Create(float width, float height, string name) =>
+            new Window(this, width, height, name);
+    }
+    public class Window {
+        public GameObject Background { init; get; }
+        public GameObject Content { init; get; }
+        public string Title { get => TitleUI.text; set => TitleUI.SetText(value);  }
+        CompositeDisposable Subscriptions;
+        IObservable<Vector2> OnPositionUpdate;
+        TextMeshProUGUI TitleUI;
+        Window(IObservable<Unit> OnUpdate) =>
+            OnPositionUpdate = OnUpdate
+                .Select(_ =>  Background.GetComponent<RectTransform>())
+                .Select(rt => rt.anchoredPosition)
+                .DistinctUntilChanged();
+
+        Window(GameObject go) : this(go.OnUpdateAsObservable())=>
+            (Background = go).OnDestroyAsObservable().Subscribe(_ => Subscriptions.Dispose());
+
+        Window(WindowConfig config, string name) : this(new GameObject($"Window.{name}")) =>
+            Subscriptions = [
+                OnPositionUpdate.Subscribe(config.Update),
+                config.OnToggle.Subscribe(Background.SetActive)
+            ];
+        internal Window(WindowConfig config, float width, float height, string name) : this(config, name) =>
+            Content = Background
+                .With(UGUI.Go(parent: UGUI.RootCanvas, active: config.State.Value))
+                .With(UGUI.Cmp(UGUI.Rt(
+                    anchoredPosition: new(config.AnchorX.Value, config.AnchorY.Value),
+                    sizeDelta: new(width + 12, height + 48),
+                    anchorMin: new(0, 1),
+                    anchorMax: new(0, 1),
+                    offsetMin: new(0, 0),
+                    offsetMax: new(0, 0),
+                    pivot: new(0, 1))))
+                .With(UGUI.Cmp(UGUI.Image(color: new(0, 0, 0, 0))))
+                .With(UGUI.Cmp(UGUI.LayoutGroup<VerticalLayoutGroup>(
+                    spacing: 6,
+                    padding: new() { left = 6, right = 6, top = 6, bottom = 6 })))
+                .With(UGUI.Cmp<UI_DragWindow>())
+                .With(UGUI.Content("Title")(
+                    UGUI.Cmp(UGUI.Layout(width: width, height: 30)) +
+                    UGUI.Cmp(UGUI.Image(color: new(1, 1, 1, 1), sprite: BorderSprites.ColorBg.Get())) +
+                    UGUI.Cmp(UGUI.LayoutGroup<HorizontalLayoutGroup>(
+                        padding: new() { left = 20, right = 20, top = 0, bottom = 0 })) +
+                    UGUI.Content($"Label")(
+                        UGUI.Cmp(UGUI.Font() + UGUI.Text(text: name)) +
+                        UGUI.Cmp<TextMeshProUGUI>(ui => TitleUI = ui))))
+                .Wrap(new GameObject(name))
+                .With(UGUI.Cmp(UGUI.Layout(width: width, height: height)));
     }
 
     public static partial class UGUI
@@ -95,12 +162,11 @@ namespace CoastalSmell
         public static Action<GameObject> Go(Transform parent = null, string name = null, bool active = true) =>
             go => ((go.name, go.active) = (name ?? go.name, active)).With(ParentAndScale(parent).Apply(go.transform));
         public static Action<GameObject> Cmp<T>() where T : Component =>
-            go => ObservableTriggerExtensions.GetOrAddComponent<T>(go);
+            go => _ = go.GetComponent<T>() ?? go.AddComponent<T>();
         public static Action<GameObject> Cmp<T>(this Action<T> action) where T : Component =>
-            go => action(ObservableTriggerExtensions.GetOrAddComponent<T>(go));
+            go => action(go.GetComponent<T>() ?? go.AddComponent<T>());
         public static Action<GameObject> Cmp<U, T>(Action<U, T> action) where T : Component where U : Component =>
-            go => action(ObservableTriggerExtensions.GetOrAddComponent<U>(go), go.GetComponentInParent<T>(true));
-        public static Action<T> Behaviour<T>(bool? enabled) where T : Behaviour => ui => ui.enabled = enabled ?? ui.enabled;
+            go => action(go.GetComponent<U>() ?? go.AddComponent<U>(), go.GetComponentInParent<T>(true));
         public static Action<Canvas> Canvas(RenderMode? renderMode = RenderMode.ScreenSpaceOverlay) => ui =>
             (ui.renderMode, ui.sortingOrder) = (renderMode ?? ui.renderMode, 1);
         public static Action<CanvasScaler> CanvasScaler(
@@ -280,119 +346,66 @@ namespace CoastalSmell
                  new GameObject(Plugin.Name)
                     .With(Go(parent: RootTransform)).With(Cmp(Canvas()))
                     .With(Cmp(CanvasScaler(referenceResolution: new(1920, 1080))))
-                    .With(Cmp<GraphicRaycaster>())
-                    .With(Cmp<ObservableUpdateTrigger>())
-                    .transform;
-        public static Func<float, float, string, WindowHandle, GameObject> Window =>
-            (width, height, name, handle) =>
-                new GameObject(name)
-                    .With(Go(parent: new GameObject($"Window.{name}")
-                        .With(Go(parent: RootCanvas))
-                        .With(Cmp(Image(color: new(0, 0, 0, 0))))
-                        .With(Cmp(Rt(
-                            anchoredPosition: handle,
-                            sizeDelta: new(width + 12, height + 48),
-                            anchorMin: new(0, 1),
-                            anchorMax: new(0, 1),
-                            offsetMin: new(0, 0),
-                            offsetMax: new(0, 0),
-                            pivot: new(0, 1))))
-                        .With(Cmp(LayoutGroup<VerticalLayoutGroup>(
-                            spacing: 6,
-                            padding: new() { left = 6, right = 6, top = 6, bottom = 6 })))
-                        .With(Cmp<UI_DragWindow>())
-                        .With(Content("Title")(
-                            Cmp(Layout(width: width, height: 30)) +
-                            Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.ColorBg.Get())) +
-                            Cmp(LayoutGroup<HorizontalLayoutGroup>(padding: new() { left = 20, right = 20, top = 0, bottom = 0 })) +
-                            Content($"Label")(Cmp(Font() + Text(text: name)))))
-                        .With(handle.Apply)
-                        .transform))
-                    .With(Cmp(Layout(width: width, height: height)));
+                    .With(Cmp<GraphicRaycaster>()).transform;
+
         public static Func<string, GameObject, GameObject> Panel =>
             (name, parent) => new GameObject(name)
                 .With(Go(parent: parent.transform, active: false))
                 .With(Cmp(Image(color: new(0.5f, 0.5f, 0.5f, 0.7f), sprite: BorderSprites.ColorBg.Get())));
 
+        public static GameObject Wrap(this GameObject parent, GameObject child) => child.With(Go(parent: parent.transform));
         public static Func<float, float, string, GameObject, GameObject> ScrollWrap =>
-            (width, height, name, go) => go
-                .With(Go(parent: new GameObject(name)
-                    .With(Go(parent: new GameObject($"ScrollView.{name}")
-                        .With(Go(parent: go.transform.parent.transform))
-                        .With(Cmp(Image(color: new(0, 0, 0, 0))))
-                        .With(Cmp(Layout(width: width, height: height)))
-                        .With(Cmp(LayoutGroup<HorizontalLayoutGroup>(
-                            reverseArrangement: true,
-                            childForceExpandHeight: true)))
-                        .With(Cmp<ScrollRect>(ui => (ui.horizontal, ui.vertical, ui.scrollSensitivity) = (false, true, Math.Min(200, height / 2))))
-                        .With(Content($"Scrollbar.{name}")(
-                            Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get())) +
-                            Cmp(Layout(width: 5, height: height)) +
-                            Cmp<Scrollbar>(ui => ui.direction = Scrollbar.Direction.BottomToTop) +
-                            Cmp<Scrollbar, ScrollRect>((scroll, ui) => ui.verticalScrollbar = scroll) +
-                            Content($"Slider.{name}")(
-                                Cmp(RtFill) +
-                                Content($"Handle.{name}")(
-                                    Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.ColorBg.Get())) + Cmp(RtFill) +
-                                    Cmp<RectTransform, Scrollbar>((rt, ui) => ui.handleRect = rt)))))
-                    .transform))
-                    .With(Cmp(Layout(width: width - 5, height: height)))
-                    .With(Cmp<RectMask2D>())
-                    .With(Cmp<RectTransform, ScrollRect>((rt, ui) => ui.viewport = rt))
-                    .transform))
-                .With(Cmp(Rt(
-                    anchorMin: new(0, 1),
-                    anchorMax: new(0, 1),
-                    offsetMin: new(0, 0),
-                    offsetMax: new(0, 0),
-                    pivot: new(0, 1))))
-                .With(Cmp<RectTransform, ScrollRect>((rt, ui) => (ui.content, ui.normalizedPosition) = (rt, new(0, 1))));
+            (width, height, name, go) =>
+                new GameObject($"ScrollView.{name}")
+                    .With(Go(parent: go.transform.parent.transform))
+                    .With(Cmp(Image(color: new(0, 0, 0, 0))))
+                    .With(Cmp(Layout(width: width, height: height)))
+                    .With(Cmp(LayoutGroup<HorizontalLayoutGroup>(
+                        reverseArrangement: true,
+                        childForceExpandHeight: true)))
+                    .With(Cmp<ScrollRect>(ui => (ui.horizontal, ui.vertical, ui.scrollSensitivity) = (false, true, Math.Min(200, height / 2))))
+                    .With(Content($"Scrollbar.{name}")(
+                        Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get())) +
+                        Cmp(Layout(width: 5, height: height)) +
+                        Cmp<Scrollbar>(ui => ui.direction = Scrollbar.Direction.BottomToTop) +
+                        Cmp<Scrollbar, ScrollRect>((scroll, ui) => ui.verticalScrollbar = scroll) +
+                        Content($"Slider.{name}")(
+                            Cmp(RtFill) +
+                            Content($"Handle.{name}")(
+                                Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.ColorBg.Get())) + Cmp(RtFill) +
+                                Cmp<RectTransform, Scrollbar>((rt, ui) => ui.handleRect = rt)))))
+                    .Wrap(new GameObject(name))
+                        .With(Cmp(Layout(width: width - 5, height: height)))
+                        .With(Cmp<RectMask2D>())
+                        .With(Cmp<RectTransform, ScrollRect>((rt, ui) => ui.viewport = rt))
+                    .Wrap(go)
+                        .With(Cmp(Rt(
+                            anchorMin: new(0, 1),
+                            anchorMax: new(0, 1),
+                            offsetMin: new(0, 0),
+                            offsetMax: new(0, 0),
+                            pivot: new(0, 1))))
+                        .With(Cmp<RectTransform, ScrollRect>((rt, ui) => (ui.content, ui.normalizedPosition) = (rt, new(0, 1))));
 
-        public static Func<float, float, string, GameObject, GameObject> ScrollView =>
-            (width, height, name, parent) => new GameObject(name)
-                .With(Go(parent: new GameObject($"Viewport.{name}")
-                    .With(Go(parent: new GameObject($"ScrollView.{name}")
-                        .With(Go(parent: parent.transform))
-                        .With(Cmp(Image(color: new(0, 0, 0, 0))))
-                        .With(Cmp(Layout(width: width, height: height)))
-                        .With(Cmp(LayoutGroup<HorizontalLayoutGroup>(
-                            reverseArrangement: true,
-                            childForceExpandHeight: true)))
-                        .With(Cmp<ScrollRect>(ui => (ui.horizontal, ui.vertical, ui.scrollSensitivity) = (false, true, Math.Min(200, height / 2))))
-                        .With(Content($"Scrollbar.{name}")(
-                            Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get())) +
-                            Cmp(Layout(width: 16, height: height)) +
-                            Cmp<Scrollbar>(ui => ui.direction = Scrollbar.Direction.BottomToTop) +
-                            Cmp<Scrollbar, ScrollRect>((scroll, ui) => ui.verticalScrollbar = scroll) +
-                            Content($"Slider.{name}")(
-                                Cmp(RtFill) +
-                                Content($"Handle.{name}")(
-                                    Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.ColorBg.Get())) + Cmp(RtFill) +
-                                    Cmp<RectTransform, Scrollbar>((rt, ui) => ui.handleRect = rt)))))
-                        .transform))
-                    .With(Cmp(Image(color: new(0.5f, 0.5f, 0.5f, 0.7f), sprite: BorderSprites.ColorBg.Get())))
-                    .With(Cmp(Layout(width: width - 16, height: height)))
-                    .With(Cmp<RectMask2D>())
-                    .With(Cmp<RectTransform, ScrollRect>((rt, ui) => ui.viewport = rt))
-                    .transform))
-                .With(Cmp(Rt(
-                    anchorMin: new(0, 1),
-                    anchorMax: new(0, 1),
-                    offsetMin: new(0, 0),
-                    offsetMax: new(0, 0),
-                    pivot: new(0, 1))))
-                .With(Cmp<RectTransform, ScrollRect>((rt, ui) => (ui.content, ui.normalizedPosition) = (rt, new(0, 1))));
+        public static Func<float, float, string, GameObject, GameObject> ScrollPanel =>
+            (width, height, name, parent) =>
+                ScrollWrap(width, height, $"{name}.Panel", new GameObject(name).With(Go(parent: parent.transform)))
+                    .With(go => go.transform.parent.gameObject
+                        .With(Cmp(Image(color: new(0.5f, 0.5f, 0.5f, 0.7f), sprite: BorderSprites.ColorBg.Get()))));
+
         static SpriteState InputSprites => new SpriteState()
         {
             disabledSprite = BorderSprites.LightBg.Get(),
             selectedSprite = BorderSprites.DarkBg.Get(),
             highlightedSprite = BorderSprites.ColorBg.Get()
         };
+
         public static Func<float, float, string, GameObject, GameObject> Label =
             (width, height, name, parent) => new GameObject(name)
                 .With(Go(parent: parent.transform))
                 .With(Cmp(Layout(width: width, height: height)))
                 .With(Cmp(Font(size: height) + Text(text: name)));
+
         public static Func<float, float, string, GameObject, GameObject> Input =
             (width, height, name, parent) => new GameObject(name)
                 .With(Go(parent: parent.transform))
@@ -410,6 +423,7 @@ namespace CoastalSmell
                     Content($"{name}.Content")(
                         Cmp(Font(auto: false, size: 16) + Text(margin: new(5, 0, 5, 0), hrAlign: HorizontalAlignmentOptions.Right)) +
                         Cmp(RtFill) + Cmp<TextMeshProUGUI, TMP_InputField>((text, ui) => ui.textComponent = text))));
+
         public static Func<float, float, string, GameObject, GameObject> Check =
             (width, height, name, parent) => new GameObject($"Background.{name}")
                 .With(Go(parent: parent.transform))
@@ -423,6 +437,7 @@ namespace CoastalSmell
                     Content($"{name}.State")(
                         Cmp(Image(color: new(1, 1, 1, 1), sprite: SimpleSprites.CheckOn.Get(), alphaHit: 0)) +
                         Cmp(RtFill) + Cmp<Image, Toggle>((image, ui) => ui.graphic = image))));
+
         public static Func<float, float, string, GameObject, GameObject> Slider =
             (width, height, name, parent) => new GameObject(name)
                 .With(Go(parent: parent.transform, active: true))
@@ -435,6 +450,7 @@ namespace CoastalSmell
                 .With(Content($"{name}.Handle")(
                     Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.LightBg.Get())) + Cmp(RtFill) +
                     Cmp<RectTransform, Slider>((rt, ui) => ui.handleRect = rt)));
+
         public static Func<float, float, string, GameObject, GameObject> Color =
            (width, height, name, parent) => new GameObject(name)
                .With(Go(parent: parent.transform))
@@ -447,17 +463,20 @@ namespace CoastalSmell
                    Content($"{name}.Sample")(
                        Cmp(Image(color: new(1, 1, 1, 1))) + Cmp(RtFill) +
                        Cmp<Image, ThumbnailColor>((ui, cp) => cp._graphicColor = ui))));
+
         public static Func<float, float, string, Color, GameObject, GameObject> Section =
             (width, height, name, color, parent) => new GameObject($"Bagckground.{name}")
                 .With(Go(parent: parent.transform))
                 .With(Cmp(Image(color: color)))
                 .With(Cmp(Layout(width: width, height: height)))
                 .With(Content(name)(Cmp(Font(size: height) + Text(text: name)) + Cmp(RtFill)));
+
         static SpriteState ToggleSprites => new SpriteState()
         {
             disabledSprite = SimpleSprites.ToggleNa.Get(),
             highlightedSprite = SimpleSprites.ToggleHi.Get()
         };
+
         public static Func<float, float, string, GameObject, GameObject> Toggle =
             (width, height, name, parent) => new GameObject(name)
                 .With(Go(parent: parent.transform))
@@ -470,6 +489,7 @@ namespace CoastalSmell
                     Cmp(LayoutGroup<HorizontalLayoutGroup>(padding: new RectOffset() { left = 10, right = 10, top = 0, bottom = 0 })) +
                     Cmp(RtFill) + Cmp<Image, Toggle>((image, ui) => ui.graphic = image) +
                     Content($"{name}.Label")(Cmp(Font(size: height) + Text(text: name)) + Cmp(RtFill))));
+
         static SpriteState ButtonSprites => new SpriteState()
         {
             pressedSprite = BorderSprites.ButtonOn.Get(),
@@ -477,6 +497,7 @@ namespace CoastalSmell
             selectedSprite = BorderSprites.ButtonHi.Get(),
             highlightedSprite = BorderSprites.ButtonHi.Get()
         };
+
         public static Func<float, float, string, GameObject, GameObject> Button =
             (width, height, name, parent) => new GameObject(name)
                 .With(Go(parent: parent.transform))
@@ -488,30 +509,37 @@ namespace CoastalSmell
                     hrAlign: HorizontalAlignmentOptions.Center,
                     vtAlign: VerticalAlignmentOptions.Middle,
                     margin: new(5, 0, 5, 0), text: name)) + Cmp(RtFill)));
-        public static Func<float, float, string, GameObject, GameObject> Choice =
+
+        public static Func<float, float, string, GameObject, GameObject> Dropdown =
             (width, height, name, parent) => new GameObject(name)
                 .With(Go(parent: parent.transform))
                 .With(Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get(), alphaHit: 0)))
                 .With(Cmp(Layout(width: width, height: height)))
-                .With(Cmp<Toggle>(ui => (ui.isOn, ui.transition, ui.spriteState, ui.image) =
-                    (false, Selectable.Transition.SpriteSwap, InputSprites, ui.gameObject.GetComponent<Image>())))
-                .With(Content($"{name}.State")(
-                    Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.DarkBg.Get(), alphaHit: 0)) +
-                    Cmp(LayoutGroup<HorizontalLayoutGroup>(padding: new() { left = 10, right = 10, top = 0, bottom = 0 })) +
-                    Cmp(RtFill) + Cmp<Image, Toggle>((image, ui) => ui.graphic = image) +
-                    Content($"{name}.Label")(Cmp(Font(size: height) + Text(text: name)) + Cmp(RtFill))));
+                .With(Cmp<TMP_Dropdown>(ui =>
+                    (ui.transition, ui.spriteState, ui.image) =
+                    (Selectable.Transition.SpriteSwap, InputSprites, ui.gameObject.GetComponent<Image>())))
+                .With(Content($"{name}.Label")(Cmp(
+                    Font(size: height) +
+                    Text(hrAlign: HorizontalAlignmentOptions.Left, vtAlign: VerticalAlignmentOptions.Middle, margin: new(5, 0, 5, 0), text: name)
+                ) + Cmp<TextMeshProUGUI, TMP_Dropdown>((text, ui) => ui.captionText = text) + Cmp(RtFill)))
+                .With(DropdownTemplate.Apply(width).Apply(height).Apply(name))
+                .With(ModifyAt($"ScrollView.{name}.Template")(Cmp<RectTransform, TMP_Dropdown>((temp, ui) => ui.template = temp) +
+                    Cmp(Rt(anchorMin: new(0, 0), anchorMax: new(0, 0), offsetMin: new(0, 0), offsetMax: new(0, 0), sizeDelta: new (0,0)))));
+
+        static Action<float, float, string, GameObject> DropdownTemplate =
+            (width, height, name, dropdown) =>
+                Toggle(width, height, $"{name}.Item",
+                    ScrollWrap(width, height * 10, $"{name}.Template",
+                        Panel($"{name}.Panel", dropdown)
+                            .With(Cmp(LayoutGroup<VerticalLayoutGroup>()))
+                            .With(Cmp(Fitter()))))
+                        .With(ModifyAt($"{name}.Item.State", $"{name}.Item.Label")
+                            (Cmp<TextMeshProUGUI, TMP_Dropdown>((text, ui) => ui.itemText = text)));
+
         static TMP_FontAsset FontAsset;
-        static Action Setup =
-            () => FontAsset = UnityEngine.Object.Instantiate(
-                Manager.Scene.GetRootGameObjects("Title")
-                    .SelectMany(go => go.GetComponentsInChildren<TextMeshProUGUI>(true))
-                    .First(tmp => tmp.font != null)).font.With(UnityEngine.Object.DontDestroyOnLoad);
-        static Func<bool> Ready =
-            () => Manager.Scene.Instance != null
-                && Manager.Scene.NowData.LevelName == "Title"
-                && Manager.Scene.IsFadeEnd
-                && Localize.Translate.Manager.Initialized;
-        static internal void Initialize() =>
-            Util.DoOnCondition(Ready, Setup);
+        static void Initialize(GameObject go) =>
+            FontAsset = go.GetComponentsInChildren<TextMeshProUGUI>(true).First(tmp => tmp.font != null).font;
+        internal static IDisposable Initialize() =>
+            Hooks.OnFontInitialize.Subscribe(Initialize);
     }
 }

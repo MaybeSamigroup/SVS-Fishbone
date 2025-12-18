@@ -10,25 +10,13 @@
         <DefineConstants>$(GameName)</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
-        <Compile Include="..\..\Png.cs">
-            <Link>Png.cs</Link>
-        </Compile>
-        <Compile Include="..\Fishbone.cs">
-            <Link>Fishbone.cs</Link>
-        </Compile>
-        <Compile Include="..\Internal.cs">
-            <Link>Internal.cs</Link>
-        </Compile>
-        <Compile Include="..\Custom.cs">
-            <Link>Custom.cs</Link>
-        </Compile>
+        <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.738"/>
+        <PackageReference Include="IllusionLibs.SamabakeScramble.AllPackages" Version="2024.08.30.1"/>
         <ProjectReference Include="..\..\CoastalSmell\SVS\SVS_CoastalSmell.csproj">
             <Private>False</Private>
             <ExcludeAssets>all</ExcludeAssets>
         </ProjectReference>
-        <PackageReference Include="System.Reactive" Version="6.1.0"/>
-        <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.738"/>
-        <PackageReference Include="IllusionLibs.SamabakeScramble.AllPackages" Version="2024.08.30.1"/>
+        <Compile Include="..\Custom.cs"/>
     </ItemGroup>
     <Import Project="../Tasks.xml"/>
 </Project>

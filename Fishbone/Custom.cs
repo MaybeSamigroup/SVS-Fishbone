@@ -215,10 +215,10 @@ namespace Fishbone
     }
     class CustomTrack : CharaCopyTrack
     {
-        internal IObservable<CharaLimit> OnResolve { init; get; }
+        internal IObservable<(Human, CharaLimit)> OnResolve { init; get; }
         CharaLimit Limit;
         CustomTrack(HumanData data, CharaLimit limit) : base(data) =>
-            (Limit, OnResolve) = (limit, OnResolveHuman.Select(_ => Limit));
+            (Limit, OnResolve) = (limit, OnResolveHuman.Select(human => (human, Limit)));
         internal CustomTrack(HumanData data) : this(data, CharaLimit.None) =>
             Subscription.Append(OnLimitUpdate.Subscribe(Resolve))
                 .Append(CharaLoadTrack.OnModeUpdate.Subscribe(_ => Dispose()));
@@ -234,15 +234,15 @@ namespace Fishbone
     {
         static IObservable<(CustomTrack, HumanData, T)> OnTrackCustom =>
             Extension.OnTrackCustom.Select(tuple => (tuple.Item1, tuple.Item2, LoadChara(tuple.Item3)));
-        internal static IObservable<(CharaLimit, T)> OnLoadCustomChara =>
-            OnTrackCustom.SelectMany(tuple => tuple.Item1.OnResolve.Select(limit => (limit, tuple.Item3)));
+        internal static IObservable<(Human, CharaLimit, T)> OnLoadCustomChara =>
+            OnTrackCustom.SelectMany(tuple => tuple.Item1.OnResolve.Select(pair => (pair.Item1, pair.Item2, tuple.Item3)));
     }
     public static partial class Extension<T>
     {
         static IObservable<(CustomTrack, HumanData, T)> OnTrackCustom =>
             Extension.OnTrackCustom.Select(tuple => (tuple.Item1, tuple.Item2, LoadChara(tuple.Item3)));
-        internal static IObservable<(CharaLimit, T)> OnLoadCustomChara =>
-            OnTrackCustom.SelectMany(tuple => tuple.Item1.OnResolve.Select(limit => (limit, tuple.Item3)));
+        internal static IObservable<(Human, CharaLimit, T)> OnLoadCustomChara =>
+            OnTrackCustom.SelectMany(tuple => tuple.Item1.OnResolve.Select(pair => (pair.Item1, pair.Item2, tuple.Item3)));
     }
     class ActorTrack : CharaCopyTrack
     {

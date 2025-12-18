@@ -10,21 +10,7 @@
         <DefineConstants>$(GameName)</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
-        <PackageReference Include="System.Reactive" Version="6.1.0"/>
         <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.752"/>
-        <Compile Include="..\..\Png.cs">
-            <Link>Png.cs</Link>
-        </Compile>
-        <Compile Include="..\Fishbone.cs">
-            <Link>Fishbone.cs</Link>
-        </Compile>
-        <Compile Include="..\Internal.cs">
-            <Link>Internal.cs</Link>
-        </Compile>
-        <ProjectReference Include="..\..\CoastalSmell\DC\DC_CoastalSmell.csproj">
-            <Private>False</Private>
-            <ExcludeAssets>all</ExcludeAssets>
-        </ProjectReference>
         <Reference Include="Il2Cppmscorlib">
             <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\Il2Cppmscorlib.dll</HintPath>
             <Private>False</Private>
@@ -49,6 +35,10 @@
             <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\IL.dll</HintPath>
             <Private>False</Private>
         </Reference>
+        <ProjectReference Include="..\..\CoastalSmell\DC\DC_CoastalSmell.csproj">
+            <Private>False</Private>
+            <ExcludeAssets>all</ExcludeAssets>
+        </ProjectReference>
     </ItemGroup>
     <Import Project="../Tasks.xml"/>
 </Project>

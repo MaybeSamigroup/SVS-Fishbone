@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <ItemGroup>
+        <PackageReference Include="System.Reactive" Version="6.1.0"/>
+        <Compile Include="..\..\Png.cs"/>
+        <Compile Include="..\Fishbone.cs"/>
+        <Compile Include="..\Internal.cs"/>
         <NetDll Include="..\..\Resource\*.*"/>
     </ItemGroup>
     <Target Name="Deploy" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">

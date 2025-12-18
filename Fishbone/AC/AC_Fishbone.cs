@@ -7,6 +7,7 @@ using Character;
 using CharacterCreation;
 using BepInEx.Unity.IL2CPP;
 using CoastalSmell;
+using ActorIndex = (int, int);
 
 namespace Fishbone
 {
@@ -23,16 +24,18 @@ namespace Fishbone
         public static IObservable<((int, int), ZipArchive)> OnSaveActor =
             Observable.Create<((int, int), ZipArchive)>(observer => Hooks.OnSaveActor.Subscribe(actor => Save(actor, observer)));
         public static IObservable<Human> OnLoadCustomChara =>
-            OnTrackCustom.SelectMany(tuple => tuple.Item1.OnResolve.Select(_ => HumanCustom.Instance.Human));
+            OnTrackCustom.SelectMany(tuple => tuple.Item1.OnResolve.Select(pair => pair.Item1));
         public static IObservable<(int, int)> OnLoadActorChara =>
             OnTrackActor.SelectMany(tuple => tuple.Item1.OnResolve);
+        public static IObservable<(Human, (int, int))> OnActorHumanize => OnActorHumanizeInternal;
+        public static IObservable<Human> OnLoadChara =>
+            OnLoadCustomChara.Merge(OnActorHumanize.Select(tuple => tuple.Item1));
         public static IObservable<Human> OnLoadCoord =>
             OnTrackCoord.SelectMany(tuple => tuple.Item1.OnResolve.Select(pair => pair.Item1));
         public static IObservable<Human> OnLoadCustomCoord =>
             OnLoadCoord.Where(_ => CharaLoadTrack.Mode == CharaLoadTrack.FlagAware);
         public static IObservable<Human> OnLoadActorCoord =>
             OnLoadCoord.Where(_ => CharaLoadTrack.Mode != CharaLoadTrack.FlagAware);
-        public static IObservable<(Human, (int, int))> OnActorHumanize => OnActorHumanizeInternal;
         public static T Chara<T, U>(this Human human)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
@@ -61,23 +64,39 @@ namespace Fishbone
 
         public static T Chara<T, U>(this ActorData actor)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
-            where U : CoordinateExtension<U>, new() =>
-            ActorExtension<T, U>.Chara(actor.ToIndex());
+            where U : CoordinateExtension<U>, new() => Chara<T, U>(actor.ToIndex());
 
         public static U Coord<T, U>(this ActorData actor)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
-            where U : CoordinateExtension<U>, new() =>
-            ActorExtension<T, U>.Coord(actor.ToIndex());
+            where U : CoordinateExtension<U>, new() => Coord<T, U>(actor.ToIndex());
 
         public static void Chara<T, U>(this ActorData actor, T mods)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
-            where U : CoordinateExtension<U>, new() =>
-            ActorExtension<T, U>.Chara(actor.ToIndex(), mods);
+            where U : CoordinateExtension<U>, new() => Chara<T, U>(actor.ToIndex(), mods);
 
         public static void Coord<T, U>(this ActorData actor, U mods)
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+            where U : CoordinateExtension<U>, new() => Coord<T, U>(actor.ToIndex(), mods);
+
+        public static T Chara<T, U>(this ActorIndex index)
+            where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() =>
-            ActorExtension<T, U>.Coord(actor.ToIndex(), mods);
+            ActorExtension<T, U>.Chara(index);
+
+        public static U Coord<T, U>(this ActorIndex index)
+            where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+            where U : CoordinateExtension<U>, new() =>
+            ActorExtension<T, U>.Coord(index);
+
+        public static void Chara<T, U>(this ActorIndex index, T mods)
+            where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+            where U : CoordinateExtension<U>, new() =>
+            ActorExtension<T, U>.Chara(index, mods);
+
+        public static void Coord<T, U>(this ActorIndex index, U mods)
+            where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+            where U : CoordinateExtension<U>, new() =>
+            ActorExtension<T, U>.Coord(index, mods);
 
         public static T Chara<T, U>()
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
@@ -112,7 +131,7 @@ namespace Fishbone
             Hooks.OnInitializeActors.Subscribe(_ => ActorExtension<T, U>.Clear()),
             Hooks.OnInitializeActors.Subscribe(_ => ActorExtension<T, U>.Initialize()),
             OnInitializeCustom.Subscribe(HumanExtension<T, U>.Initialize),
-            Extension<T, U>.OnLoadCustomChara.Subscribe(tuple => HumanExtension<T, U>.LoadChara(tuple.Item1, tuple.Item2)),
+            Extension<T, U>.OnLoadCustomChara.Subscribe(tuple => HumanExtension<T, U>.LoadChara(tuple.Item2, tuple.Item3)),
             Extension<T, U>.OnLoadActorChara.Subscribe(tuple => ActorExtension<T, U>.LoadActor(tuple.Item1, tuple.Item2)),
             OnCopyCustomToActor.Subscribe(ActorExtension<T, U>.Copy),
             OnCopyActorToCustom.Subscribe(HumanExtension<T, U>.Copy),
@@ -136,11 +155,20 @@ namespace Fishbone
 
         public static T Chara<T>(this ActorData actor)
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
-            ActorExtension<T>.Chara(actor.ToIndex());
+            Chara<T>(actor.ToIndex());
 
         public static void Chara<T>(this ActorData actor, T mods)
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
-            ActorExtension<T>.Chara(actor.ToIndex(), mods);
+            Chara(actor.ToIndex(), mods);
+
+        public static T Chara<T>(this ActorIndex index)
+            where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
+            ActorExtension<T>.Chara(index);
+
+        public static void Chara<T>(this ActorIndex index, T mods)
+            where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
+            ActorExtension<T>.Chara(index, mods);
+
 
         public static T Chara<T>()
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() =>
@@ -159,7 +187,7 @@ namespace Fishbone
             Hooks.OnSwapActor.Subscribe(ActorExtension<T>.Swap),
             Hooks.OnInitializeActors.Subscribe(_ => ActorExtension<T>.Clear()),
             Hooks.OnInitializeActors.Subscribe(_ => ActorExtension<T>.Initialize()),
-            Extension<T>.OnLoadCustomChara.Subscribe(tuple => HumanExtension<T>.LoadChara(tuple.Item1, tuple.Item2)),
+            Extension<T>.OnLoadCustomChara.Subscribe(tuple => HumanExtension<T>.LoadChara(tuple.Item2, tuple.Item3)),
             Extension<T>.OnLoadActorChara.Subscribe(tuple => ActorExtension<T>.LoadActor(tuple.Item1, tuple.Item2)),
             OnInitializeCustom.Subscribe(HumanExtension<T>.Initialize),
             OnCopyCustomToActor.Subscribe(ActorExtension<T>.Copy),

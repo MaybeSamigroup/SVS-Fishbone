@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <ItemGroup>
+        <Compile Include="..\CoastalSmell.cs"/>
+        <Compile Include="..\Reactive.cs"/>
+        <Compile Include="..\IOHelper.cs"/>
+        <Compile Include="..\UIHelper.cs"/>
         <UITexture Include="Resource\*.*"/>
     </ItemGroup>
     <Target Name="Deploy" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">

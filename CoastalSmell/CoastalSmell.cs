@@ -1,9 +1,10 @@
 using System;
 using System.Linq;
+using System.Collections.Generic;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
-using System.Collections.Generic;
+using System.Reactive.Disposables;
 using Il2CppSystem.Threading;
 #if Aicomi
 using ILLGAMES.Unity.Component;
@@ -11,7 +12,10 @@ using ILLGAMES.Unity.Component;
 using ILLGames.Unity.Component;
 #endif
 using Cysharp.Threading.Tasks;
+using UnityEngine;
+using HarmonyLib;
 using BepInEx;
+using BepInEx.Unity.IL2CPP;
 
 namespace CoastalSmell
 {
@@ -43,7 +47,8 @@ namespace CoastalSmell
             SingletonInitializer<T>
                 .WaitUntilSetup(CancellationToken.None)
                 .ContinueWith(F.Apply(Startup.OnNext, Unit.Default));
-        static SingletonInitializerExtension() {
+        static SingletonInitializerExtension()
+        {
             OnDestroy.Subscribe(_ => UniTask.NextFrame().ContinueWith(Wait));
             OnStartup.Subscribe(cmp => cmp.OnDestroyAsObservable().Subscribe(Destroy.OnNext));
             Wait();
@@ -166,7 +171,7 @@ namespace CoastalSmell
         #endregion
 
         #region Misc
-        
+
         public static Func<I, O> Constant<I, O>(this Action<I> f, O value) => i => value.With(f.Apply(i));
         public static Action DoNothing = () => { };
 
@@ -177,26 +182,32 @@ namespace CoastalSmell
 
         #region Enumerable Extensions
 
-        public static IEnumerable<Tuple<T, int>> Index<T>(this IEnumerable<T> values) =>
-            values.Select((v, i) => new Tuple<T, int>(v, i));
+        public static IEnumerable<(T, int)> Index<T>(this IEnumerable<T> values) =>
+            values.Select((v, i) => (v, i));
 
         public static void ForEach<T>(this IEnumerable<T> values, Action<T> action) =>
             values.Aggregate(DoNothing, Accumulate(action))();
 
-        public static void ForEach<K, V>(this IEnumerable<Tuple<K, V>> values, Action<K, V> action) =>
-            values.Aggregate(DoNothing, Accumulate<Tuple<K, V>>(entry => action(entry.Item1, entry.Item2)))();
+        public static void ForEach<K, V>(this IEnumerable<(K, V)> values, Action<K, V> action) =>
+            values.Aggregate(DoNothing, Accumulate<(K, V)>(entry => action(entry.Item1, entry.Item2)))();
 
         public static void ForEach<K, V>(this IEnumerable<KeyValuePair<K, V>> values, Action<K, V> action) =>
             values.Aggregate(DoNothing, Accumulate<KeyValuePair<K, V>>(entry => action(entry.Key, entry.Value)))();
 
         public static void ForEachIndex<T>(this IEnumerable<T> values, Action<T, int> action) =>
-            Index(values).Aggregate(DoNothing, Accumulate<Tuple<T, int>>(tuple => action(tuple.Item1, tuple.Item2)))();
+            Index(values).Aggregate(DoNothing, Accumulate<(T, int)>(tuple => action(tuple.Item1, tuple.Item2)))();
 
         public static Dictionary<K, V> ToDictionary<K, V>(this IEnumerable<Tuple<K, V>> tuples) =>
             tuples.ToDictionary(item => item.Item1, item => item.Item2);
 
         public static Dictionary<K, V> ToDictionary<K, V>(this IEnumerable<KeyValuePair<K, V>> tuples) =>
             tuples.ToDictionary(item => item.Key, item => item.Value);
+
+        public static Il2CppSystem.Collections.Generic.List<T> AsIl2Cpp<T>(this IEnumerable<T> values) =>
+            new Il2CppSystem.Collections.Generic.List<T>().With(list => values.ForEach(list.Add));
+
+        public static Il2CppSystem.Collections.Generic.IReadOnlyList<T> AsReadOnly<T>(this Il2CppSystem.Collections.Generic.List<T> values) =>
+            new(values.Pointer);
 
         public static IEnumerable<Tuple<K, V>> Yield<K, V>(this Il2CppSystem.Collections.Generic.Dictionary<K, V> items)
         {
@@ -212,17 +223,45 @@ namespace CoastalSmell
         }
         #endregion
     }
+    public static partial class Hooks
+    {
+        static Subject<GameObject> FontInitialize = new();
+        static Subject<Unit> CommonSpaceInitialize = new();
+        internal static IObservable<GameObject> OnFontInitialize =>
+            FontInitialize.AsObservable().FirstAsync();
+        internal static IObservable<Transform> OnCommonSpaceInitialize =>
+            CommonSpaceInitialize.AsObservable().Select(_ => Manager.Scene.CommonSpace.transform).FirstAsync();
+
+        [HarmonyPostfix]
+        [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(Manager.Scene), nameof(Manager.Scene.CreateSpace))]
+        static void NotifyCommonSpaceInitialize() =>
+            CommonSpaceInitialize.OnNext(Unit.Default);
+
+        [HarmonyPostfix]
+        [HarmonyWrapSafe]
+        [HarmonyPatch(typeof(Localize.Translate.Manager), nameof(Localize.Translate.Manager.BindFont), typeof(GameObject), typeof(int))]
+        static void NotifyTranslateReady(GameObject target) =>
+            FontInitialize.OnNext(target);
+
+        internal static IDisposable Initialize() =>
+             Disposable.Create(Harmony.CreateAndPatchAll(typeof(Hooks), $"Hooks.{Plugin.Name}").UnpatchSelf);
+    }
 
     #region Plugin
 
     [BepInProcess(Process)]
     [BepInPlugin(Guid, Name, Version)]
-    public partial class Plugin
+    public partial class Plugin : BasePlugin
     {
-        internal static BepInEx.Logging.ManualLogSource Logger;
         public const string Guid = $"{Process}.{Name}";
         public const string Name = "CoastalSmell";
         public const string Version = "2.0.0";
+        internal static Plugin Instance;
+        CompositeDisposable Subscriptions;
+        public override void Load() => (Instance, Subscriptions) =
+            (this, [Hooks.Initialize(), Sprites.Initialize(), UGUI.Initialize()]);
+        public override bool Unload() => true.With(Subscriptions.Dispose) && base.Unload();
     }
     #endregion
 
