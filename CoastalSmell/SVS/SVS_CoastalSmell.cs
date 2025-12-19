@@ -5,11 +5,6 @@ using ThumbnailColor = ILLGames.Unity.UI.ColorPicker.ThumbnailColor;
 
 namespace CoastalSmell
 {
-    public static partial class Util
-    {
-        public static Action<Action> OnCustomHumanReady =
-            action => DoOnCondition(() => HumanCustom.Instance?.Human != null, action);
-    }
     public static partial class UGUI
     {
         public static Action<ThumbnailColor> ThumbnailColor(

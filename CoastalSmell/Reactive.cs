@@ -5,8 +5,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Events;
-using Il2CppSystem.Threading;
 #if Aicomi
+using Il2CppSystem.Threading;
 using Rx = R3;
 #else
 using Rx = UniRx;
@@ -23,6 +23,7 @@ namespace CoastalSmell
                 handler => config.SettingChanged += handler,
                 handler => config.SettingChanged -= handler
             ).Select(args => config.Value);
+
 #if Aicomi
         public static IObservable<T> Wrap<T>(this Rx.Observable<T> il2cpp) =>
             Observable.Create<T>(mono => Rx.ObservableSubscribeExtensions.Subscribe(il2cpp, (Action<T>)mono.OnNext).Dispose);
@@ -47,7 +48,6 @@ namespace CoastalSmell
 
         public static IObservable<Unit> OnClickAsObservable(this Button ui) =>
             Rx.UnityEventExtensions.AsObservable(ui.onClick).Wrap();
-
 #endif
         public static Il2CppSystem.IDisposable Unwrap(this IDisposable mono) =>
             Rx.Disposable.Create((Action)mono.Dispose);

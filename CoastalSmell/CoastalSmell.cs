@@ -22,18 +22,11 @@ namespace CoastalSmell
     #region Utilities
     public static partial class Util
     {
-#if DigitalCraft        
-        public static Action<Func<bool>, Action> DoOnCondition =
-            (predicate, action) => predicate()
-                .Either(DoNextFrame.Apply(DoOnCondition.Apply(predicate).Apply(action)), action);
-#else
-        public static Action<Action> DoNextFrame = action => UniTask.NextFrame().ContinueWith(action);
-        public static Func<Func<bool>, Action, Action> DoOnCondition =
-            (predicate, action) => new CancellationTokenSource()
-                .With(DoOnConditionAndToken.Apply(predicate).Apply(action)).Cancel;
-        static Action<Func<bool>, Action, CancellationTokenSource> DoOnConditionAndToken =
-            (predicate, action, source) => UniTask.WaitUntil(predicate, PlayerLoopTiming.Update, source.Token).ContinueWith(action);
-#endif
+        static IDisposable DelayFrames(this CancellationTokenSource cts, Action action, int frames) =>
+            UniTask.DelayFrame(frames, PlayerLoopTiming.Update, cts.Token)
+                .ContinueWith(action) switch { _ => Disposable.Create(cts.Cancel) };
+        public static IDisposable DelayFrames(this Action action, int frames) =>
+            new CancellationTokenSource().DelayFrames(action, frames);
     }
 
     public static class SingletonInitializerExtension<T> where T : SingletonInitializer<T>
@@ -43,16 +36,14 @@ namespace CoastalSmell
         public static IObservable<Unit> OnDestroy => Destroy.AsObservable();
         static Subject<Unit> Startup = new();
         static Subject<Unit> Destroy = new();
-        static Action Wait = () =>
+        static Action Initialize = () =>
             SingletonInitializer<T>
                 .WaitUntilSetup(CancellationToken.None)
                 .ContinueWith(F.Apply(Startup.OnNext, Unit.Default));
-        static SingletonInitializerExtension()
-        {
-            OnDestroy.Subscribe(_ => UniTask.NextFrame().ContinueWith(Wait));
-            OnStartup.Subscribe(cmp => cmp.OnDestroyAsObservable().Subscribe(Destroy.OnNext));
-            Wait();
-        }
+        static SingletonInitializerExtension() => (
+            OnDestroy.Subscribe(_ => UniTask.NextFrame().ContinueWith(Initialize)),
+            OnStartup.Subscribe(cmp => cmp.OnDestroyAsObservable().Subscribe(Destroy.OnNext))
+        ).With(Initialize);
     }
 
     #endregion

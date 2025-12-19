@@ -10,54 +10,18 @@
         <DefineConstants>$(GameName)</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
-        <PackageReference Include="System.Reactive" Version="6.1.0"/>
         <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.752"/>
-        <Reference Include="Il2Cppmscorlib">
-            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\Il2Cppmscorlib.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="UnityEngine.CoreModule">
-            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UnityEngine.CoreModule.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="UnityEngine.UIModule">
-            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UnityEngine.UIModule.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="UnityEngine.TextRenderingModule">
-            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UnityEngine.TextRenderingModule.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="UnityEngine.UI">
-            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UnityEngine.UI.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="Unity.TextMeshPro">
-            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\Unity.TextMeshPro.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="UnityEngine.ImageConversionModule">
-            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UnityEngine.ImageConversionModule.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="UniRx">
-            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UniRx.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="UniTask">
-            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\UniTask.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
+		<PackageReference Include="BepInEx.KeyboardShortcut.IL2CPP" Version="18.4.1"/>
+        <PackageReference Include="IllusionLibs.HoneyCome.UnityEngine" Version="2021.3.14.3"/>
+        <PackageReference Include="IllusionLibs.HoneyCome.UnityEngine.UI" Version="2021.3.14.3"/>
+        <PackageReference Include="IllusionLibs.HoneyCome.UnityEngine.ImageConversionModule" Version="2021.3.14.3"/>
+        <PackageReference Include="IllusionLibs.HoneyCome.Il2Cppmscorlib" Version="2023.99.12.15"/>
         <Reference Include="Assembly-CSharp">
             <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\Assembly-CSharp.dll</HintPath>
             <Private>False</Private>
         </Reference>
         <Reference Include="IL">
             <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\IL.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="BepinEx.KeyboardShortcut">
-            <HintPath>$(GamePath)\BepInEx\plugins\ConfigurationManager\BepinEx.KeyboardShortcut.dll</HintPath>
             <Private>False</Private>
         </Reference>
     </ItemGroup>

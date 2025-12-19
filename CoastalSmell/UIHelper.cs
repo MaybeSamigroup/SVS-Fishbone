@@ -17,7 +17,6 @@ using ILLGames.Unity.UI.ColorPicker;
 #endif
 using ScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode;
 using ScreenMatchMode = UnityEngine.UI.CanvasScaler.ScreenMatchMode;
-using BepInEx;
 using BepInEx.Unity.IL2CPP;
 using BepInEx.Configuration;
 
@@ -48,7 +47,7 @@ namespace CoastalSmell
         static Dictionary<SimpleSprites, Sprite> Simples = new();
         static Dictionary<BorderSprites, Sprite> Borders = new();
         static string ToPath<T>(T item) =>
-            Path.Combine(Paths.GameRootPath, "UserData", "plugins", Plugin.Name, $"{item}.png");
+            Path.Combine(Util.UserDataPath, "plugins", Plugin.Name, $"{item}.png");
         static void RegisterSprite(this GameObject go, Sprite item) =>
             go.With(UGUI.Cmp(UGUI.Image(sprite: item)));
         public static Sprite Get(this SimpleSprites item) => Simples[item];
@@ -363,7 +362,9 @@ namespace CoastalSmell
                     .With(Cmp(LayoutGroup<HorizontalLayoutGroup>(
                         reverseArrangement: true,
                         childForceExpandHeight: true)))
-                    .With(Cmp<ScrollRect>(ui => (ui.horizontal, ui.vertical, ui.scrollSensitivity) = (false, true, Math.Min(200, height / 2))))
+                    .With(Cmp<ScrollRect>(ui =>
+                       (ui.horizontal, ui.vertical, ui.verticalScrollbarVisibility, ui.scrollSensitivity)
+                        = (false, true, ScrollRect.ScrollbarVisibility.AutoHide, Math.Min(200, height / 2))))
                     .With(Content($"Scrollbar.{name}")(
                         Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get())) +
                         Cmp(Layout(width: 5, height: height)) +
@@ -529,12 +530,12 @@ namespace CoastalSmell
         static Action<float, float, string, GameObject> DropdownTemplate =
             (width, height, name, dropdown) =>
                 Toggle(width, height, $"{name}.Item",
-                    ScrollWrap(width, height * 10, $"{name}.Template",
-                        Panel($"{name}.Panel", dropdown)
-                            .With(Cmp(LayoutGroup<VerticalLayoutGroup>()))
-                            .With(Cmp(Fitter()))))
-                        .With(ModifyAt($"{name}.Item.State", $"{name}.Item.Label")
-                            (Cmp<TextMeshProUGUI, TMP_Dropdown>((text, ui) => ui.itemText = text)));
+                    Panel($"{name}.Panel", dropdown)
+                        .With(Cmp(LayoutGroup<VerticalLayoutGroup>()))
+                        .With(Cmp(Fitter()))
+                    .With(ScrollWrap.Apply(width).Apply(height * 10).Apply($"{name}.Template")))
+                    .With(ModifyAt($"{name}.Item.State", $"{name}.Item.Label")
+                        (Cmp<TextMeshProUGUI, TMP_Dropdown>((text, ui) => ui.itemText = text)));
 
         static TMP_FontAsset FontAsset;
         static void Initialize(GameObject go) =>

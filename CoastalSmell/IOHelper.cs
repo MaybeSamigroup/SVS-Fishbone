@@ -5,6 +5,12 @@ using System.Text.Unicode;
 using System.Text.Encodings.Web;
 using System.Text.Json.Serialization;
 using UnityEngine;
+#if Aicomi
+using ILLGAMES.IO;
+#else
+using ILLGames.IO;
+#endif
+
 
 namespace CoastalSmell
 {
@@ -65,6 +71,7 @@ namespace CoastalSmell
     }
     public static partial class Util
     {
+        public static string UserDataPath => UserData.Path;
         public static string ToJson<T>(T value) =>
             JsonSerializer.Serialize(value, JsonOpts);
         internal static readonly JsonSerializerOptions JsonOpts = new()

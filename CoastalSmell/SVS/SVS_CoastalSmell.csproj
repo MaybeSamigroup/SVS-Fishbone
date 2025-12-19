@@ -9,14 +9,9 @@
         <DefineConstants>$(GameName)</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
-        <PackageReference Include="System.Reactive" Version="6.1.0"/>
         <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.738"/>
         <PackageReference Include="IllusionLibs.SamabakeScramble.AllPackages" Version="2024.08.30.1"/>
         <Compile Include="..\Custom.cs"/>
-        <Reference Include="BepinEx.KeyboardShortcut">
-            <HintPath>$(GamePath)\BepInEx\plugins\ConfigurationManager\BepinEx.KeyboardShortcut.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
     </ItemGroup>
     <Import Project="../Tasks.xml"/>
 </Project>
