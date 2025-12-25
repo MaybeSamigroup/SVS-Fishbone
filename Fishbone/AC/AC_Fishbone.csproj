@@ -12,11 +12,11 @@
     <ItemGroup>
         <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.738"/>
         <PackageReference Include="IllusionLibs.Aicomi.AllPackages" Version="2024.10.03.0"/>
-        <ProjectReference Include="..\..\CoastalSmell\AC\AC_CoastalSmell.csproj">
+        <ProjectReference Include="../../CoastalSmell/AC/AC_CoastalSmell.csproj">
             <Private>False</Private>
             <ExcludeAssets>all</ExcludeAssets>
         </ProjectReference>
-        <Compile Include="..\Custom.cs"/>
+        <Compile Include="../Custom.cs"/>
     </ItemGroup>
     <Import Project="../Tasks.xml"/>
 </Project>

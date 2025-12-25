@@ -9,21 +9,21 @@
         <GamePath>$([MSBuild]::GetRegistryValue('HKEY_CURRENT_USER\Software\ILLGAMES\$(GameName)','INSTALLDIR'))</GamePath>
     </PropertyGroup>
     <ItemGroup>
-        <Compile Include="..\Png.cs">
+        <Compile Include="../Png.cs">
             <Link>Png.cs</Link>
         </Compile>
     </ItemGroup>
     <Target Name="Release" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
         <ItemGroup>
-            <Binaries Include="$(OutputPath)\*.dll"/>
-            <Binaries Include="$(OutputPath)\*.exe"/>
-            <Binaries Include="$(OutputPath)\*.runtimeconfig.json"/>
+            <Binaries Include="$(OutputPath)/*.dll"/>
+            <Binaries Include="$(OutputPath)/*.exe"/>
+            <Binaries Include="$(OutputPath)/*.runtimeconfig.json"/>
         </ItemGroup>
-        <Copy SourceFiles="@(Binaries)" DestinationFolder="..\Release\$(AssemblyName)"/>
-        <ZipDirectory SourceDirectory="..\Release\$(AssemblyName)" Overwrite="true" DestinationFile="..\$(AssemblyName).zip"/>
+        <Copy SourceFiles="@(Binaries)" DestinationFolder="../Release/$(AssemblyName)"/>
+        <ZipDirectory SourceDirectory="../Release/$(AssemblyName)" Overwrite="true" DestinationFile="../$(AssemblyName).zip"/>
     </Target>
     <Target Name="CleanRelease" AfterTargets="Clean">
-        <RemoveDir Directories="..\Release\$(AssemblyName)"/>
-        <Delete Files="..\$(AssemblyName).zip"/>
+        <RemoveDir Directories="../Release/$(AssemblyName)"/>
+        <Delete Files="../$(AssemblyName).zip"/>
     </Target>
 </Project>

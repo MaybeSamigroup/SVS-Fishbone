@@ -14,6 +14,7 @@ using Character;
 using CharacterCreation;
 using HarmonyLib;
 using CoastalSmell;
+using ActorIndex = (int, int);
 
 namespace Fishbone
 {
@@ -130,10 +131,10 @@ namespace Fishbone
     static partial class Hooks
     {
         [HarmonyPrefix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(AC.Scene.ConvertHumanDataScene), nameof(AC.Scene.ConvertHumanDataScene.ConvertAsync))]
+        [HarmonyPatch(typeof(ConvertHumanDataScene), nameof(ConvertHumanDataScene.ConvertAsync))]
         static void ConvertHumanDataSceneConvertAsyncPrefix() => EnterConversion.OnNext(Unit.Default);
 
-        [HarmonyPatch(typeof(AC.Scene.ConvertHumanDataScene), nameof(AC.Scene.ConvertHumanDataScene.ConvertAsync))]
+        [HarmonyPatch(typeof(ConvertHumanDataScene), nameof(ConvertHumanDataScene.ConvertAsync))]
         static void ConvertHumanDataSceneConvertAsyncPostfix(ref UniTask __result) =>
             __result = __result.ContinueWith(F.Apply(LeaveConversion.OnNext, Unit.Default));
     }
@@ -150,24 +151,15 @@ namespace Fishbone
         static void RegistrationUISwapPostfix(RegistrationUI.SwapData from, RegistrationUI.SwapData to) =>
             SwapActor.OnNext(((from.Group, from.DataIndex), (to.Group, to.DataIndex)));
     }
-    internal static partial class ActorExtension<T, U>
-        where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
-        where U : CoordinateExtension<U>, new()
+    public static partial class Extension<T, U>
     {
-        internal static void SwapChara(((int, int), (int, int)) tuple) =>
-            Charas.Remove(tuple.Item1, out var chara).Maybe(() => Charas[tuple.Item2] = chara);
-        internal static void SwapCoord(((int, int), (int, int)) tuple) =>
-            Coords.Remove(tuple.Item1, out var coord).Maybe(() => Coords[tuple.Item2] = coord);
-        internal static void Initialize() =>
-            Enumerable.Range(1, 3).ForEach(index => Coords[(-1, index)] = (Charas[(-1, index)] = new()).Get(0));
+        internal static void Swap((ActorIndex Src, ActorIndex Dst) tuple) => ActorsValues.Swap(tuple.Src, tuple.Dst);
     }
-    internal static partial class ActorExtension<T>
-        where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
+
+    public static partial class Extension<T>
     {
-        internal static void Swap(((int, int), (int, int)) tuple) =>
-            Charas.Remove(tuple.Item1, out var chara).Maybe(() => Charas[tuple.Item2] = chara);
-        internal static void Initialize() =>
-            Enumerable.Range(1, 3).ForEach(index => Charas[(-1, index)] = new());
+        internal static void Swap((ActorIndex Src, ActorIndex Dst) tuple) => ActorsValues.Swap(tuple.Src, tuple.Dst);
     }
+
     #endregion
 }

@@ -173,20 +173,23 @@ namespace CoastalSmell
 
         #region Enumerable Extensions
 
-        public static IEnumerable<(T, int)> Index<T>(this IEnumerable<T> values) =>
+        public static IEnumerable<(T Value, int Index)> Index<T>(this IEnumerable<T> values) =>
             values.Select((v, i) => (v, i));
 
         public static void ForEach<T>(this IEnumerable<T> values, Action<T> action) =>
             values.Aggregate(DoNothing, Accumulate(action))();
 
         public static void ForEach<K, V>(this IEnumerable<(K, V)> values, Action<K, V> action) =>
-            values.Aggregate(DoNothing, Accumulate<(K, V)>(entry => action(entry.Item1, entry.Item2)))();
+            values.Aggregate(DoNothing, Accumulate<(K Key, V Value)>(entry => action(entry.Key, entry.Value)))();
 
         public static void ForEach<K, V>(this IEnumerable<KeyValuePair<K, V>> values, Action<K, V> action) =>
             values.Aggregate(DoNothing, Accumulate<KeyValuePair<K, V>>(entry => action(entry.Key, entry.Value)))();
 
         public static void ForEachIndex<T>(this IEnumerable<T> values, Action<T, int> action) =>
-            Index(values).Aggregate(DoNothing, Accumulate<(T, int)>(tuple => action(tuple.Item1, tuple.Item2)))();
+            Index(values).Aggregate(DoNothing, Accumulate<(T Value, int Index)>(tuple => action(tuple.Value, tuple.Index)))();
+
+        public static Dictionary<K, V> ToDictionary<K, V>(this IEnumerable<(K Key, V Value)> tuples) =>
+            tuples.ToDictionary(item => item.Key, item => item.Value);
 
         public static Dictionary<K, V> ToDictionary<K, V>(this IEnumerable<Tuple<K, V>> tuples) =>
             tuples.ToDictionary(item => item.Item1, item => item.Item2);
@@ -200,17 +203,15 @@ namespace CoastalSmell
         public static Il2CppSystem.Collections.Generic.IReadOnlyList<T> AsReadOnly<T>(this Il2CppSystem.Collections.Generic.List<T> values) =>
             new(values.Pointer);
 
-        public static IEnumerable<Tuple<K, V>> Yield<K, V>(this Il2CppSystem.Collections.Generic.Dictionary<K, V> items)
+        public static IEnumerable<(K Key, V Value)> Yield<K, V>(this Il2CppSystem.Collections.Generic.Dictionary<K, V> items)
         {
-            foreach (var (k, v) in items)
-                yield return new Tuple<K, V>(k, v);
+            foreach (var (k, v) in items) yield return (k, v);
         }
         public static IEnumerable<T> Yield<T>(this Il2CppSystem.Collections.Generic.IReadOnlyList<T> items) =>
             Yield(items, new Il2CppSystem.Collections.Generic.ICollection<T>(items.Pointer).Count);
         static IEnumerable<T> Yield<T>(this Il2CppSystem.Collections.Generic.IReadOnlyList<T> items, int count)
         {
-            for (var index = 0; index < count; index++)
-                yield return items[index];
+            for (var index = 0; index < count; index++) yield return items[index];
         }
         #endregion
     }
@@ -250,8 +251,9 @@ namespace CoastalSmell
         public const string Version = "2.0.0";
         internal static Plugin Instance;
         CompositeDisposable Subscriptions;
-        public override void Load() => (Instance, Subscriptions) =
-            (this, [Hooks.Initialize(), Sprites.Initialize(), UGUI.Initialize()]);
+        public Plugin() : base() => Instance = this;
+        public override void Load() => Subscriptions =
+            [Hooks.Initialize(), Sprites.Initialize(), UGUI.Initialize()];
         public override bool Unload() => true.With(Subscriptions.Dispose) && base.Unload();
     }
     #endregion

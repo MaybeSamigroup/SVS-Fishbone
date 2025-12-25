@@ -7,13 +7,31 @@ using System.Reactive.Disposables;
 using Character;
 using HarmonyLib;
 using CoastalSmell;
-using CoordLimit = Character.HumanDataCoordinate.LoadLimited.Flags;
 using Il2CppReader = Il2CppSystem.IO.BinaryReader;
 using Il2CppWriter = Il2CppSystem.IO.BinaryWriter;
 using System;
 
 namespace Fishbone
 {
+    class HumansStorage<T,U> : Storage<T, U, Human>
+        where T : ComplexExtension<T, U>, CharacterExtension<T>, new() where U : CoordinateExtension<U>, new()
+    {
+        Dictionary<Human, T> Humans = new();
+        public T Get(Human human) => Humans[human];
+        public void Set(Human human, T value) => Humans[human] = value; 
+        public U GetNowCoordinate(Human human) => Humans[human].Get(human.data.Status.coordinateType);
+        public void SetNowCoordinate(Human human, U value) => Humans[human] = Humans[human].Merge(human.data.Status.coordinateType, value);
+        internal void Remove(Human human) => Humans.Remove(human);
+    }
+    class HumansStorage<T> : Storage<T, Human>
+        where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
+    {
+        Dictionary<Human, T> Humans = new();
+        public T Get(Human human) => Humans[human];
+        public void Set(Human human, T value) => Humans[human] = value; 
+        internal void Remove(Human human) => Humans.Remove(human);
+    }
+
     static partial class Hooks
     {
         [HarmonyPrefix, HarmonyWrapSafe]
@@ -54,9 +72,20 @@ namespace Fishbone
     } 
     public static partial class Extension
     {
-        static void Save(Human human, IObserver<(Human, ZipArchive)> observer) =>
-            Implant(human.data, ToBinary(Observer.Create<ZipArchive>(archive => observer.OnNext((human, archive)))));
+        static void Save(Human human, IObserver<(ZipArchive, Human)> observer) =>
+            Implant(human.data, ToBinary(Observer.Create<ZipArchive>(archive => observer.OnNext((archive, human)))));
     }
+    public static partial class Extension<T, U>
+    {
+        internal static void SaveChara((ZipArchive Value, Human Human) tuple) =>
+            SaveChara(tuple.Value, Values[tuple.Human]);
+    }
+    public static partial class Extension<T>
+    {
+        internal static void SaveChara((ZipArchive Value, Human Human) tuple) =>
+            SaveChara(tuple.Value, Values[tuple.Human]);
+    }
+
     class CharaCopyTrack : IDisposable
     {
         protected CompositeDisposable Subscription;
@@ -65,7 +94,7 @@ namespace Fishbone
         HumanData Data;
         CharaCopyTrack() =>
             (OnDataUpdate, OnResolve) = (
-                Hooks.OnHumanDataCopy.Where(Match).Select(tuple => tuple.Item2),
+                Hooks.OnHumanDataCopy.Where(Match).Select(tuple => tuple.Dst),
                 Hooks.OnHumanResolve.Where(Match).FirstAsync());
         internal CharaCopyTrack(HumanData data) : this() =>
             (Data, Subscription) = (data, [
@@ -73,30 +102,34 @@ namespace Fishbone
                 OnResolve.Subscribe(_ => Dispose()),
                 OnDataUpdate.Subscribe(Resolve),
             ]);
-        bool Match<T>((HumanData, T) tuple) => Data == tuple.Item1;
+        bool Match<T>((HumanData Data, T Value) tuple) => Data == tuple.Data;
         bool Match(Human human) => Data == human.data; 
         void Resolve(HumanData value) => Data = value;
         public void Dispose() => Subscription.Dispose();
     }
     public static partial class Extension
     {
-        internal static IObservable<(CharaCopyTrack, HumanData, ZipArchive)> OnTrackChara =>
+        internal static IObservable<(CharaCopyTrack Track, HumanData Data, ZipArchive Value)> OnTrackChara =>
             OnPreprocessChara.Where(_ => CharaLoadTrack.Mode == CharaLoadTrack.FlagAware)
-                .Select(tuple => (new CharaCopyTrack(tuple.Item1), tuple.Item1, tuple.Item2));
+                .Select(tuple => (new CharaCopyTrack(tuple.Data), tuple.Data, tuple.Value));
     }
     public static partial class Extension<T, U>
     {
-        static IObservable<(CharaCopyTrack, HumanData, T)> OnTrackChara =>
-            Extension.OnTrackChara.Select(tuple => (tuple.Item1, tuple.Item2, LoadChara(tuple.Item3)));
-        internal static IObservable<(Human, T)> OnLoadChara =>
-            OnTrackChara.SelectMany(tuple => tuple.Item1.OnResolve.Select(human => (human, tuple.Item3)));
+        static IObservable<(CharaCopyTrack Track, HumanData Data, T Value)> OnTrackChara =>
+            Extension.OnTrackChara.Select(tuple => (tuple.Track, tuple.Data, LoadChara(tuple.Value)));
+        internal static IObservable<(Human Human, T Value)> OnLoadChara =>
+            OnTrackChara.SelectMany(tuple => tuple.Track.OnResolve.Select(human => (human, tuple.Value)));
+        internal static void Prepare(Human human) =>
+            human.component.OnDestroyAsObservable().Select(_ => human).Subscribe(Storage.Remove);
     }
     public static partial class Extension<T>
     {
-        static IObservable<(CharaCopyTrack, HumanData, T)> OnTrackChara =>
-            Extension.OnTrackChara.Select(tuple => (tuple.Item1, tuple.Item2, LoadChara(tuple.Item3)));
-        internal static IObservable<(Human, T)> OnLoadChara =>
-            OnTrackChara.SelectMany(tuple => tuple.Item1.OnResolve.Select(human => (human, tuple.Item3)));
+        static IObservable<(CharaCopyTrack Track, HumanData Data, T Value)> OnTrackChara =>
+            Extension.OnTrackChara.Select(tuple => (tuple.Track, tuple.Data, LoadChara(tuple.Value)));
+        internal static IObservable<(Human Human, T Value)> OnLoadChara =>
+            OnTrackChara.SelectMany(tuple => tuple.Track.OnResolve.Select(human => (human, tuple.Value)));
+        internal static void Prepare(Human human) =>
+            human.component.OnDestroyAsObservable().Select(_ => human).Subscribe(Storage.Remove);
     }
     static partial class Hooks
     {
@@ -108,48 +141,6 @@ namespace Fishbone
         static void HumanCoordinateChangeCoordinateTypePostfix(HumanCoordinate __instance, ChaFileDefine.CoordinateType type, bool changeBackCoordinateType) =>
             (changeBackCoordinateType || __instance.human.data.Status.coordinateType != (int)type)
                 .Maybe(F.Apply(ChangeCoordinate.OnNext, (__instance.human, (int)type)));
-    }
-
-    internal static class HumanExtension<T, U>
-        where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
-        where U : CoordinateExtension<U>, new()
-    {
-        static readonly Dictionary<Human, T> Characters = new();
-
-        internal static T Chara(Human human) =>
-            Characters.GetValueOrDefault(human, new());
-
-        internal static U Coord(Human human) =>
-            Characters.GetValueOrDefault(human, new T()).Get(human.data.Status.coordinateType);
-
-        internal static void Chara(Human human, T mods) =>
-            Characters[human] = mods;
-
-        internal static void Coord(Human human, U mods) =>
-            Characters[human] = Chara(human).Merge(human.data.Status.coordinateType, mods);
-
-        internal static void Prepare(Human human) =>
-            human.component.OnDestroyAsObservable()
-                .Subscribe(F.Apply(Characters.Remove, human).Ignoring().Ignoring<Unit>());
-
-        internal static void LoadCoord(Human human, CoordLimit limit, U value) =>
-            Characters[human] = Characters.GetValueOrDefault(human, new()).Merge(human.data.Status.coordinateType, limit, value);
-    }
-
-    internal static class HumanExtension<T>
-        where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
-    {
-        static readonly Dictionary<Human, T> Characters = new();
-
-        internal static T Chara(Human human) =>
-            Characters.GetValueOrDefault(human, new());
-
-        internal static void Chara(Human human, T mods) =>
-            Characters[human] = mods;
-
-        internal static void Prepare(Human human) =>
-            human.component.OnDestroyAsObservable()
-                .Subscribe(F.Apply(Characters.Remove, human).Ignoring().Ignoring<Unit>());
     }
 
     public static partial class Extension

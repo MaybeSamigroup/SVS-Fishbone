@@ -44,24 +44,528 @@ namespace CoastalSmell
     }
     public static class Sprites
     {
-        static Dictionary<SimpleSprites, Sprite> Simples = new();
-        static Dictionary<BorderSprites, Sprite> Borders = new();
+        static Dictionary<SimpleSprites, Sprite> Simples;
+        static Dictionary<BorderSprites, Sprite> Borders;
+        static void InitializeSprites() => (Simples, Borders) = (
+            Enum.GetValues<SimpleSprites>().ToDictionary(item => item, item => ToSimpleSprite(ToPath(item))),
+            Enum.GetValues<BorderSprites>().ToDictionary(item => item, item => ToBorderSprite(new(6, 6, 6, 6), ToPath(item)))
+        );
         static string ToPath<T>(T item) =>
-            Path.Combine(Util.UserDataPath, "plugins", Plugin.Name, $"{item}.png");
-        static void RegisterSprite(this GameObject go, Sprite item) =>
-            go.With(UGUI.Cmp(UGUI.Image(sprite: item)));
+            Path.Combine(Util.UserDataPath, "plugins", Plugin.Name, $"{item}.png").With(Plugin.Instance.Log.LogInfo);
+        static Func<string, Texture2D> ToTexture2D =
+            (path) => new Texture2D(64, 64).With(t2d => t2d.LoadImage(File.ReadAllBytes(path)));
+        static Func<Texture2D, Sprite> Texture2DToSimpleSprite =
+            (t2d) => Sprite.Create(t2d, new(0, 0, t2d.width, t2d.height), new(0.5f, 0.5f));
+        static Func<Vector4, Texture2D, Sprite> Texture2DToBorderSprite =
+            (border, t2d) => Sprite.Create(t2d, new(0, 0, t2d.width, t2d.height), new(0.5f, 0.5f), 100, 0, SpriteMeshType.FullRect, border);
         public static Sprite Get(this SimpleSprites item) => Simples[item];
         public static Sprite Get(this BorderSprites item) => Borders[item];
+        public static Func<string, Sprite> ToSimpleSprite =
+            (path) => Texture2DToSimpleSprite(ToTexture2D(path));
+        public static Func<Vector4, string, Sprite> ToBorderSprite =
+            (border, path) => Texture2DToBorderSprite(border, ToTexture2D(path));
+        static IEnumerable<UIDesign> Setup<T>(Dictionary<T, Sprite> entries) where T : Enum =>
+            entries.Select(entry => entry.Key.ToString().AsChild(UGUI.Image(sprite: entry.Value)));
         static void Setup(Transform parent) =>
-            (Simples, Borders) = (
-                Enum.GetValues<SimpleSprites>()
-                    .ToDictionary(item => item, item => UGUI.ToSimpleSprite(ToPath(item))
-                        .With(new GameObject(item.ToString()).With(UGUI.Go(parent: parent)).RegisterSprite)),
-                Enum.GetValues<BorderSprites>()
-                    .ToDictionary(item => item, item => UGUI.ToBorderSprite(new(6, 6, 6, 6), ToPath(item))
-                        .With(new GameObject(item.ToString()).With(UGUI.Go(parent: parent)).RegisterSprite)));
+            parent.With(InitializeSprites).With(UGUI.AsDesign([.. Setup(Simples), .. Setup(Borders)]));
         internal static IDisposable Initialize() =>
             Hooks.OnCommonSpaceInitialize.Subscribe(Setup);
+    }
+
+    public delegate void UIDesign(GameObject go);
+
+    public static partial class UGUI
+    {
+        static UIDesign Identity = new UIDesign(F.Ignoring<GameObject>(F.DoNothing));
+
+        public static Transform TransformAt(this Transform tf, string[] paths) =>
+            paths.Length == 0 ? tf : tf.Find(paths[0]).TransformAt(paths[1..]);
+
+        public static Transform TransformAt(this GameObject go, string[] paths) =>
+            go.transform.TransformAt(paths);
+
+        public static Transform With(this Transform tf, UIDesign design) =>
+            tf.gameObject.With(design).transform;
+
+        public static GameObject With(this GameObject go, UIDesign design) =>
+            F.With(go, design.Invoke);
+
+        public static UIDesign AsDesign(this IEnumerable<UIDesign> designs) =>
+            (designs ?? []).Aggregate(Identity, (f, g) => f + g);
+
+        public static UIDesign Component<T>() where T : Component =>
+            go => _ = go.GetComponent<T>() ?? go.AddComponent<T>();
+
+        public static UIDesign Component<T>(Action<T> action) where T : Component =>
+            go => action(go.GetComponent<T>() ?? go.AddComponent<T>());
+
+        public static UIDesign Component<T, U>(Action<T, U> action) where T : Component where U : Component =>
+            go => action(go.GetComponent<T>() ?? go.AddComponent<T>(), go.GetComponent<U>() ?? go.GetComponentInParent<U>(true));
+
+        public static UIDesign GameObject(bool active = true) => go => go.SetActive(active);
+
+        public static UIDesign AsParent(this GameObject parent, bool active = true, Vector2? scale = null) =>
+            parent.transform.AsParent(active, scale);
+
+        public static UIDesign AsParent(this Transform parent, bool active = true, Vector2? scale = null) =>
+            go => (go.transform.parent, go.active, go.transform.localScale) = (parent, active, scale ?? new (1.0f, 1.0f));
+
+        public static UIDesign AsParent(this string name, UIDesign design) =>
+            go => new GameObject(name).With(go.transform.parent.AsParent() + design).AsParent().Invoke(go);
+
+        public static UIDesign AsChild(this string name, UIDesign design) =>
+            go => new GameObject(name).With(go.transform.AsParent() + design);
+
+        public static UIDesign AsTemplate(this string name, UIDesign design) =>
+            go => new GameObject(name).With(go.transform.AsParent(active: false) + design);
+
+        public static UIDesign Canvas(RenderMode? renderMode = RenderMode.ScreenSpaceOverlay) =>
+            Component<Canvas>(cmp => (cmp.renderMode, cmp.sortingOrder) = (renderMode ?? cmp.renderMode, 1));
+
+        public static UIDesign CanvasScaler(
+            Vector2? referenceResolution = null,
+            ScaleMode? scaleMode = ScaleMode.ScaleWithScreenSize,
+            ScreenMatchMode? screenMatchMode = ScreenMatchMode.MatchWidthOrHeight
+        ) => Component<CanvasScaler>(cmp => (
+            cmp.uiScaleMode,
+            cmp.screenMatchMode,
+            cmp.referenceResolution
+        ) = (
+            scaleMode ?? cmp.uiScaleMode,
+            screenMatchMode ?? cmp.screenMatchMode,
+            referenceResolution ?? cmp.referenceResolution
+        ));
+
+        public static UIDesign Image(
+            Image.Type? type = UnityEngine.UI.Image.Type.Sliced,
+            Color? color = null,
+            Sprite sprite = null,
+            float? alphaHit = null
+        ) => Component<Image>(cmp => (
+            cmp.type,
+            cmp.color,
+            cmp.sprite,
+            cmp.alphaHitTestMinimumThreshold
+        ) = (
+            type ?? cmp.type,
+            color ?? cmp.color,
+            sprite ?? cmp.sprite,
+            alphaHit ?? cmp.alphaHitTestMinimumThreshold
+        ));
+
+        public static UIDesign Rt(
+            Vector2? anchorMin = null,
+            Vector2? anchorMax = null,
+            Vector2? offsetMin = null,
+            Vector2? offsetMax = null,
+            Vector2? sizeDelta = null,
+            Vector2? anchoredPosition = null,
+            Vector2? pivot = null
+        ) => Component<RectTransform>(cmp => (
+            cmp.pivot,
+            cmp.anchorMin,
+            cmp.anchorMax,
+            cmp.offsetMin,
+            cmp.offsetMax,
+            cmp.sizeDelta,
+            cmp.anchoredPosition
+        ) = (
+            pivot ?? cmp.pivot,
+            anchorMin ?? cmp.anchorMin,
+            anchorMax ?? cmp.anchorMax,
+            offsetMin ?? cmp.offsetMin,
+            offsetMax ?? cmp.offsetMax,
+            sizeDelta ?? cmp.sizeDelta,
+            anchoredPosition ?? cmp.anchoredPosition
+        ));
+
+        public static UIDesign RtZero = Rt(
+            pivot: new(0, 0),
+            sizeDelta: new(0, 0),
+            anchorMin: new(0, 0),
+            anchorMax: new(0, 0),
+            offsetMin: new(0, 0),
+            offsetMax: new(0, 0),
+            anchoredPosition: new(0, 0)
+        );
+
+        public static UIDesign RtFill = Rt(
+            pivot: new(0, 0),
+            sizeDelta: new(0, 0),
+            anchorMin: new(0, 0),
+            anchorMax: new(1, 1),
+            offsetMin: new(0, 0),
+            offsetMax: new(0, 0),
+            anchoredPosition: new(0, 0)
+        );
+
+        public static RectOffset Offset(int left = 0, int right = 0, int top = 0, int bottom = 0) =>
+            new() { left = left, right = right, top = top, bottom = bottom };
+
+        public static RectOffset Offset(int hr = 0, int vt = 0) =>
+            new() { left = hr, right = hr, top = vt, bottom = vt };
+
+        public static UIDesign Layout<T>(
+            bool? childScaleWidth = false,
+            bool? childScaleHeight = false,
+            bool? childControlWidth = true,
+            bool? childControlHeight = true,
+            bool? childForceExpandWidth = false,
+            bool? childForceExpandHeight = false,
+            bool? reverseArrangement = false,
+            float? spacing = 0,
+            RectOffset padding = null,
+            TextAnchor? childAlignment = TextAnchor.UpperLeft
+        ) where T : HorizontalOrVerticalLayoutGroup => Component<T>(cmp => (
+            cmp.childAlignment,
+            cmp.childScaleWidth,
+            cmp.childScaleHeight,
+            cmp.childControlWidth,
+            cmp.childControlHeight,
+            cmp.childForceExpandWidth,
+            cmp.childForceExpandHeight,
+            cmp.reverseArrangement,
+            cmp.spacing,
+            cmp.padding
+        ) = (
+            childAlignment ?? cmp.childAlignment,
+            childScaleWidth ?? cmp.childScaleWidth,
+            childScaleHeight ?? cmp.childScaleHeight,
+            childControlWidth ?? cmp.childControlWidth,
+            childControlHeight ?? cmp.childControlHeight,
+            childForceExpandWidth ?? cmp.childForceExpandWidth,
+            childForceExpandHeight ?? cmp.childForceExpandHeight,
+            reverseArrangement ?? cmp.reverseArrangement,
+            spacing ?? cmp.spacing,
+            padding ?? cmp.padding
+        ));
+
+        public static UIDesign LayoutV(
+            bool? childScaleWidth = false,
+            bool? childScaleHeight = false,
+            bool? childControlWidth = true,
+            bool? childControlHeight = true,
+            bool? childForceExpandWidth = false,
+            bool? childForceExpandHeight = false,
+            bool? reverseArrangement = false,
+            float? spacing = 0,
+            RectOffset padding = null,
+            TextAnchor? childAlignment = TextAnchor.UpperLeft
+        ) => Layout<VerticalLayoutGroup>(
+            childScaleWidth, childScaleHeight,
+            childControlWidth, childControlHeight,
+            childForceExpandWidth, childForceExpandHeight,
+            reverseArrangement, spacing, padding, childAlignment);
+
+        public static UIDesign LayoutH(
+            bool? childScaleWidth = false,
+            bool? childScaleHeight = false,
+            bool? childControlWidth = true,
+            bool? childControlHeight = true,
+            bool? childForceExpandWidth = false,
+            bool? childForceExpandHeight = false,
+            bool? reverseArrangement = false,
+            float? spacing = 0,
+            RectOffset padding = null,
+            TextAnchor? childAlignment = TextAnchor.UpperLeft
+        ) => Layout<HorizontalLayoutGroup>(
+            childScaleWidth, childScaleHeight,
+            childControlWidth, childControlHeight,
+            childForceExpandWidth, childForceExpandHeight,
+            reverseArrangement, spacing, padding, childAlignment);
+
+        public static UIDesign Size(float? width = null, float? height = null) =>
+            Component<LayoutElement>(cmp => (cmp.preferredWidth, cmp.preferredHeight) = (cmp.minWidth = width ?? cmp.preferredWidth, cmp.minHeight = height ?? cmp.preferredHeight));
+
+        public static UIDesign Fitter(
+            ContentSizeFitter.FitMode horizontal = ContentSizeFitter.FitMode.PreferredSize,
+            ContentSizeFitter.FitMode vertical = ContentSizeFitter.FitMode.PreferredSize) =>
+            Component<ContentSizeFitter>(cmp => (cmp.horizontalFit, cmp.verticalFit) = (horizontal, vertical));
+
+        public static UIDesign Font(
+            bool auto = true,
+            float size = 18,
+            float minSize = 12,
+            float maxSize = 24,
+            Color? color = null,
+            Color? outline = null
+        ) => Component<TextMeshProUGUI>(cmp => (
+            cmp.font,
+            cmp.enableAutoSizing,
+            cmp.fontSize,
+            cmp.fontSizeMin,
+            cmp.fontSizeMax,
+            cmp.faceColor,
+            cmp.outlineColor
+        ) = (
+            FontAsset,
+            auto,
+            size,
+            auto ? minSize : size,
+            auto ? maxSize : size,
+            color ?? cmp.color,
+            outline ?? cmp.outlineColor
+        ));
+
+        public static UIDesign Text(
+            HorizontalAlignmentOptions? hrAlign = HorizontalAlignmentOptions.Left,
+            VerticalAlignmentOptions? vtAlign = VerticalAlignmentOptions.Top,
+            TextOverflowModes? overflow = TextOverflowModes.Ellipsis,
+            Vector4? margin = null,
+            string text = null
+        ) => Component<TextMeshProUGUI>(cmp => (
+            cmp.horizontalAlignment,
+            cmp.verticalAlignment,
+            cmp.overflowMode,
+            cmp.margin,
+            cmp.m_text
+        ) = (
+            hrAlign ?? cmp.horizontalAlignment,
+            vtAlign ?? cmp.verticalAlignment,
+            overflow ?? cmp.overflowMode,
+            margin ?? cmp.margin,
+            text ?? cmp.m_text
+        ));
+
+        public static UIDesign Input(
+            bool? restoreOriginalTextOnEscape = true,
+            int? characterLimit = 10,
+            int? lineLimit = 1,
+            TMP_InputField.ContentType? contentType = null,
+            TMP_InputField.LineType? lineType = TMP_InputField.LineType.SingleLine
+        ) => Component<TMP_InputField>(cmp => (
+            cmp.restoreOriginalTextOnEscape,
+            cmp.characterLimit,
+            cmp.lineLimit,
+            cmp.contentType,
+            cmp.lineType
+        ) = (
+            restoreOriginalTextOnEscape ?? cmp.restoreOriginalTextOnEscape,
+            characterLimit ?? cmp.characterLimit,
+            lineLimit ?? cmp.lineLimit,
+            contentType ?? cmp.contentType,
+            lineType ?? cmp.lineType
+        ));
+
+        public static UIDesign Interactable(bool interactable) => Component<Selectable>(cmp => cmp.interactable = interactable);
+
+        public static UIDesign AssignSprites(this SpriteState spriteState) =>
+            Component<Image, Selectable>((image, cmp) =>
+                (cmp.image, cmp.spriteState, cmp.transition) =
+                (image, spriteState, Selectable.Transition.SpriteSwap));
+
+        public static UIDesign ToggleGroup(bool allowSwitchOff = false) =>
+            Component<ToggleGroup>(cmp => cmp.allowSwitchOff = allowSwitchOff);
+
+        public static GameObject SceneRoot =>
+            Manager.Scene.GetRootComponent<Component>(Manager.Scene.NowData.LevelName).gameObject;
+
+        public static GameObject Root =>
+            SceneRoot.transform.Find(Plugin.Name)?.gameObject ??
+                SceneRoot.With(Plugin.Name.AsChild(Canvas() +
+                    CanvasScaler(referenceResolution: new(1920, 1080)) +
+                    Component<GraphicRaycaster>()));
+
+        public static UIDesign ClearPanel =
+            Image(color: new(0.0f, 0.0f, 0.0f, 0.0f));
+
+        public static UIDesign ColorPanel =
+            Image(color: new(0.5f, 0.5f, 0.5f, 0.7f), sprite: BorderSprites.ColorBg.Get());
+
+        public static UIDesign VtScroll(float width, float height, UIDesign design) =>
+            Size(width: width, height: height) +
+            LayoutH(childForceExpandHeight: true) +
+            Component<ScrollRect>(cmp =>
+                (cmp.horizontal, cmp.vertical, cmp.verticalScrollbarVisibility, cmp.scrollSensitivity) =
+                    (false, true, ScrollRect.ScrollbarVisibility.AutoHide, Math.Min(200, height / 2))) +
+            "ViewPort".AsChild(
+                Size(width: width - 5, height: height) +
+                Component<RectMask2D>() +
+                Component<RectTransform, ScrollRect>((rect, scroll) => scroll.viewport = rect) +
+                "Content".AsChild(
+                    Component<RectTransform, ScrollRect>((rect, scroll) => (
+                        rect.anchorMin,
+                        rect.anchorMax,
+                        rect.offsetMin,
+                        rect.offsetMax,
+                        rect.pivot,
+                        scroll.normalizedPosition,
+                        scroll.content
+                    ) = (
+                        new(0, 1),
+                        new(0, 1),
+                        new(0, 0),
+                        new(0, 0),
+                        new(0, 1),
+                        new(0, 1),
+                        rect
+                    )) + design)) +
+            "Scrollbar".AsChild(
+                Size(width: 5, height: height) +
+                Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get()) +
+                Component<Scrollbar, ScrollRect>((scroll, rect) =>
+                    (scroll.direction, rect.verticalScrollbar) = (Scrollbar.Direction.BottomToTop, scroll)) +
+                "Slider".AsChild(
+                    RtFill +
+                    "Handle".AsChild(RtFill +
+                        Image(color: new(1, 1, 1, 1), sprite: BorderSprites.ColorBg.Get()) +
+                        Component<RectTransform, Scrollbar>((rect, scroll) => scroll.handleRect = rect))));
+
+        public static UIDesign VtScrollAsParent(string name, float width, float height, UIDesign design) =>
+            name.AsParent(Image(color: new(0, 0, 0, 0)) + VtScroll(width, height, design));
+
+        public static UIDesign VtScrollAsChild(string name, float width, float height, UIDesign design) =>
+            name.AsChild(Image(color: new(0.5f, 0.5f, 0.5f, 0.7f),sprite: BorderSprites.ColorBg.Get()) + VtScroll(width, height, design));
+
+        static SpriteState InputSprites => new SpriteState()
+        {
+            disabledSprite = BorderSprites.LightBg.Get(),
+            selectedSprite = BorderSprites.DarkBg.Get(),
+            highlightedSprite = BorderSprites.ColorBg.Get()
+        };
+
+        public static UIDesign Label(float width, float height) =>
+            Size(width: width, height: height) + Font(size: height);
+
+        public static UIDesign Section(float width, float height, Color bg, UIDesign design) =>
+            Size(width: width, height: height) + Image(color: bg) + "Label".AsChild(RtFill + Font(size: height) + design);
+
+        public static UIDesign Input(float width, float height, UIDesign design) =>
+            Size(width: width, height: height) +
+            Input() +
+            Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get()) +
+            AssignSprites(InputSprites) +
+            "TextArea".AsChild(
+                RtFill +
+                Component<RectMask2D>() +
+                Component<RectTransform, TMP_InputField>((rect, input) => input.textViewport = rect) +
+                "Charet".AsChild(
+                    RtFill +
+                    Component<TMP_SelectionCaret>() +
+                    Component<RectTransform, TMP_InputField>((rect, input) => input.caretRectTrans = rect) +
+                    Component<TMP_SelectionCaret, RectMask2D>((caret, mask) => caret.m_ParentMask = mask)) +
+                "Content".AsChild(
+                    RtFill +
+                    Font(auto: false, size: 16) +
+                    Text(margin: new(5, 0, 5, 0), hrAlign: HorizontalAlignmentOptions.Right) +
+                    Component<TextMeshProUGUI, TMP_InputField>((label, input) => input.textComponent = label) + design));
+
+        public static UIDesign Check(float width, float height) =>
+            Size(width: width, height: height) +
+            LayoutH(padding: Offset(5, 0), childAlignment: TextAnchor.MiddleCenter) +
+            Component<Toggle>(cmp => (cmp.isOn, cmp.transition) = (false, Selectable.Transition.SpriteSwap)) +
+            "Toggle".AsChild(
+                Size(width: 18, height: 18) +
+                Image(color: new(1, 1, 1, 1), sprite: BorderSprites.LightBg.Get(), alphaHit: 0) +
+                "State".AsChild(
+                    RtFill +
+                    Image(color: new(1, 1, 1, 1), sprite: SimpleSprites.CheckOn.Get(), alphaHit: 0) +
+                    Component<Image, Toggle>((image, cmp) => (cmp.image, cmp.graphic) = (image, image))));
+
+        public static UIDesign Slider(float width, float height) =>
+            Size(width: width, height: height) +
+            Component<Slider>(ui => ui.direction = UnityEngine.UI.Slider.Direction.LeftToRight) +
+            "Guide".AsChild(
+                RtFill +
+                Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get())) +
+            "Gauge".AsChild(
+                RtFill +
+                Image(color: new(1, 1, 1, 1), sprite: BorderSprites.ColorBg.Get()) +
+                Component<RectTransform, Slider>((rect, slider) => slider.fillRect = rect)) +
+            "Handle".AsChild(
+                RtFill +
+                Image(color: new(1, 1, 1, 1), sprite: BorderSprites.LightBg.Get()) +
+                Component<RectTransform, Slider>((rect, slider) => slider.handleRect = rect));
+
+        public static UIDesign Color(float width, float height) =>
+            Size(width: width, height: height) +
+            Component<ThumbnailColor>() +
+            Component<UIText, ThumbnailColor>((text, color) => color._title = text) +
+            "Button".AsChild(
+                RtFill +
+                Image(type: UnityEngine.UI.Image.Type.Tiled, color: new(1, 1, 1, 1), sprite: SimpleSprites.AlphaSample.Get()) +
+                Component<Button>() +
+                Component<Button, ThumbnailColor>((cmp, color) => color._button = cmp) +
+                "Sample".AsChild(
+                    RtFill +
+                    Image(color: new(1, 1, 1, 1)) +
+                    Component<Image, ThumbnailColor>((image, color) => color._graphicColor = image)));
+
+        static SpriteState ToggleSprites => new SpriteState()
+        {
+            disabledSprite = SimpleSprites.ToggleNa.Get(),
+            highlightedSprite = SimpleSprites.ToggleHi.Get()
+        };
+
+        public static UIDesign Toggle(float width, float height, UIDesign design) =>
+            Size(width: width, height: height) +
+            Image(color: new(1, 1, 1, 1), sprite: SimpleSprites.ToggleBg.Get(), alphaHit: 0) +
+            Component<Toggle>() + AssignSprites(ToggleSprites) +
+            "State".AsChild(
+                RtFill +
+                LayoutH(padding: Offset(10, 0)) +
+                Image(color: new(1, 1, 1, 1), sprite: SimpleSprites.ToggleOn.Get(), alphaHit: 0) +
+                Component<Image, Toggle>((image, toggle) => toggle.graphic = image) +
+                "Label".AsChild(RtFill + Font(size: height) + design));
+
+        static SpriteState ButtonSprites => new SpriteState()
+        {
+            pressedSprite = BorderSprites.ButtonOn.Get(),
+            disabledSprite = BorderSprites.ButtonNa.Get(),
+            selectedSprite = BorderSprites.ButtonHi.Get(),
+            highlightedSprite = BorderSprites.ButtonHi.Get()
+        };
+
+        public static UIDesign Button(float width, float height, UIDesign design) =>
+            Size(width: width, height: height) +
+            Image(color: new(1, 1, 1, 1), sprite: BorderSprites.ButtonBg.Get(), alphaHit: 0) +
+            Component<Button>() + AssignSprites(ButtonSprites) +
+            "Label".AsChild(
+                RtFill +
+                Font(size: height) +
+                Text(
+                    hrAlign: HorizontalAlignmentOptions.Center,
+                    vtAlign: VerticalAlignmentOptions.Middle,
+                    margin: new(5, 0, 5, 0)
+                ) + design);
+
+        public static UIDesign Dropdown(float width, float height, UIDesign design) =>
+            Size(width: width, height: height) +
+            Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get(), alphaHit: 0) +
+            Component<TMP_Dropdown>() + AssignSprites(InputSprites) +
+            "Label".AsChild(
+                RtFill +
+                Font(size: height) +
+                Text(
+                    hrAlign: HorizontalAlignmentOptions.Left,
+                    vtAlign: VerticalAlignmentOptions.Middle,
+                    margin: new(5, 0, 5, 0)
+                ) +
+                Component<TextMeshProUGUI, TMP_Dropdown>((text, dropdown) => dropdown.captionText = text) + design) +
+            "Template".AsChild(
+                RtZero +
+                VtScroll(width, height * 10,
+                    Fitter() +
+                    LayoutV() +
+                    Image(color: new(0.5f, 0.5f, 0.5f, 0.7f), sprite: BorderSprites.ColorBg.Get()) +
+                    "Option".AsChild(Toggle(width, height, Component<TextMeshProUGUI, TMP_Dropdown>((label, dropdown) => dropdown.itemText = label)))
+                ) + Component<RectTransform, TMP_Dropdown>((rect, dropdown) => dropdown.template = rect));
+
+        public static UIDesign Window(float width, float height, UIDesign design) =>
+            ClearPanel +
+            LayoutV(spacing: 6, padding: Offset(6, 6)) +
+            Component<UI_DragWindow>() +
+            "Title".AsChild(
+                Size(width: width, height: 30) +
+                LayoutH(padding: Offset(20, 0)) +
+                Image(color: new(1, 1, 1, 1), sprite: BorderSprites.ColorBg.Get()) +
+                "Label".AsChild(Font() + design));
+
+        static TMP_FontAsset FontAsset;
+        static void Initialize(GameObject go) =>
+            FontAsset = go.GetComponentsInChildren<TextMeshProUGUI>(true).First(tmp => tmp.font != null).font;
+        internal static IDisposable Initialize() =>
+            Hooks.OnFontInitialize.Subscribe(Initialize);
     }
     public class WindowConfig
     {
@@ -77,470 +581,56 @@ namespace CoastalSmell
                 plugin.Config.Bind("UI", $"{prefix} window visibility", visible));
         public void Update(Vector2 position) =>
             (AnchorX.Value, AnchorY.Value) = (position.x, position.y);
+
         public IObservable<bool> OnToggle =>
-            UGUI.RootCanvas.OnUpdateAsObservable()
+            UGUI.Root.OnUpdateAsObservable()
                 .Where(_ => Shortcut.Value.IsDown())
                 .Select(_ => State.Value = !State.Value);
+
         public Window Create(float width, float height, string name) =>
-            new Window(this, width, height, name);
+            new Window(this,
+
+
+            width, height, name);
     }
-    public class Window {
+    public class Window : IDisposable {
         public GameObject Background { init; get; }
         public GameObject Content { init; get; }
+        public IObservable<Unit> OnUpdate { init; get; }
+        public CompositeDisposable Subscriptions { init; get; }
         public string Title { get => TitleUI.text; set => TitleUI.SetText(value);  }
-        CompositeDisposable Subscriptions;
-        IObservable<Vector2> OnPositionUpdate;
         TextMeshProUGUI TitleUI;
-        Window(IObservable<Unit> OnUpdate) =>
-            OnPositionUpdate = OnUpdate
-                .Select(_ =>  Background.GetComponent<RectTransform>())
-                .Select(rt => rt.anchoredPosition)
-                .DistinctUntilChanged();
-
-        Window(GameObject go) : this(go.OnUpdateAsObservable())=>
-            (Background = go).OnDestroyAsObservable().Subscribe(_ => Subscriptions.Dispose());
-
-        Window(WindowConfig config, string name) : this(new GameObject($"Window.{name}")) =>
+        public void Dispose() => Subscriptions.Dispose();
+        Window(GameObject go, IObservable<Unit> observable) =>
+            (Background, OnUpdate) = (go, observable);
+        Window(GameObject go) : this(go, go.OnUpdateAsObservable()) =>
+            go.OnDestroyAsObservable().Subscribe(_ => Dispose());
+        Window(WindowConfig config, string name) : this(new GameObject(name)) =>
             Subscriptions = [
-                OnPositionUpdate.Subscribe(config.Update),
-                config.OnToggle.Subscribe(Background.SetActive)
+                config.OnToggle.Subscribe(Background.SetActive),
+                OnUpdate
+                    .Select(_ =>  Background.GetComponent<RectTransform>())
+                    .Select(rt => rt.anchoredPosition)
+                    .DistinctUntilChanged()
+                    .Subscribe(config.Update),
             ];
         internal Window(WindowConfig config, float width, float height, string name) : this(config, name) =>
-            Content = Background
-                .With(UGUI.Go(parent: UGUI.RootCanvas, active: config.State.Value))
-                .With(UGUI.Cmp(UGUI.Rt(
-                    anchoredPosition: new(config.AnchorX.Value, config.AnchorY.Value),
-                    sizeDelta: new(width + 12, height + 48),
-                    anchorMin: new(0, 1),
-                    anchorMax: new(0, 1),
-                    offsetMin: new(0, 0),
-                    offsetMax: new(0, 0),
-                    pivot: new(0, 1))))
-                .With(UGUI.Cmp(UGUI.Image(color: new(0, 0, 0, 0))))
-                .With(UGUI.Cmp(UGUI.LayoutGroup<VerticalLayoutGroup>(
-                    spacing: 6,
-                    padding: new() { left = 6, right = 6, top = 6, bottom = 6 })))
-                .With(UGUI.Cmp<UI_DragWindow>())
-                .With(UGUI.Content("Title")(
-                    UGUI.Cmp(UGUI.Layout(width: width, height: 30)) +
-                    UGUI.Cmp(UGUI.Image(color: new(1, 1, 1, 1), sprite: BorderSprites.ColorBg.Get())) +
-                    UGUI.Cmp(UGUI.LayoutGroup<HorizontalLayoutGroup>(
-                        padding: new() { left = 20, right = 20, top = 0, bottom = 0 })) +
-                    UGUI.Content($"Label")(
-                        UGUI.Cmp(UGUI.Font() + UGUI.Text(text: name)) +
-                        UGUI.Cmp<TextMeshProUGUI>(ui => TitleUI = ui))))
-                .Wrap(new GameObject(name))
-                .With(UGUI.Cmp(UGUI.Layout(width: width, height: height)));
+            Content = new GameObject("Content").With(
+                Background.With(
+                    UGUI.Root.AsParent(active: config.State.Value) +
+                    UGUI.Rt(
+                        anchoredPosition: new(config.AnchorX.Value, config.AnchorY.Value),
+                        sizeDelta: new(width + 12, height + 48),
+                        anchorMin: new(0, 1),
+                        anchorMax: new(0, 1),
+                        offsetMin: new(0, 0),
+                        offsetMax: new(0, 0),
+                        pivot: new(0, 1)) +
+                    UGUI.Window(width, height,
+                        UGUI.Text(text: name) +
+                        UGUI.Component<TextMeshProUGUI>(text => TitleUI = text))
+            ).AsParent() + UGUI.Size(width, height));
     }
 
-    public static partial class UGUI
-    {
-        static Func<string, Texture2D> ToTexture2D =
-            (path) => new Texture2D(64, 64).With(t2d => t2d.LoadImage(File.ReadAllBytes(path)));
-        static Func<Texture2D, Sprite> Texture2DToSimpleSprite =
-            (t2d) => Sprite.Create(t2d, new(0, 0, t2d.width, t2d.height), new(0.5f, 0.5f));
-        public static Func<string, Sprite> ToSimpleSprite =
-            (path) => Texture2DToSimpleSprite(ToTexture2D(path));
-        static Func<Vector4, Texture2D, Sprite> Texture2DToBorderSprite =
-            (border, t2d) => Sprite.Create(t2d, new(0, 0, t2d.width, t2d.height), new(0.5f, 0.5f), 100, 0, SpriteMeshType.FullRect, border);
-        public static Func<Vector4, string, Sprite> ToBorderSprite =
-            (border, path) => Texture2DToBorderSprite(border, ToTexture2D(path));
-        static Func<Transform, Transform> TransformAt(string[] paths) =>
-            paths.Length == 0 ? tf => tf : tf => TransformAt(paths[1..])(tf.Find(paths[0]));
-        static Func<Transform, GameObject> GoAt = tf => tf.gameObject;
-        public static Func<Action<GameObject>, Action<GameObject>> ModifyAt(params string[] paths) =>
-            action => go => action(GoAt(TransformAt(paths)(go.transform)));
-        public static Func<Action<GameObject>, Action<GameObject>> Content(string name) =>
-            action => go => new GameObject(name).With(Go(parent: go.transform)).With(action);
-        public static Action<GameObject> DestroyAt(params string[] paths) =>
-            ModifyAt(paths)(UnityEngine.Object.Destroy);
-        public static Action<GameObject> DestroyChildren =
-            go => Enumerable.Range(0, go.transform.childCount).Select(go.transform.GetChild).Select(GoAt).ForEach(UnityEngine.Object.Destroy);
-        public static Action<Transform> ParentAndScale(Transform parent = null, Vector2? scale = null) =>
-            transform => transform.With(F.Apply(transform.SetParent, parent ?? transform.parent)).localScale = scale ?? new(1, 1);
-        public static Action<GameObject> Go(Transform parent = null, string name = null, bool active = true) =>
-            go => ((go.name, go.active) = (name ?? go.name, active)).With(ParentAndScale(parent).Apply(go.transform));
-        public static Action<GameObject> Cmp<T>() where T : Component =>
-            go => _ = go.GetComponent<T>() ?? go.AddComponent<T>();
-        public static Action<GameObject> Cmp<T>(this Action<T> action) where T : Component =>
-            go => action(go.GetComponent<T>() ?? go.AddComponent<T>());
-        public static Action<GameObject> Cmp<U, T>(Action<U, T> action) where T : Component where U : Component =>
-            go => action(go.GetComponent<U>() ?? go.AddComponent<U>(), go.GetComponentInParent<T>(true));
-        public static Action<Canvas> Canvas(RenderMode? renderMode = RenderMode.ScreenSpaceOverlay) => ui =>
-            (ui.renderMode, ui.sortingOrder) = (renderMode ?? ui.renderMode, 1);
-        public static Action<CanvasScaler> CanvasScaler(
-            Vector2? referenceResolution = null,
-            ScaleMode? scaleMode = ScaleMode.ScaleWithScreenSize,
-            ScreenMatchMode? screenMatchMode = ScreenMatchMode.MatchWidthOrHeight
-        ) => ui => (
-            ui.uiScaleMode,
-            ui.screenMatchMode,
-            ui.referenceResolution
-        ) = (
-            scaleMode ?? ui.uiScaleMode,
-            screenMatchMode ?? ui.screenMatchMode,
-            referenceResolution ?? ui.referenceResolution
-        );
-        public static Action<Image> Image(
-            Image.Type? type = UnityEngine.UI.Image.Type.Sliced,
-            Color? color = null,
-            Sprite sprite = null,
-            float? alphaHit = null
-        ) => ui => (
-            ui.type,
-            ui.color,
-            ui.sprite,
-            ui.alphaHitTestMinimumThreshold
-        ) = (
-            type ?? ui.type,
-            color ?? ui.color,
-            sprite ?? ui.sprite,
-            alphaHit ?? ui.alphaHitTestMinimumThreshold
-        );
-        public static Action<RectTransform> Rt(
-            Vector2? anchorMin = null,
-            Vector2? anchorMax = null,
-            Vector2? offsetMin = null,
-            Vector2? offsetMax = null,
-            Vector2? sizeDelta = null,
-            Vector2? anchoredPosition = null,
-            Vector2? pivot = null
-        ) => ui => (
-            ui.anchorMin,
-            ui.anchorMax,
-            ui.offsetMin,
-            ui.offsetMax,
-            ui.sizeDelta,
-            ui.anchoredPosition,
-            ui.pivot
-        ) = (
-            anchorMin ?? ui.anchorMin,
-            anchorMax ?? ui.anchorMax,
-            offsetMin ?? ui.offsetMin,
-            offsetMax ?? ui.offsetMax,
-            sizeDelta ?? ui.sizeDelta,
-            anchoredPosition ?? ui.anchoredPosition,
-            pivot ?? ui.pivot
-        );
-        public static Action<RectTransform> RtFill => Rt(
-            anchoredPosition: new(0, 0),
-            sizeDelta: new(0, 0),
-            anchorMin: new(0, 0),
-            anchorMax: new(1, 1),
-            offsetMin: new(0, 0),
-            offsetMax: new(0, 0),
-            pivot: new(0, 0)
-        );
-        public static Action<T> LayoutGroup<T>(
-            bool? childScaleWidth = false,
-            bool? childScaleHeight = false,
-            bool? childControlWidth = true,
-            bool? childControlHeight = true,
-            bool? childForceExpandWidth = false,
-            bool? childForceExpandHeight = false,
-            bool? reverseArrangement = false,
-            float? spacing = 0,
-            RectOffset padding = null,
-            TextAnchor? childAlignment = TextAnchor.UpperLeft
-        ) where T : HorizontalOrVerticalLayoutGroup => ui => (
-            ui.childScaleWidth,
-            ui.childScaleHeight,
-            ui.childControlWidth,
-            ui.childControlHeight,
-            ui.childForceExpandWidth,
-            ui.childForceExpandHeight,
-            ui.reverseArrangement,
-            ui.spacing,
-            ui.padding,
-            ui.childAlignment
-        ) = (
-            childScaleWidth ?? ui.childScaleWidth,
-            childScaleHeight ?? ui.childScaleHeight,
-            childControlWidth ?? ui.childControlWidth,
-            childControlHeight ?? ui.childControlHeight,
-            childForceExpandWidth ?? ui.childForceExpandWidth,
-            childForceExpandHeight ?? ui.childForceExpandHeight,
-            reverseArrangement ?? ui.reverseArrangement,
-            spacing ?? ui.spacing,
-            padding ?? ui.padding,
-            childAlignment ?? ui.childAlignment
-        );
-        public static Action<LayoutElement> Layout(float? width = null, float? height = null) =>
-            ui => (ui.preferredWidth, ui.preferredHeight) =
-                (ui.minWidth = width ?? ui.preferredWidth, ui.minHeight = height ?? ui.preferredHeight);
-        public static Action<ContentSizeFitter> Fitter(
-            ContentSizeFitter.FitMode horizontal = ContentSizeFitter.FitMode.PreferredSize,
-            ContentSizeFitter.FitMode vertical = ContentSizeFitter.FitMode.PreferredSize) =>
-            ui => (ui.horizontalFit, ui.verticalFit) = (horizontal, vertical);
-        public static Action<TextMeshProUGUI> Font(
-            bool auto = true,
-            float size = 18,
-            float minSize = 12,
-            float maxSize = 24,
-            Color? color = null,
-            Color? outline = null
-        ) => ui => (
-            ui.font,
-            ui.enableAutoSizing,
-            ui.fontSize,
-            ui.fontSizeMin,
-            ui.fontSizeMax,
-            ui.faceColor,
-            ui.outlineColor
-        ) = (
-            FontAsset,
-            auto,
-            size,
-            auto ? minSize : size,
-            auto ? maxSize : size,
-            color ?? ui.color,
-            outline ?? ui.outlineColor
-        );
-        public static Action<TextMeshProUGUI> Text(
-            HorizontalAlignmentOptions? hrAlign = HorizontalAlignmentOptions.Left,
-            VerticalAlignmentOptions? vtAlign = VerticalAlignmentOptions.Top,
-            TextOverflowModes? overflow = TextOverflowModes.Ellipsis,
-            Vector4? margin = null,
-            string text = null
-        ) => ui => (
-            ui.horizontalAlignment,
-            ui.verticalAlignment,
-            ui.overflowMode,
-            ui.margin,
-            ui.m_text
-        ) = (
-            hrAlign ?? ui.horizontalAlignment,
-            vtAlign ?? ui.verticalAlignment,
-            overflow ?? ui.overflowMode,
-            margin ?? ui.margin,
-            text ?? ui.m_text
-        );
-        public static Action<TMP_InputField> InputField(
-            bool? restoreOriginalTextOnEscape = true,
-            int? characterLimit = 10,
-            int? lineLimit = 1,
-            TMP_InputField.ContentType? contentType = null,
-            TMP_InputField.LineType? lineType = TMP_InputField.LineType.SingleLine
-        ) => ui => (
-            ui.restoreOriginalTextOnEscape,
-            ui.characterLimit,
-            ui.lineLimit,
-            ui.contentType,
-            ui.lineType
-        ) = (
-            restoreOriginalTextOnEscape ?? ui.restoreOriginalTextOnEscape,
-            characterLimit ?? ui.characterLimit,
-            lineLimit ?? ui.lineLimit,
-            contentType ?? ui.contentType,
-            lineType ?? ui.lineType
-        );
-        public static Action<T> Interactable<T>(bool interactable) where T : Selectable =>
-            ui => ui.interactable = interactable;
-        public static Action<ToggleGroup> ToggleGroup(bool allowSwitchOff = false) =>
-            ui => ui.allowSwitchOff = allowSwitchOff;
-        public static Transform RootTransform =>
-            Manager.Scene.GetRootComponent<Component>(Manager.Scene.NowData.LevelName).gameObject.transform;
-        public static Transform RootCanvas =>
-            RootTransform.Find(Plugin.Name) ??
-                 new GameObject(Plugin.Name)
-                    .With(Go(parent: RootTransform)).With(Cmp(Canvas()))
-                    .With(Cmp(CanvasScaler(referenceResolution: new(1920, 1080))))
-                    .With(Cmp<GraphicRaycaster>()).transform;
 
-        public static Func<string, GameObject, GameObject> Panel =>
-            (name, parent) => new GameObject(name)
-                .With(Go(parent: parent.transform, active: false))
-                .With(Cmp(Image(color: new(0.5f, 0.5f, 0.5f, 0.7f), sprite: BorderSprites.ColorBg.Get())));
-
-        public static GameObject Wrap(this GameObject parent, GameObject child) => child.With(Go(parent: parent.transform));
-        public static Func<float, float, string, GameObject, GameObject> ScrollWrap =>
-            (width, height, name, go) =>
-                new GameObject($"ScrollView.{name}")
-                    .With(Go(parent: go.transform.parent.transform))
-                    .With(Cmp(Image(color: new(0, 0, 0, 0))))
-                    .With(Cmp(Layout(width: width, height: height)))
-                    .With(Cmp(LayoutGroup<HorizontalLayoutGroup>(
-                        reverseArrangement: true,
-                        childForceExpandHeight: true)))
-                    .With(Cmp<ScrollRect>(ui =>
-                       (ui.horizontal, ui.vertical, ui.verticalScrollbarVisibility, ui.scrollSensitivity)
-                        = (false, true, ScrollRect.ScrollbarVisibility.AutoHide, Math.Min(200, height / 2))))
-                    .With(Content($"Scrollbar.{name}")(
-                        Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get())) +
-                        Cmp(Layout(width: 5, height: height)) +
-                        Cmp<Scrollbar>(ui => ui.direction = Scrollbar.Direction.BottomToTop) +
-                        Cmp<Scrollbar, ScrollRect>((scroll, ui) => ui.verticalScrollbar = scroll) +
-                        Content($"Slider.{name}")(
-                            Cmp(RtFill) +
-                            Content($"Handle.{name}")(
-                                Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.ColorBg.Get())) + Cmp(RtFill) +
-                                Cmp<RectTransform, Scrollbar>((rt, ui) => ui.handleRect = rt)))))
-                    .Wrap(new GameObject(name))
-                        .With(Cmp(Layout(width: width - 5, height: height)))
-                        .With(Cmp<RectMask2D>())
-                        .With(Cmp<RectTransform, ScrollRect>((rt, ui) => ui.viewport = rt))
-                    .Wrap(go)
-                        .With(Cmp(Rt(
-                            anchorMin: new(0, 1),
-                            anchorMax: new(0, 1),
-                            offsetMin: new(0, 0),
-                            offsetMax: new(0, 0),
-                            pivot: new(0, 1))))
-                        .With(Cmp<RectTransform, ScrollRect>((rt, ui) => (ui.content, ui.normalizedPosition) = (rt, new(0, 1))));
-
-        public static Func<float, float, string, GameObject, GameObject> ScrollPanel =>
-            (width, height, name, parent) =>
-                ScrollWrap(width, height, $"{name}.Panel", new GameObject(name).With(Go(parent: parent.transform)))
-                    .With(go => go.transform.parent.gameObject
-                        .With(Cmp(Image(color: new(0.5f, 0.5f, 0.5f, 0.7f), sprite: BorderSprites.ColorBg.Get()))));
-
-        static SpriteState InputSprites => new SpriteState()
-        {
-            disabledSprite = BorderSprites.LightBg.Get(),
-            selectedSprite = BorderSprites.DarkBg.Get(),
-            highlightedSprite = BorderSprites.ColorBg.Get()
-        };
-
-        public static Func<float, float, string, GameObject, GameObject> Label =
-            (width, height, name, parent) => new GameObject(name)
-                .With(Go(parent: parent.transform))
-                .With(Cmp(Layout(width: width, height: height)))
-                .With(Cmp(Font(size: height) + Text(text: name)));
-
-        public static Func<float, float, string, GameObject, GameObject> Input =
-            (width, height, name, parent) => new GameObject(name)
-                .With(Go(parent: parent.transform))
-                .With(Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get())))
-                .With(Cmp<TMP_InputField>(ui => (ui.transition, ui.image, ui.spriteState) =
-                    (Selectable.Transition.SpriteSwap, ui.gameObject.GetComponent<Image>(), InputSprites)))
-                .With(Cmp(Layout(width: width, height: height)))
-                .With(Content($"{name}.Area")(
-                    Cmp<RectMask2D>() + Cmp(RtFill) +
-                    Cmp<RectTransform, TMP_InputField>((rt, ui) => ui.textViewport = rt) +
-                    Content($"{name}.Charet")(
-                        Cmp<TMP_SelectionCaret>() + Cmp(RtFill) +
-                        Cmp<RectTransform, TMP_InputField>((rt, ui) => ui.caretRectTrans = rt) +
-                        Cmp<TMP_SelectionCaret, RectMask2D>((caret, ui) => caret.m_ParentMask = ui)) +
-                    Content($"{name}.Content")(
-                        Cmp(Font(auto: false, size: 16) + Text(margin: new(5, 0, 5, 0), hrAlign: HorizontalAlignmentOptions.Right)) +
-                        Cmp(RtFill) + Cmp<TextMeshProUGUI, TMP_InputField>((text, ui) => ui.textComponent = text))));
-
-        public static Func<float, float, string, GameObject, GameObject> Check =
-            (width, height, name, parent) => new GameObject($"Background.{name}")
-                .With(Go(parent: parent.transform))
-                .With(Cmp(LayoutGroup<HorizontalLayoutGroup>(padding: new() { left = 5, right = 5, top = 0, bottom = 0 }, childAlignment: TextAnchor.MiddleCenter)))
-                .With(Cmp(Layout(width: width + 10, height: height)))
-                .With(Content(name)(
-                    Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.LightBg.Get(), alphaHit: 0)) +
-                    Cmp(Layout(width: 18, height: 18)) +
-                    Cmp<Toggle>(ui => (ui.isOn, ui.transition, ui.image) =
-                        (false, Selectable.Transition.SpriteSwap, ui.gameObject.GetComponent<Image>())) +
-                    Content($"{name}.State")(
-                        Cmp(Image(color: new(1, 1, 1, 1), sprite: SimpleSprites.CheckOn.Get(), alphaHit: 0)) +
-                        Cmp(RtFill) + Cmp<Image, Toggle>((image, ui) => ui.graphic = image))));
-
-        public static Func<float, float, string, GameObject, GameObject> Slider =
-            (width, height, name, parent) => new GameObject(name)
-                .With(Go(parent: parent.transform, active: true))
-                .With(Cmp(Layout(width: width, height: height)))
-                .With(Cmp<Slider>(ui => ui.direction = UnityEngine.UI.Slider.Direction.LeftToRight))
-                .With(Content($"{name}.Background")(Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get())) + Cmp(RtFill)))
-                .With(Content($"{name}.Gauge")(
-                    Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.ColorBg.Get())) + Cmp(RtFill) +
-                    Cmp<RectTransform, Slider>((rt, ui) => ui.fillRect = rt)))
-                .With(Content($"{name}.Handle")(
-                    Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.LightBg.Get())) + Cmp(RtFill) +
-                    Cmp<RectTransform, Slider>((rt, ui) => ui.handleRect = rt)));
-
-        public static Func<float, float, string, GameObject, GameObject> Color =
-           (width, height, name, parent) => new GameObject(name)
-               .With(Go(parent: parent.transform))
-               .With(Cmp(Layout(width: width, height: height)))
-               .With(Cmp<ThumbnailColor>())
-               .With(Cmp<UIText>(ui => ui.gameObject.GetComponent<ThumbnailColor>()._title = ui))
-               .With(Content($"{name}.Button")(
-                   Cmp(Image(type: UnityEngine.UI.Image.Type.Tiled, color: new(1, 1, 1, 1), sprite: SimpleSprites.AlphaSample.Get())) +
-                   Cmp<Button>() + Cmp(RtFill) + Cmp<Button, ThumbnailColor>((ui, cp) => cp._button = ui) +
-                   Content($"{name}.Sample")(
-                       Cmp(Image(color: new(1, 1, 1, 1))) + Cmp(RtFill) +
-                       Cmp<Image, ThumbnailColor>((ui, cp) => cp._graphicColor = ui))));
-
-        public static Func<float, float, string, Color, GameObject, GameObject> Section =
-            (width, height, name, color, parent) => new GameObject($"Bagckground.{name}")
-                .With(Go(parent: parent.transform))
-                .With(Cmp(Image(color: color)))
-                .With(Cmp(Layout(width: width, height: height)))
-                .With(Content(name)(Cmp(Font(size: height) + Text(text: name)) + Cmp(RtFill)));
-
-        static SpriteState ToggleSprites => new SpriteState()
-        {
-            disabledSprite = SimpleSprites.ToggleNa.Get(),
-            highlightedSprite = SimpleSprites.ToggleHi.Get()
-        };
-
-        public static Func<float, float, string, GameObject, GameObject> Toggle =
-            (width, height, name, parent) => new GameObject(name)
-                .With(Go(parent: parent.transform))
-                .With(Cmp(Image(color: new(1, 1, 1, 1), sprite: SimpleSprites.ToggleBg.Get(), alphaHit: 0)))
-                .With(Cmp(Layout(width: width, height: height)))
-                .With(Cmp<Toggle>(ui => (ui.isOn, ui.transition, ui.spriteState, ui.image) =
-                    (false, Selectable.Transition.SpriteSwap, ToggleSprites, ui.gameObject.GetComponent<Image>())))
-                .With(Content($"{name}.State")(
-                    Cmp(Image(color: new(1, 1, 1, 1), sprite: SimpleSprites.ToggleOn.Get(), alphaHit: 0)) +
-                    Cmp(LayoutGroup<HorizontalLayoutGroup>(padding: new RectOffset() { left = 10, right = 10, top = 0, bottom = 0 })) +
-                    Cmp(RtFill) + Cmp<Image, Toggle>((image, ui) => ui.graphic = image) +
-                    Content($"{name}.Label")(Cmp(Font(size: height) + Text(text: name)) + Cmp(RtFill))));
-
-        static SpriteState ButtonSprites => new SpriteState()
-        {
-            pressedSprite = BorderSprites.ButtonOn.Get(),
-            disabledSprite = BorderSprites.ButtonNa.Get(),
-            selectedSprite = BorderSprites.ButtonHi.Get(),
-            highlightedSprite = BorderSprites.ButtonHi.Get()
-        };
-
-        public static Func<float, float, string, GameObject, GameObject> Button =
-            (width, height, name, parent) => new GameObject(name)
-                .With(Go(parent: parent.transform))
-                .With(Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.ButtonBg.Get(), alphaHit: 0)))
-                .With(Cmp(Layout(width: width, height: height)))
-                .With(Cmp<Button>(ui => (ui.transition, ui.image, ui.spriteState) =
-                    (Selectable.Transition.SpriteSwap, ui.gameObject.GetComponent<Image>(), ButtonSprites)))
-                .With(Content($"{name}.Label")(Cmp(Font(size: height) + Text(
-                    hrAlign: HorizontalAlignmentOptions.Center,
-                    vtAlign: VerticalAlignmentOptions.Middle,
-                    margin: new(5, 0, 5, 0), text: name)) + Cmp(RtFill)));
-
-        public static Func<float, float, string, GameObject, GameObject> Dropdown =
-            (width, height, name, parent) => new GameObject(name)
-                .With(Go(parent: parent.transform))
-                .With(Cmp(Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get(), alphaHit: 0)))
-                .With(Cmp(Layout(width: width, height: height)))
-                .With(Cmp<TMP_Dropdown>(ui =>
-                    (ui.transition, ui.spriteState, ui.image) =
-                    (Selectable.Transition.SpriteSwap, InputSprites, ui.gameObject.GetComponent<Image>())))
-                .With(Content($"{name}.Label")(Cmp(
-                    Font(size: height) +
-                    Text(hrAlign: HorizontalAlignmentOptions.Left, vtAlign: VerticalAlignmentOptions.Middle, margin: new(5, 0, 5, 0), text: name)
-                ) + Cmp<TextMeshProUGUI, TMP_Dropdown>((text, ui) => ui.captionText = text) + Cmp(RtFill)))
-                .With(DropdownTemplate.Apply(width).Apply(height).Apply(name))
-                .With(ModifyAt($"ScrollView.{name}.Template")(Cmp<RectTransform, TMP_Dropdown>((temp, ui) => ui.template = temp) +
-                    Cmp(Rt(anchorMin: new(0, 0), anchorMax: new(0, 0), offsetMin: new(0, 0), offsetMax: new(0, 0), sizeDelta: new (0,0)))));
-
-        static Action<float, float, string, GameObject> DropdownTemplate =
-            (width, height, name, dropdown) =>
-                Toggle(width, height, $"{name}.Item",
-                    Panel($"{name}.Panel", dropdown)
-                        .With(Cmp(LayoutGroup<VerticalLayoutGroup>()))
-                        .With(Cmp(Fitter()))
-                    .With(ScrollWrap.Apply(width).Apply(height * 10).Apply($"{name}.Template")))
-                    .With(ModifyAt($"{name}.Item.State", $"{name}.Item.Label")
-                        (Cmp<TextMeshProUGUI, TMP_Dropdown>((text, ui) => ui.itemText = text)));
-
-        static TMP_FontAsset FontAsset;
-        static void Initialize(GameObject go) =>
-            FontAsset = go.GetComponentsInChildren<TextMeshProUGUI>(true).First(tmp => tmp.font != null).font;
-        internal static IDisposable Initialize() =>
-            Hooks.OnFontInitialize.Subscribe(Initialize);
-    }
 }

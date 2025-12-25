@@ -11,17 +11,8 @@
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.752"/>
-        <PackageReference Include="IllusionLibs.HoneyCome.UnityEngine" Version="2021.3.14.3"/>
-        <PackageReference Include="IllusionLibs.HoneyCome.Il2Cppmscorlib" Version="2023.99.12.15"/>
-        <Reference Include="Assembly-CSharp">
-            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\Assembly-CSharp.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <Reference Include="IL">
-            <HintPath>$(GamePath)\BepInEx\$(GameName)\interop\IL.dll</HintPath>
-            <Private>False</Private>
-        </Reference>
-        <ProjectReference Include="..\..\CoastalSmell\DC\DC_CoastalSmell.csproj">
+        <PackageReference Include="IllusionLibs.DigitalCraft.AllPackages" Version="2025.11.21"/>
+        <ProjectReference Include="../../CoastalSmell/DC/DC_CoastalSmell.csproj">
             <Private>False</Private>
             <ExcludeAssets>all</ExcludeAssets>
         </ProjectReference>

@@ -12,18 +12,34 @@ namespace CoastalSmell
     public static class HumanCustomExtension
     {
         public static IObservable<GameObject> OnUIPrefab(string bundle, string asset) =>
-            Hooks.UIPrefab.AsObservable().Where(tuple => (tuple.Item1, tuple.Item2) == (bundle, asset)).Select(tuple => tuple.Item3);
+            Hooks.UIPrefab.AsObservable().Where(tuple => (tuple.Bundle, tuple.Asset) == (bundle, asset)).Select(tuple => tuple.Prefab);
+        public static IObservable<(HumanCustom Scene, Human Human)> OnHumanInitialize =>
+            SingletonInitializerExtension<HumanCustom>.OnStartup.SelectMany(scene =>
+#if Aicomi
+                OnBodyChange.Select(part => (scene, part._human))
+                    .Merge(OnFaceChange.Select(part => (scene, part._human))).FirstAsync());
+#else
+                OnBodyChange.Select(part => (scene, part.human))
+                    .Merge(OnFaceChange.Select(part => (scene, part.human))).FirstAsync());
+#endif
         public static IObservable<HumanBody> OnBodyChange => Hooks.BodyChange.AsObservable();
         public static IObservable<HumanFace> OnFaceChange => Hooks.FaceChange.AsObservable();
-        public static IObservable<(HumanHair, int)> OnHairChange => Hooks.HairChange.AsObservable();
-        public static IObservable<(HumanCloth, int)> OnClothesChange => Hooks.ClothesChange.AsObservable();
-        public static IObservable<(HumanAccessory, int)> OnAccessoryChange => Hooks.AccessoryChange.AsObservable();
+        public static IObservable<(HumanHair Hair, int Index)> OnHairChange => Hooks.HairChange.AsObservable();
+        public static IObservable<(HumanCloth Clothes, int Index)> OnClothesChange => Hooks.ClothesChange.AsObservable();
+        public static IObservable<(HumanAccessory Accessory, int Index)> OnAccessoryChange => Hooks.AccessoryChange.AsObservable();
+        public static void NotifyBodyChange(HumanBody body) => Hooks.BodyChange.OnNext(body);
+        public static void NotifyFaceChange(HumanFace face) => Hooks.FaceChange.OnNext(face);
+        public static void NotifyHairChange(HumanHair hair, int index) => Hooks.HairChange.OnNext((hair, index));
+        public static void NotifyClothesChange(HumanCloth clothes, int index) => Hooks.ClothesChange.OnNext((clothes, index));
+        public static void NotifyAccessoryChange(HumanAccessory accessory, int index) => Hooks.AccessoryChange.OnNext((accessory, index));
     }
 
     public static partial class Hooks {
-        internal static Subject<(string, string, GameObject)> UIPrefab = new ();
+        internal static Subject<(string Bundle, string Asset, GameObject Prefab)> UIPrefab = new ();
 
-        static Hooks() => UIPrefab.Subscribe(tuple => Plugin.Instance.Log.LogInfo($"{tuple.Item1},{tuple.Item2}"));
+#if DEBUG
+        static Hooks() => UIPrefab.Subscribe(tuple => Plugin.Instance.Log.LogInfo($"{tuple.Asset},{tuple.Bundle}"));
+#endif
 
         [HarmonyPostfix]
         [HarmonyWrapSafe]
@@ -39,9 +55,9 @@ namespace CoastalSmell
 
         internal static Subject<HumanBody> BodyChange = new ();
         internal static Subject<HumanFace> FaceChange = new ();
-        internal static Subject<(HumanHair, int)> HairChange = new ();
-        internal static Subject<(HumanCloth, int)> ClothesChange = new ();
-        internal static Subject<(HumanAccessory, int)> AccessoryChange = new ();
+        internal static Subject<(HumanHair Hair, int Index)> HairChange = new ();
+        internal static Subject<(HumanCloth Clothes, int Index)> ClothesChange = new ();
+        internal static Subject<(HumanAccessory Accessory, int Indexj)> AccessoryChange = new ();
 
         [HarmonyPostfix]
         [HarmonyWrapSafe]

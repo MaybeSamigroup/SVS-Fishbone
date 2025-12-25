@@ -53,10 +53,10 @@ namespace Fishbone
         static void Translate<V>(Func<V, U> map, ZipArchive archive, ZipArchiveEntry entry) where V : new() =>
             SaveCoord(archive, map(Json<V>.Load(Plugin.Instance.Log.LogError, entry.Open())));
 
-        internal static void SaveChara(ZipArchive archive, T value) =>
+        static void SaveChara(ZipArchive archive, T value) =>
             SerializeChara(archive.CreateEntry(Path).Open(), value);
 
-        internal static void SaveCoord(ZipArchive archive, U value) =>
+        static void SaveCoord(ZipArchive archive, U value) =>
             SerializeCoord(archive.CreateEntry(Path).Open(), value);
 
         internal static T LoadChara(ZipArchive archive) =>
@@ -108,7 +108,7 @@ namespace Fishbone
         protected static readonly CharaLoadTrack GetPngSizeAware = new CharaLoadGetPngSizeAware() { Track = FlagAware };
         protected static readonly CharaLoadTrack GetPngSizeIgnore = new CharaLoadGetPngSizeIgnore() { Track = FlagIgnore };
         protected static readonly CharaLoadTrack WithPng = new CharaLoadWithPng() { Track = FlagIgnore };
-        internal static IObservable<(HumanData, ZipArchive)> OnLoadComplete => LoadComplete.AsObservable();
+        internal static IObservable<(HumanData Data, ZipArchive Value)> OnLoadComplete => LoadComplete.AsObservable();
         internal static void OnDefault(HumanData data) => Current.Complete(data, new MemoryStream());
     }
     class CharaLoadFlagAware : CharaLoadTrack
@@ -207,8 +207,8 @@ namespace Fishbone
         static Subject<(HumanData, HumanData)> HumanDataCopy = new();
         static Subject<(HumanData, CharaLimit)> HumanDataLimit = new();
         static Subject<Human> HumanResolve = new();
-        internal static IObservable<(HumanData, HumanData)> OnHumanDataCopy => HumanDataCopy.AsObservable();
-        internal static IObservable<(HumanData, CharaLimit)> OnHumanDataLimit => HumanDataLimit.AsObservable();
+        internal static IObservable<(HumanData Src, HumanData Dst)> OnHumanDataCopy => HumanDataCopy.AsObservable();
+        internal static IObservable<(HumanData Data, CharaLimit Value)> OnHumanDataLimit => HumanDataLimit.AsObservable();
         internal static IObservable<Human> OnHumanResolve => HumanResolve.AsObservable();
 
         [HarmonyPrefix, HarmonyWrapSafe]
@@ -248,8 +248,8 @@ namespace Fishbone
     #region Coordinate Definitions
     partial class CoordLoadTrack
     {
-        static Subject<(HumanDataCoordinate, ZipArchive)> LoadComplete = new();
-        internal static IObservable<(HumanDataCoordinate, ZipArchive)> OnLoadComplete => LoadComplete.AsObservable();
+        static Subject<(HumanDataCoordinate Data, ZipArchive Value)> LoadComplete = new();
+        internal static IObservable<(HumanDataCoordinate Data, ZipArchive Value)> OnLoadComplete => LoadComplete.AsObservable();
         CoordLoadTrack Track;
         protected CoordLoadTrack() => Track = this;
         protected CoordLoadTrack(CoordLoadTrack track) => Track = track;
@@ -305,7 +305,7 @@ namespace Fishbone
     }
     class CoordLimitTrack : IDisposable
     {
-        internal IObservable<(Human, CoordLimit)> OnResolve;
+        internal IObservable<(Human Human, CoordLimit Limit)> OnResolve;
         CoordLimit Limit = CoordLimit.None;
         Il2CppBytes Bytes = new Il2CppBytes([]);
         HumanDataBodyMakeup Body; 
@@ -320,28 +320,28 @@ namespace Fishbone
             (Body, Face, Hair, Clothes, Acs, Subscription) =
                 (data.BodyMakeup, data.FaceMakeup, data.Hair, data.Clothes, data.Accessory, [
                     Hooks.OnHumanDataBodyMakeupCopy
-                        .Where(Match).Select(tuple => tuple.Item2).Subscribe(Resolve),
+                        .Where(Match).Select(tuple => tuple.Dst).Subscribe(Resolve),
                     Hooks.OnHumanDataFaceMakeupCopy
-                        .Where(Match).Select(tuple => tuple.Item2).Subscribe(Resolve),
+                        .Where(Match).Select(tuple => tuple.Dst).Subscribe(Resolve),
                     Hooks.OnHumanDataHairCopy
-                        .Where(Match).Select(tuple => tuple.Item2).Subscribe(Resolve),
+                        .Where(Match).Select(tuple => tuple.Dst).Subscribe(Resolve),
                     Hooks.OnHumanDataClothesCopy
-                        .Where(Match).Select(tuple => tuple.Item2).Subscribe(Resolve),
+                        .Where(Match).Select(tuple => tuple.Dst).Subscribe(Resolve),
                     Hooks.OnHumanDataAccessoryCopy
-                        .Where(Match).Select(tuple => tuple.Item2).Subscribe(Resolve),
+                        .Where(Match).Select(tuple => tuple.Dst).Subscribe(Resolve),
                     Hooks.OnHumanDataCoordinateSaveBytes
-                        .Where(Match).Select(tuple => tuple.Item2).Subscribe(Resolve),
+                        .Where(Match).Select(tuple => tuple.Dst).Subscribe(Resolve),
                     Hooks.OnHumanDataCoordinateLoadBytes
-                        .Where(Match).Select(tuple => tuple.Item2).Subscribe(Resolve),
+                        .Where(Match).Select(tuple => tuple.Dst).Subscribe(Resolve),
                     OnResolve.Subscribe(F.Ignoring<(Human,CoordLimit)>(F.DoNothing), Dispose)
                 ]);
-        bool Match((HumanDataBodyMakeup, HumanDataBodyMakeup) tuple) => Body == tuple.Item1;
-        bool Match((HumanDataFaceMakeup, HumanDataFaceMakeup) tuple) => Face == tuple.Item1;
-        bool Match((HumanDataHair, HumanDataHair) tuple) => Hair == tuple.Item1;
-        bool Match((HumanDataClothes, HumanDataClothes) tuple) => Clothes == tuple.Item1;
-        bool Match((HumanDataAccessory, HumanDataAccessory) tuple) => Acs == tuple.Item1;
-        bool Match((HumanDataCoordinate, Il2CppBytes) tuple) => Match(tuple.Item1);
-        bool Match((Il2CppBytes, HumanDataCoordinate) tuple) => Bytes == tuple.Item1;
+        bool Match((HumanDataBodyMakeup Src, HumanDataBodyMakeup Dst) tuple) => Body == tuple.Src;
+        bool Match((HumanDataFaceMakeup Src, HumanDataFaceMakeup Dst) tuple) => Face == tuple.Src;
+        bool Match((HumanDataHair Src, HumanDataHair Dst) tuple) => Hair == tuple.Src;
+        bool Match((HumanDataClothes Src, HumanDataClothes Dst) tuple) => Clothes == tuple.Src;
+        bool Match((HumanDataAccessory Src, HumanDataAccessory Dst) tuple) => Acs == tuple.Src;
+        bool Match((HumanDataCoordinate Src, Il2CppBytes Dst) tuple) => Match(tuple.Src);
+        bool Match((Il2CppBytes Src, HumanDataCoordinate Dst) tuple) => Bytes == tuple.Src;
         bool Match(Human human) => Match(human.coorde.Now);
         bool Match(HumanDataCoordinate data) =>
             (Body == data.BodyMakeup) || (Face == data.FaceMakeup) || (Hair == data.Hair) || (Clothes == data.Clothes) || (Acs == data.Accessory);
@@ -357,15 +357,15 @@ namespace Fishbone
     }
     public static partial class Extension
     {
-        internal static IObservable<(CoordLimitTrack, HumanDataCoordinate, ZipArchive)> OnTrackCoord =>
-            CoordLoadTrack.OnLoadComplete.Select(tuple => (new CoordLimitTrack(tuple.Item1), tuple.Item1, tuple.Item2));
+        internal static IObservable<(CoordLimitTrack Track, HumanDataCoordinate Data, ZipArchive Value)> OnTrackCoord =>
+            CoordLoadTrack.OnLoadComplete.Select(tuple => (new CoordLimitTrack(tuple.Data), tuple.Data, tuple.Value));
     }
     public static partial class Extension<T,U>
     {
-        internal static IObservable<(CoordLimitTrack, HumanDataCoordinate, U)> OnCoordLimitTrack =>
-            Extension.OnTrackCoord.Select(tuple => (tuple.Item1, tuple.Item2, LoadCoord(tuple.Item3)));
-        internal static IObservable<(Human, CoordLimit, U)> OnLoadCoordInternal =>
-            OnCoordLimitTrack.SelectMany(tuple => tuple.Item1.OnResolve.Select(pair => (pair.Item1, pair.Item2, tuple.Item3)));
+        internal static IObservable<(CoordLimitTrack Track, HumanDataCoordinate Data, U Value)> OnCoordLimitTrack =>
+            Extension.OnTrackCoord.Select(tuple => (tuple.Track, tuple.Data, LoadCoord(tuple.Value)));
+        internal static IObservable<(Human Human, CoordLimit Limit, U Value)> OnLoadCoordInternal =>
+            OnCoordLimitTrack.SelectMany(tuple => tuple.Track.OnResolve.Select(pair => (pair.Human, pair.Limit, tuple.Value)));
     }
     static partial class Hooks
     {
@@ -377,13 +377,13 @@ namespace Fishbone
         static Subject<(HumanDataCoordinate, Il2CppBytes)> HumanDataCoordinateSaveBytes = new();
         static Subject<(Il2CppBytes, HumanDataCoordinate)> HumanDataCoordinateLoadBytes = new();
         static Subject<Human> HumanCoordinateResolve = new();
-        internal static IObservable<(HumanDataBodyMakeup, HumanDataBodyMakeup)> OnHumanDataBodyMakeupCopy => HumanDataBodyMakeupCopy.AsObservable();
-        internal static IObservable<(HumanDataFaceMakeup, HumanDataFaceMakeup)> OnHumanDataFaceMakeupCopy => HumanDataFaceMakeupCopy.AsObservable();
-        internal static IObservable<(HumanDataHair, HumanDataHair)> OnHumanDataHairCopy => HumanDataHairCopy.AsObservable();
-        internal static IObservable<(HumanDataClothes, HumanDataClothes)> OnHumanDataClothesCopy => HumanDataClothesCopy.AsObservable();
-        internal static IObservable<(HumanDataAccessory, HumanDataAccessory)> OnHumanDataAccessoryCopy => HumanDataAccessoryCopy.AsObservable();
-        internal static IObservable<(HumanDataCoordinate, Il2CppBytes)> OnHumanDataCoordinateSaveBytes => HumanDataCoordinateSaveBytes.AsObservable();
-        internal static IObservable<(Il2CppBytes, HumanDataCoordinate)> OnHumanDataCoordinateLoadBytes => HumanDataCoordinateLoadBytes.AsObservable();
+        internal static IObservable<(HumanDataBodyMakeup Src, HumanDataBodyMakeup Dst)> OnHumanDataBodyMakeupCopy => HumanDataBodyMakeupCopy.AsObservable();
+        internal static IObservable<(HumanDataFaceMakeup Src, HumanDataFaceMakeup Dst)> OnHumanDataFaceMakeupCopy => HumanDataFaceMakeupCopy.AsObservable();
+        internal static IObservable<(HumanDataHair Src, HumanDataHair Dst)> OnHumanDataHairCopy => HumanDataHairCopy.AsObservable();
+        internal static IObservable<(HumanDataClothes Src, HumanDataClothes Dst)> OnHumanDataClothesCopy => HumanDataClothesCopy.AsObservable();
+        internal static IObservable<(HumanDataAccessory Src, HumanDataAccessory Dst)> OnHumanDataAccessoryCopy => HumanDataAccessoryCopy.AsObservable();
+        internal static IObservable<(HumanDataCoordinate Src, Il2CppBytes Dst)> OnHumanDataCoordinateSaveBytes => HumanDataCoordinateSaveBytes.AsObservable();
+        internal static IObservable<(Il2CppBytes Src, HumanDataCoordinate Dst)> OnHumanDataCoordinateLoadBytes => HumanDataCoordinateLoadBytes.AsObservable();
         internal static IObservable<Human> OnHumanCoordinateResolve => HumanCoordinateResolve.AsObservable();
 
         [HarmonyPostfix, HarmonyWrapSafe]

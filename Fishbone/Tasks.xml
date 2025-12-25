@@ -2,22 +2,22 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <ItemGroup>
         <PackageReference Include="System.Reactive" Version="6.1.0"/>
-        <Compile Include="..\..\Png.cs"/>
-        <Compile Include="..\Fishbone.cs"/>
-        <Compile Include="..\Internal.cs"/>
-        <NetDll Include="..\..\Resource\*.*"/>
+        <Compile Include="../../Png.cs"/>
+        <Compile Include="../Fishbone.cs"/>
+        <Compile Include="../Internal.cs"/>
+        <NetDll Include="../../Resource/*.*"/>
     </ItemGroup>
     <Target Name="Deploy" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">
-        <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="$(GamePath)\BepInEx\plugins\" />
-        <Copy SourceFiles="@(NetDll)" DestinationFolder="$(GamePath)\dotnet\"/>
+        <Copy SourceFiles="$(OutputPath)/$(AssemblyName).dll" DestinationFolder="$(GamePath)/BepInEx/plugins/" />
+        <Copy SourceFiles="@(NetDll)" DestinationFolder="$(GamePath)/dotnet/"/>
     </Target>
     <Target Name="Release" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
-        <Copy SourceFiles="@(NetDll)" DestinationFolder="..\..\Release\$(GameName)\dotnet"/>
-        <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="..\..\Release\$(GameName)\BepinEx\plugins"/>
-        <ZipDirectory SourceDirectory="..\..\Release\$(GameName)" Overwrite="true" DestinationFile="..\..\$(AssemblyName).zip"/>
+        <Copy SourceFiles="@(NetDll)" DestinationFolder="../../Release/$(GameName)/dotnet"/>
+        <Copy SourceFiles="$(OutputPath)/$(AssemblyName).dll" DestinationFolder="../../Release/$(GameName)/BepinEx/plugins"/>
+        <ZipDirectory SourceDirectory="../../Release/$(GameName)" Overwrite="true" DestinationFile="../../$(AssemblyName).zip"/>
     </Target>
     <Target Name="CleanRelease" AfterTargets="Clean">
-        <RemoveDir Directories="..\..\Release\$(GameName)"/>
-        <Delete Files="..\..\$(AssemblyName).zip"/>
+        <RemoveDir Directories="../../Release/$(GameName)"/>
+        <Delete Files="../../$(AssemblyName).zip"/>
     </Target>
 </Project>

@@ -13,9 +13,9 @@ namespace CoastalSmell
 {
     public static partial class UGUI
     {
-        public static Action<ThumbnailColor> ThumbnailColor(
+        public static UIDesign ThumbnailColor(
             string name, Func<Color> getColor, Action<Color> setColor, bool useAlpha = true, bool autoOpen = true
-        ) => ui => ui.Initialize(HumanCustom.Instance.ColorPicker, name, getColor, setColor.Constant(true), useAlpha, autoOpen);
+        ) => Component<ThumbnailColor>(ui =>ui.Initialize(HumanCustom.Instance.ColorPicker, name, getColor, setColor.Constant(true), useAlpha, autoOpen));
     }
     public static class SceneSingletonExtension<T> where T : SceneSingleton<T>
     {

@@ -18,8 +18,8 @@ namespace Fishbone
     // Extension events and helpers
     public static partial class Extension
     {
-        public static IObservable<(HumanData, ZipArchive)> OnPreprocessChara => CharaLoadTrack.OnLoadComplete;
-        public static IObservable<(HumanDataCoordinate, ZipArchive)> OnPreprocessCoord => CoordLoadTrack.OnLoadComplete;
+        public static IObservable<(HumanData Data, ZipArchive Value)> OnPreprocessChara => CharaLoadTrack.OnLoadComplete;
+        public static IObservable<(HumanDataCoordinate Data, ZipArchive Value)> OnPreprocessCoord => CoordLoadTrack.OnLoadComplete;
         public static Dictionary<K, V> Merge<K, V>(this Dictionary<K, V> mods, K index, V mod) =>
             mods == null ? new() { [index] = mod } :
                 mods.Where(entry => !index.Equals(entry.Key))
@@ -44,7 +44,7 @@ namespace Fishbone
     {
         U Get(int coordinateType);
         T Merge(int coordinateType, U mods);
-        virtual T Merge(int coordinateType, CoordLimit limit, U coord) =>
+        sealed T Merge(int coordinateType, CoordLimit limit, U coord) =>
             Merge(coordinateType, Get(coordinateType).Merge(limit, coord));
     }
 
@@ -52,9 +52,9 @@ namespace Fishbone
         where T : ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
         T Get();
-        virtual T Get(int coordinateType) => Get();
-        virtual T Merge(int coordinateType, T mods) => Get();
-        virtual T Merge(CoordLimit limit, T mods) => Get();
+        sealed T Get(int coordinateType) => Get();
+        sealed T Merge(int coordinateType, T mods) => Get();
+        sealed T Merge(CoordLimit limit, T mods) => Get();
     }
 
     // Attribute for complex extensions
@@ -66,6 +66,49 @@ namespace Fishbone
         internal string Path;
         public ExtensionAttribute(params string[] paths) =>
             Path = System.IO.Path.Combine(paths);
+    }
+
+    public interface Storage<T, U, Index>
+        where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+        where U : CoordinateExtension<U>, new()
+    {
+        T Get(Index index);
+        void Set(Index index, T value);
+        U GetNowCoordinate(Index index);
+        void SetNowCoordinate(Index index, U value);
+        sealed U Get(Index index, int coordinateType) =>
+            Get(index).Get(coordinateType);
+        sealed void Set(Index index, int coordinateType, U value) =>
+            Set(index, Get(index).Merge(coordinateType, value));
+        public record class Now(Storage<T, U, Index> Storage)
+        {
+            public U this[Index index]
+            {
+                get => Storage.GetNowCoordinate(index);
+                set => Storage.SetNowCoordinate(index, value);
+            }
+            public U this[Index index, CoordLimit limit]
+            {
+                get => new U().Merge(limit, Storage.GetNowCoordinate(index));
+                set => Storage.SetNowCoordinate(index, Storage.GetNowCoordinate(index).Merge(limit, value));
+            }
+        }
+        sealed T this[Index index]
+        {
+            get => Get(index);
+            set => Set(index, value);
+        }
+        sealed T this[Index index, CharaLimit limit]
+        {
+            get => new T().Merge(limit, Get(index));
+            set => Set(index, Get(index).Merge(limit, value));
+        }
+        sealed U this[Index index, int coordinateType]
+        {
+            get => Get(index, coordinateType);
+            set => Set(index, coordinateType, value);
+        }
+        sealed Now NowCoordinate => new Now(this);
     }
 
     // Static extension class for complex extensions
@@ -83,10 +126,10 @@ namespace Fishbone
             Json<U>.Load.Apply(Plugin.Instance.Log.LogError);
         public static IDisposable Translate<V>(string path, Func<V, T> map) where V : new() =>
             Extension.OnPreprocessChara
-                .Subscribe(tuple => TryGetEntry(tuple.Item2, path, out var entry).Maybe(F.Apply(Translate, map, tuple.Item2, entry)));
+                .Subscribe(tuple => TryGetEntry(tuple.Value, path, out var entry).Maybe(F.Apply(Translate, map, tuple.Value, entry)));
         public static IDisposable Translate<V>(string path, Func<V, U> map) where V : new() =>
             Extension.OnPreprocessCoord
-                .Subscribe(tuple => TryGetEntry(tuple.Item2, path, out var entry).Maybe(F.Apply(Translate, map, tuple.Item2, entry)));
+                .Subscribe(tuple => TryGetEntry(tuple.Value, path, out var entry).Maybe(F.Apply(Translate, map, tuple.Value, entry)));
     }
 
     // Attribute for simple extensions
@@ -99,6 +142,24 @@ namespace Fishbone
             Path = System.IO.Path.Combine(paths);
     }
 
+    public interface Storage<T, Index>
+        where T : SimpleExtension<T>, ComplexExtension<T,T>, CharacterExtension<T>, CoordinateExtension<T>, new()
+    {
+        T Get(Index index);
+        void Set(Index index, T value);
+
+        sealed T this[Index index]
+        {
+            get => Get(index);
+            set => Set(index, value);
+        }
+        sealed T this[Index index, CharaLimit limit]
+        {
+            get => new T().Merge(limit, Get(index));
+            set => Set(index, Get(index).Merge(limit, value));
+        }
+    }
+
     // Static extension class for simple extensions
     public static partial class Extension<T>
         where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
@@ -108,8 +169,9 @@ namespace Fishbone
         public static Func<Stream, T> DeserializeChara =
             Json<T>.Load.Apply(Plugin.Instance.Log.LogError);
         public static IDisposable Translate<V>(string path, Func<V, T> map) where V : new() =>
-            Extension.OnPreprocessChara
-                .Subscribe(tuple => TryGetEntry(tuple.Item2, path, out var entry).Maybe(F.Apply(Translate, map, tuple.Item2, entry)));
+            Extension.OnPreprocessChara.Subscribe(tuple => 
+                TryGetEntry(tuple.Value, path, out var entry)
+                    .Maybe(F.Apply(Translate, map, tuple.Value, entry)));
     }
 
     // Main plugin class

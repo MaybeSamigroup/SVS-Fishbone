@@ -28,8 +28,8 @@ namespace Fishbone
         [HarmonyPatch(typeof(WorldData), nameof(WorldData.Save), typeof(string))]
         static void WorldSavePrefix(WorldData __instance) =>
             __instance.Charas.Yield()
-                .Where(entry => entry != null && entry.Item2 != null)
-                .Select(entry => entry.Item2).ForEach(SaveActor.OnNext);
+                .Where(entry => entry.Value != null)
+                .Select(entry => entry.Value).ForEach(SaveActor.OnNext);
     }
     #endregion
 
