@@ -13,7 +13,7 @@ namespace CoastalSmell
 {
     public static partial class UGUI
     {
-        public static UIDesign ThumbnailColor(
+        public static UIAction ThumbnailColor(
             string name, Func<Color> getColor, Action<Color> setColor, bool useAlpha = true, bool autoOpen = true
         ) => Component<ThumbnailColor>(ui =>ui.Initialize(HumanCustom.Instance.ColorPicker, name, getColor, setColor.Constant(true), useAlpha, autoOpen));
     }

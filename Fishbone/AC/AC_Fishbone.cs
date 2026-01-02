@@ -1,6 +1,5 @@
 using System;
 using System.IO.Compression;
-using System.Reactive;
 using System.Reactive.Linq;
 using Character;
 using CharacterCreation;
@@ -46,37 +45,61 @@ namespace Fishbone
 
     public static partial class Extension
     {
-        public static IObservable<Unit> OnPrepareSaveChara =>
-            OnSaveCustomChara.Select(_ => Unit.Default).Concat(OnCopyCustomToActor.Select(_ => Unit.Default));
-        public static IObservable<Unit> OnPrepareSaveCoord =>
-            Hooks.OnChangeCustomCoord.Select(_ => Unit.Default);
-        public static IObservable<ZipArchive> OnSaveCustomChara =>
-            Observable.Create<ZipArchive>(observer => Hooks.OnSaveCustomChara.Subscribe(path => Save(path, observer)));
-        public static IObservable<ZipArchive> OnSaveCustomCoord =>
-            Observable.Create<ZipArchive>(observer => Hooks.OnSaveCustomCoord.Subscribe(path => Save(path, observer)));
         public static IObservable<(ZipArchive Value, ActorIndex Index)> OnSaveActor =
             Observable.Create<(ZipArchive, ActorIndex)>(observer => Hooks.OnSaveActor.Subscribe(actor => Save(actor, observer)));
+
+        public static IObservable<Human> OnPrepareSaveChara =>
+            OnSaveCustomChara.Select(_ => HumanCustom.Instance.Human)
+                .Merge(OnCopyCustomToActor.Select(_ => HumanCustom.Instance.Human));
+
+        public static IObservable<Human> OnPrepareSaveCoord =>
+            Hooks.OnChangeCustomCoord.Select(_ => HumanCustom.Instance.Human);
+
+        public static IObservable<(ZipArchive Value, Human Human)> OnSaveCustomChara =>
+            Observable.Create<ZipArchive>(observer =>
+                Hooks.OnSaveCustomChara.Subscribe(path => Save(path, observer)))
+                .Select(archive => (archive, HumanCustom.Instance.Human));
+
+        public static IObservable<(ZipArchive Value, Human Human)> OnSaveCustomCoord =>
+            Observable.Create<ZipArchive>(observer =>
+                Hooks.OnSaveCustomCoord.Subscribe(path => Save(path, observer)))
+                .Select(archive => (archive, HumanCustom.Instance.Human));
+
+        public static IObservable<(ZipArchive Output, ZipArchive Input, HumanData Data)> OnConvertChara =>
+            Observable.Create<(ZipArchive, ZipArchive, HumanData)>(observer =>
+                Hooks.OnConvertChara.Subscribe(tuple => Convert(tuple.Path, tuple.Data, observer)));
+        
+        public static IObservable<(ZipArchive Output, ZipArchive Input, HumanDataCoordinate Data)> OnConvertCoord =>
+            Observable.Create<(ZipArchive, ZipArchive, HumanDataCoordinate)>(observer =>
+                Hooks.OnConvertCoord.Subscribe(tuple => Convert(tuple.Path, tuple.Data, observer)));
+
         public static IObservable<Human> OnLoadCustomChara =>
             OnTrackCustom.SelectMany(tuple => tuple.Track.OnResolve.Select(pair => pair.Human));
+
         public static IObservable<(int, int)> OnLoadActorChara =>
             OnTrackActor.SelectMany(tuple => tuple.Track.OnResolve);
-        public static IObservable<(Human Human, ActorIndex Index)> OnActorHumanize => OnActorHumanizeInternal;
+
+        public static IObservable<(Human Human, ActorIndex Index)> OnActorHumanize =>
+            OnActorHumanizeInternal;
+
         public static IObservable<Human> OnLoadChara =>
             OnLoadCustomChara.Merge(OnActorHumanize.Select(tuple => tuple.Human));
+
         public static IObservable<Human> OnLoadCoord =>
             OnTrackCoord.SelectMany(tuple => tuple.Track.OnResolve.Select(pair => pair.Human));
+
         public static IObservable<Human> OnLoadCustomCoord =>
             OnLoadCoord.Where(_ => CharaLoadTrack.Mode == CharaLoadTrack.FlagAware);
+
         public static IObservable<Human> OnLoadActorCoord =>
             OnLoadCoord.Where(_ => CharaLoadTrack.Mode != CharaLoadTrack.FlagAware);
+
         public static IDisposable[] Register<T, U>()
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() => [
+            OnSaveActor.Subscribe(Extension<T, U>.SaveActorChara),
             OnSaveCustomChara.Subscribe(Extension<T, U>.SaveCustomChara),
             OnSaveCustomCoord.Subscribe(Extension<T, U>.SaveCustomCoord),
-            OnConvertChara.Subscribe(Extension<T, U>.SaveCustomChara),
-            OnConvertCoord.Subscribe(Extension<T, U>.SaveCustomCoord),
-            OnSaveActor.Subscribe(Extension<T, U>.SaveActorChara),
             Hooks.OnSwapActor.Subscribe(Extension<T, U>.Swap),
             Hooks.OnInitializeActors.Subscribe(Extension<T, U>.ClearActors),
             OnInitializeCustom.Subscribe(Extension<T, U>.ClearCustom),
@@ -90,9 +113,8 @@ namespace Fishbone
 
         public static IDisposable[] Register<T>()
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() => [
-            OnSaveCustomChara.Subscribe(Extension<T>.SaveCustomChara),
-            OnConvertChara.Subscribe(Extension<T>.SaveCustomChara),
             OnSaveActor.Subscribe(Extension<T>.SaveActorChara),
+            OnSaveCustomChara.Subscribe(Extension<T>.SaveCustomChara),
             Hooks.OnSwapActor.Subscribe(Extension<T>.Swap),
             Hooks.OnInitializeActors.Subscribe(Extension<T>.ClearActors),
             OnInitializeCustom.Subscribe(Extension<T>.ClearCustom),
@@ -101,6 +123,20 @@ namespace Fishbone
             OnCopyCustomToActor.Subscribe(Extension<T>.CustomToActor),
             OnCopyActorToCustom.Subscribe(Extension<T>.ActorToCustom),
         ];
+
+        public static IDisposable[] RegisterConversion<T, U>()
+            where T : ComplexExtension<T, U>, CharacterExtension<T>, CharacterConversion<T>, new()
+            where U : CoordinateExtension<U>, CoordinateConversion<U>, new() => [
+            OnConvertChara.Subscribe(Conversion<T, U>.ConvertChara),
+            OnConvertCoord.Subscribe(Conversion<T, U>.ConvertCoord),
+        ];
+
+        public static IDisposable[] RegisterConversion<T>()
+            where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, CharacterConversion<T>, new() => [
+            OnConvertChara.Subscribe(Conversion<T>.ConvertChara),
+        ];
+
+
         public static void HumanCustomReload() => HumanCustomReload(HumanCustom.Instance);
     }
     public partial class Plugin : BasePlugin

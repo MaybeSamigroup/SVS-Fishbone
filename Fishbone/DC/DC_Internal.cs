@@ -78,7 +78,7 @@ namespace Fishbone
     public static partial class Extension<T, U>
     {
         internal static void SaveChara((ZipArchive Value, Human Human) tuple) =>
-            SaveChara(tuple.Value, Values[tuple.Human]);
+            SaveChara(tuple.Value, Humans[tuple.Human]);
     }
     public static partial class Extension<T>
     {

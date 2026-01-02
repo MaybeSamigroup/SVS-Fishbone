@@ -32,12 +32,18 @@ namespace Fishbone
     {
         T Merge(CharaLimit limit, T mods);
     }
-
+    public interface CharacterConversion<T> where T : CharacterExtension<T>, CharacterConversion<T>
+    {
+        T Convert(HumanData data);
+    }
     public interface CoordinateExtension<T> where T : CoordinateExtension<T>
     {
         T Merge(CoordLimit limit, T mods);
     }
-
+    public interface CoordinateConversion<T> where T : CoordinateExtension<T>, CoordinateConversion<T>
+    {
+        T Convert(HumanDataCoordinate data);
+    }
     public interface ComplexExtension<T, U>
         where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
         where U : CoordinateExtension<U>, new()
@@ -51,7 +57,7 @@ namespace Fishbone
     public interface SimpleExtension<T>
         where T : ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
-        T Get();
+        virtual T Get() => (T)this;
         sealed T Get(int coordinateType) => Get();
         sealed T Merge(int coordinateType, T mods) => Get();
         sealed T Merge(CoordLimit limit, T mods) => Get();
@@ -173,6 +179,11 @@ namespace Fishbone
                 TryGetEntry(tuple.Value, path, out var entry)
                     .Maybe(F.Apply(Translate, map, tuple.Value, entry)));
     }
+    public static partial class Hooks
+    {
+        internal static IDisposable Initialize() =>
+            Disposable.Create(Harmony.CreateAndPatchAll(typeof(Hooks), $"{Plugin.Name}.Hooks").UnpatchSelf);
+    }
 
     // Main plugin class
     [BepInProcess(Process)]
@@ -185,10 +196,10 @@ namespace Fishbone
         public const string Version = "4.0.0";
         internal static Plugin Instance;
         CompositeDisposable Subscriptions;
-        IDisposable Initialize() =>
-            Disposable.Create(Harmony.CreateAndPatchAll(typeof(Hooks), $"{Name}.Hooks").UnpatchSelf);
-        public override void Load() =>
-            (Instance, Subscriptions) = (this, [Initialize(), .. Extension.Initialize()]);
+        public Plugin() : base() => Instance = this;
+        public override void Load() => Subscriptions = [
+            .. Extension.Initialize(), Hooks.Initialize()
+        ];
         public override bool Unload() =>
             true.With(Subscriptions.Dispose) && base.Unload();
     }

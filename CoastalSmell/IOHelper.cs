@@ -11,7 +11,6 @@ using ILLGAMES.IO;
 using ILLGames.IO;
 #endif
 
-
 namespace CoastalSmell
 {
     public struct Float2 : IEquatable<Float2>

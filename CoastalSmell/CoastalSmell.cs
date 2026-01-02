@@ -165,10 +165,9 @@ namespace CoastalSmell
 
         public static Func<I, O> Constant<I, O>(this Action<I> f, O value) => i => value.With(f.Apply(i));
         public static Action DoNothing = () => { };
-
         public static Func<Action, T, Action> Accumulate<T>(Action<T> action) =>
             (actions, value) => actions += action.Apply(value);
-
+        public static Il2CppSystem.Action AsIl2Cpp(Action action) => action;
         #endregion
 
         #region Enumerable Extensions
@@ -199,9 +198,6 @@ namespace CoastalSmell
 
         public static Il2CppSystem.Collections.Generic.List<T> AsIl2Cpp<T>(this IEnumerable<T> values) =>
             new Il2CppSystem.Collections.Generic.List<T>().With(list => values.ForEach(list.Add));
-
-        public static Il2CppSystem.Collections.Generic.IReadOnlyList<T> AsReadOnly<T>(this Il2CppSystem.Collections.Generic.List<T> values) =>
-            new(values.Pointer);
 
         public static IEnumerable<(K Key, V Value)> Yield<K, V>(this Il2CppSystem.Collections.Generic.Dictionary<K, V> items)
         {
@@ -237,7 +233,7 @@ namespace CoastalSmell
             FontInitialize.OnNext(target);
 
         internal static IDisposable Initialize() =>
-             Disposable.Create(Harmony.CreateAndPatchAll(typeof(Hooks), $"Hooks.{Plugin.Name}").UnpatchSelf);
+            Disposable.Create(Harmony.CreateAndPatchAll(typeof(Hooks), $"Hooks.{Plugin.Name}").UnpatchSelf);
     }
 
     #region Plugin
@@ -252,8 +248,9 @@ namespace CoastalSmell
         internal static Plugin Instance;
         CompositeDisposable Subscriptions;
         public Plugin() : base() => Instance = this;
-        public override void Load() => Subscriptions =
-            [Hooks.Initialize(), Sprites.Initialize(), UGUI.Initialize()];
+        public override void Load() => Subscriptions = [
+            Sprites.Initialize(), UGUI.Initialize(), Hooks.Initialize()
+        ];
         public override bool Unload() => true.With(Subscriptions.Dispose) && base.Unload();
     }
     #endregion

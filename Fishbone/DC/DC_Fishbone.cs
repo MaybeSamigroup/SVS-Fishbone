@@ -11,7 +11,7 @@ namespace Fishbone
     {
         static readonly HumansStorage<T, U> Storage = new HumansStorage<T, U>();
 
-        public static Storage<T, U, Human> Values => Storage;
+        public static Storage<T, U, Human> Humans => Storage;
 
         public static IObservable<(HumanData Data, T Value)> OnPreprocessChara =>
             OnTrackChara.Select(tuple => (tuple.Data, tuple.Value));
@@ -49,9 +49,9 @@ namespace Fishbone
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() => [
             OnSaveChara.Subscribe(Extension<T, U>.SaveChara),
-            Extension<T, U>.OnLoadChara.Subscribe(tuple => Extension<T, U>.Values[tuple.Human] = tuple.Value),
+            Extension<T, U>.OnLoadChara.Subscribe(tuple => Extension<T, U>.Humans[tuple.Human] = tuple.Value),
             Extension<T, U>.OnLoadChara.Subscribe(tuple => Extension<T, U>.Prepare(tuple.Human)),
-            Extension<T, U>.OnLoadCoordInternal.Subscribe(tuple => Extension<T, U>.Values.NowCoordinate[tuple.Human, tuple.Limit] = tuple.Value)
+            Extension<T, U>.OnLoadCoordInternal.Subscribe(tuple => Extension<T, U>.Humans.NowCoordinate[tuple.Human, tuple.Limit] = tuple.Value)
         ];
 
         public static IDisposable[] Register<T>()

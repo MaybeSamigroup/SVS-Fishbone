@@ -18,11 +18,11 @@ namespace Fishbone
     {
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.SaveCharaFileBeforeAction))]
-        static void HumanDataSaveCharaFileBeforeAction(string path) => SaveCustomChara.OnNext(path);
+        static void HumanDataSaveCharaFileBeforeAction(HumanData __instance, string path) => SaveChara.OnNext((__instance, path));
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.SaveFile))]
-        static void HumanDataCoordinateSaveFilePostfix(string path) => SaveCustomCoord.OnNext(path);
+        static void HumanDataCoordinateSaveFilePostfix(HumanDataCoordinate __instance, string path) => SaveCoord.OnNext((__instance, path));
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(WorldData), nameof(WorldData.Save), typeof(string))]
@@ -114,13 +114,11 @@ namespace Fishbone
     static partial class Hooks
     {
         [HarmonyPrefix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(SV.ConvertHumanDataScene), nameof(SV.ConvertHumanDataScene.ConvertAsync))]
-        static void ConvertHumanDataSceneConvertAsyncPrefix() => EnterConversion.OnNext(Unit.Default);
-
-        [HarmonyPostfix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(SV.ConvertHumanDataScene), nameof(SV.ConvertHumanDataScene.ConvertAsync))]
-        static void ConvertHumanDataSceneConvertAsyncPostfix(ref UniTask __result) =>
-            __result = __result.ContinueWith(F.Apply(LeaveConversion.OnNext, Unit.Default));
+        [HarmonyPatch(typeof(SV.ConvertHumanDataScene), nameof(SV.ConvertHumanDataScene.Start))]
+        static void ConvertHumanDataSceneConvertAsyncPrefix(SV.ConvertHumanDataScene __instance) =>
+            (InConversion, CharaLoadTrack.Mode, _) = (true, CharaLoadTrack.FlagIgnore,
+                __instance.OnDestroyAsObservable()
+                    .Subscribe(_ => (InConversion, CharaLoadTrack.Mode) = (false, CharaLoadTrack.Ignore)));
     }
     #endregion
 }

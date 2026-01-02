@@ -23,11 +23,11 @@ namespace Fishbone
     {
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.SaveCharaFileBeforeAction))]
-        static void HumanDataSaveCharaFileBeforeAction(string path) => SaveCustomChara.OnNext(path);
+        static void HumanDataSaveCharaFileBeforeAction(HumanData __instance, string path) => SaveChara.OnNext((__instance, path));
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.SaveFile))]
-        static void HumanDataCoordinateSaveFilePostfix(string path) => SaveCustomCoord.OnNext(path);
+        static void HumanDataCoordinateSaveFilePostfix(HumanDataCoordinate __instance, string path) => SaveCoord.OnNext((__instance, path));
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(ActorData), nameof(ActorData.SerializeHumanData))]
@@ -123,7 +123,8 @@ namespace Fishbone
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanCloth.ClothesCoordeCacheCommand), nameof(HumanCloth.ClothesCoordeCacheCommand.ChangeAll))]
         static void ClothesCoordeCacheCommandChangeAll(HumanCloth.ClothesCoordeCacheCommand __instance) =>
-            ChangeActorCoordinate.OnNext((__instance._cloth._human, __instance._cloth._human.data.Status.coordinateType));
+            (CharaLoadTrack.Mode != CharaLoadTrack.FlagAware)
+                .Maybe(F.Apply(ChangeActorCoordinate.OnNext, (__instance._cloth._human, __instance._cloth._human.data.Status.coordinateType)));
     }
     #endregion
 
@@ -131,12 +132,11 @@ namespace Fishbone
     static partial class Hooks
     {
         [HarmonyPrefix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(ConvertHumanDataScene), nameof(ConvertHumanDataScene.ConvertAsync))]
-        static void ConvertHumanDataSceneConvertAsyncPrefix() => EnterConversion.OnNext(Unit.Default);
-
-        [HarmonyPatch(typeof(ConvertHumanDataScene), nameof(ConvertHumanDataScene.ConvertAsync))]
-        static void ConvertHumanDataSceneConvertAsyncPostfix(ref UniTask __result) =>
-            __result = __result.ContinueWith(F.Apply(LeaveConversion.OnNext, Unit.Default));
+        [HarmonyPatch(typeof(ConvertHumanDataScene), nameof(ConvertHumanDataScene.Start))]
+        static void ConvertHumanDataSceneConvertAsyncPrefix(ConvertHumanDataScene __instance) =>
+            (InConversion, CharaLoadTrack.Mode, _) = (true, CharaLoadTrack.FlagIgnore,
+                __instance.OnDestroyAsObservable()
+                    .Subscribe(_ => (InConversion, CharaLoadTrack.Mode) = (false, CharaLoadTrack.Ignore)));
     }
     #endregion
 

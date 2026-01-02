@@ -1,19 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <TargetFramework>net6</TargetFramework>
+        <PluginName>CoastalSmell</PluginName>
+        <LangVersion>latest</LangVersion>
+        <GamePath>$([MSBuild]::GetRegistryValue('HKEY_CURRENT_USER\Software\ILLGAMES\$(GameName)','INSTALLDIR'))</GamePath>
+        <GamePrefix>$([System.IO.Path]::GetFileName($(MSBuildProjectDirectory)))</GamePrefix>
+        <AssemblyName>$(GamePrefix)_$(PluginName)</AssemblyName>
+        <DefineConstants>$(GameName)</DefineConstants>
+    </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="System.Reactive" Version="6.1.0"/>
-        <Compile Include="../CoastalSmell.cs"/>
+        <Compile Include="../$(PluginName).cs"/>
         <Compile Include="../Reactive.cs"/>
         <Compile Include="../IOHelper.cs"/>
         <Compile Include="../UIHelper.cs"/>
         <UITexture Include="Resource/*.*"/>
     </ItemGroup>
     <Target Name="Deploy" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">
-        <Copy SourceFiles="@(UITexture)" DestinationFolder="$(GamePath)/UserData/plugins/CoastalSmell"/>
+        <Copy SourceFiles="@(UITexture)" DestinationFolder="$(GamePath)/UserData/plugins/$(PluginName)"/>
         <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="$(GamePath)/BepInEx/plugins/" />
     </Target>
     <Target Name="Release" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
-        <Copy SourceFiles="@(UITexture)" DestinationFolder="../../Release/$(GameName)/UserData/plugins/CoastalSmell"/>
+        <Copy SourceFiles="@(UITexture)" DestinationFolder="../../Release/$(GameName)/UserData/plugins/$(PluginName)"/>
         <Copy SourceFiles="$(OutputPath)/$(AssemblyName).dll" DestinationFolder="../../Release/$(GameName)/BepinEx/plugins"/>
     </Target>
 </Project>

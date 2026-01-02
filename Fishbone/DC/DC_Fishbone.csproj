@@ -1,13 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>net6</TargetFramework>
-        <AssemblyName>DC_Fishbone</AssemblyName>
         <Description>plugin api to serialize and deserialize character or coordinate bound extension data, for DigitalCraft</Description>
-        <LangVersion>latest</LangVersion>
-        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <GameName>DigitalCraft</GameName>
-        <GamePath>$([MSBuild]::GetRegistryValue('HKEY_CURRENT_USER\Software\ILLGAMES\$(GameName)','INSTALLDIR'))</GamePath>
-        <DefineConstants>$(GameName)</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.752"/>

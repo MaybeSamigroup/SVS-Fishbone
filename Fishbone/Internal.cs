@@ -3,6 +3,7 @@ using System.Linq;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
+using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using Character;
@@ -26,8 +27,14 @@ namespace Fishbone
     #region Common Definitions
     public static partial class Extension
     {
+        internal static byte[] NoExtension =
+            new MemoryStream().With(Save(Observer.Create<ZipArchive>(_ => { }))).ToArray();
+
+        internal static byte[] ToExtension(byte[] buffer) =>
+            buffer is [] ? NoExtension : buffer;
+
         internal static MemoryStream Extract(byte[] buffer) =>
-            new MemoryStream().With(stream => stream.Write(Decode.Extract(buffer)));
+            new MemoryStream().With(stream => stream.Write(ToExtension(Decode.Extract(buffer))));
 
         internal static void Implant(HumanData data, byte[] bytes) =>
             data.PngData = data.PngData != null ? Encode.Implant(data.PngData, bytes) : Encode.Implant(bytes);
@@ -36,7 +43,8 @@ namespace Fishbone
             new MemoryStream().With(Save(observer)).ToArray();
 
         static Action<MemoryStream> Save(IObserver<ZipArchive> observer) =>
-            stream => F.ApplyDisposable(observer.OnNext, new ZipArchive(stream, ZipArchiveMode.Create)).Try(Plugin.Instance.Log.LogError);
+            stream => F.ApplyDisposable(observer.OnNext,
+                new ZipArchive(stream, ZipArchiveMode.Create)).Try(Plugin.Instance.Log.LogError);
     }
     public static partial class Extension<T, U>
     {
@@ -53,10 +61,10 @@ namespace Fishbone
         static void Translate<V>(Func<V, U> map, ZipArchive archive, ZipArchiveEntry entry) where V : new() =>
             SaveCoord(archive, map(Json<V>.Load(Plugin.Instance.Log.LogError, entry.Open())));
 
-        static void SaveChara(ZipArchive archive, T value) =>
+        internal static void SaveChara(ZipArchive archive, T value) =>
             SerializeChara(archive.CreateEntry(Path).Open(), value);
 
-        static void SaveCoord(ZipArchive archive, U value) =>
+        internal static void SaveCoord(ZipArchive archive, U value) =>
             SerializeCoord(archive.CreateEntry(Path).Open(), value);
 
         internal static T LoadChara(ZipArchive archive) =>
