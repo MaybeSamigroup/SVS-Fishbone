@@ -1,6 +1,5 @@
 using System.IO.Compression;
 using System.Collections.Generic;
-using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Reactive.Disposables;
@@ -16,18 +15,18 @@ namespace Fishbone
     class HumansStorage<T,U> : Storage<T, U, Human>
         where T : ComplexExtension<T, U>, CharacterExtension<T>, new() where U : CoordinateExtension<U>, new()
     {
-        Dictionary<Human, T> Humans = new();
-        public T Get(Human human) => Humans[human];
+        Dictionary<Human, T> Humans = new(Il2CppEquals.Instance);
+        public T Get(Human human) => Humans.GetValueOrDefault(human, new ());
         public void Set(Human human, T value) => Humans[human] = value; 
-        public U GetNowCoordinate(Human human) => Humans[human].Get(human.data.Status.coordinateType);
-        public void SetNowCoordinate(Human human, U value) => Humans[human] = Humans[human].Merge(human.data.Status.coordinateType, value);
+        public U GetNowCoordinate(Human human) => Get(human).Get(human.data.Status.coordinateType);
+        public void SetNowCoordinate(Human human, U value) => Humans[human] = Get(human).Merge(human.data.Status.coordinateType, value);
         internal void Remove(Human human) => Humans.Remove(human);
     }
     class HumansStorage<T> : Storage<T, Human>
         where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
-        Dictionary<Human, T> Humans = new();
-        public T Get(Human human) => Humans[human];
+        Dictionary<Human, T> Humans = new(Il2CppEquals.Instance);
+        public T Get(Human human) => Humans.GetValueOrDefault(human, new());
         public void Set(Human human, T value) => Humans[human] = value; 
         internal void Remove(Human human) => Humans.Remove(human);
     }
@@ -63,17 +62,16 @@ namespace Fishbone
     }
     static partial class Hooks
     {
-        static Subject<Human> SaveHuman = new();
-        internal static IObservable<Human> OnSaveHuman => SaveHuman.AsObservable();
-
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(DigitalCraft.DigitalCraft), nameof(DigitalCraft.DigitalCraft.SaveScene))]
-        static void DigitalCraftSaveScenePrefix() => Human.list.Yield().ForEach(SaveHuman.OnNext);
+        static void DigitalCraftSaveScenePrefix() => Human.list.Yield().ForEach(Extension.Save);
     } 
     public static partial class Extension
     {
-        static void Save(Human human, IObserver<(ZipArchive, Human)> observer) =>
-            Implant(human.data, ToBinary(Observer.Create<ZipArchive>(archive => observer.OnNext((archive, human)))));
+        static Subject<Human> PrepareSaveChara = new();
+        static Subject<(ZipArchive, Human)> SaveChara = new();
+        internal static void Save(Human human) =>
+            Implant(human.data, ToBinary(SaveChara, human.With(PrepareSaveChara.OnNext)));
     }
     public static partial class Extension<T, U>
     {
@@ -102,9 +100,9 @@ namespace Fishbone
                 OnResolve.Subscribe(_ => Dispose()),
                 OnDataUpdate.Subscribe(Resolve),
             ]);
-        bool Match<T>((HumanData Data, T Value) tuple) => Data == tuple.Data;
-        bool Match(Human human) => Data == human.data; 
-        void Resolve(HumanData value) => Data = value;
+        bool Match<T>((HumanData Data, T Value) tuple) => Il2CppEquals.Apply(Data, tuple.Data);
+        bool Match(Human human) => Il2CppEquals.Apply(Data, human.data); 
+        void Resolve(HumanData value) => Il2CppEquals.Apply(Data, value);
         public void Dispose() => Subscription.Dispose();
     }
     public static partial class Extension

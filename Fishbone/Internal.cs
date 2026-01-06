@@ -28,7 +28,7 @@ namespace Fishbone
     public static partial class Extension
     {
         internal static byte[] NoExtension =
-            new MemoryStream().With(Save(Observer.Create<ZipArchive>(_ => { }))).ToArray();
+            ToBinary(F.DoNothing.Ignoring<ZipArchive>());
 
         internal static byte[] ToExtension(byte[] buffer) =>
             buffer is [] ? NoExtension : buffer;
@@ -36,15 +36,17 @@ namespace Fishbone
         internal static MemoryStream Extract(byte[] buffer) =>
             new MemoryStream().With(stream => stream.Write(ToExtension(Decode.Extract(buffer))));
 
-        internal static void Implant(HumanData data, byte[] bytes) =>
+        static void Implant(HumanData data, byte[] bytes) =>
             data.PngData = data.PngData != null ? Encode.Implant(data.PngData, bytes) : Encode.Implant(bytes);
 
-        static byte[] ToBinary(IObserver<ZipArchive> observer) =>
-            new MemoryStream().With(Save(observer)).ToArray();
+        static byte[] ToBinary<T>(this IObserver<(ZipArchive, T)> observer, T value) =>
+            ToBinary(archive => observer.OnNext((archive, value)));
 
-        static Action<MemoryStream> Save(IObserver<ZipArchive> observer) =>
-            stream => F.ApplyDisposable(observer.OnNext,
-                new ZipArchive(stream, ZipArchiveMode.Create)).Try(Plugin.Instance.Log.LogError);
+        static byte[] ToBinary(Action<ZipArchive> action) =>
+            new MemoryStream().With(action.Save).ToArray();
+
+        static void Save(this Action<ZipArchive> action, MemoryStream stream) =>
+            action.ApplyDisposable(new ZipArchive(stream, ZipArchiveMode.Create)).Try(Plugin.Instance.Log.LogError);
     }
     public static partial class Extension<T, U>
     {
@@ -320,12 +322,12 @@ namespace Fishbone
         HumanDataFaceMakeup Face; 
         HumanDataHair Hair; 
         HumanDataClothes Clothes; 
-        HumanDataAccessory Acs;
+        HumanDataAccessory Accessory;
         CompositeDisposable Subscription;
         CoordLimitTrack() =>
             OnResolve = Hooks.OnHumanCoordinateResolve.Where(Match).FirstAsync().Select(human => (human, Limit));
         internal CoordLimitTrack(HumanDataCoordinate data) : this() =>
-            (Body, Face, Hair, Clothes, Acs, Subscription) =
+            (Body, Face, Hair, Clothes, Accessory, Subscription) =
                 (data.BodyMakeup, data.FaceMakeup, data.Hair, data.Clothes, data.Accessory, [
                     Hooks.OnHumanDataBodyMakeupCopy
                         .Where(Match).Select(tuple => tuple.Dst).Subscribe(Resolve),
@@ -343,24 +345,34 @@ namespace Fishbone
                         .Where(Match).Select(tuple => tuple.Dst).Subscribe(Resolve),
                     OnResolve.Subscribe(F.Ignoring<(Human,CoordLimit)>(F.DoNothing), Dispose)
                 ]);
-        bool Match((HumanDataBodyMakeup Src, HumanDataBodyMakeup Dst) tuple) => Body == tuple.Src;
-        bool Match((HumanDataFaceMakeup Src, HumanDataFaceMakeup Dst) tuple) => Face == tuple.Src;
-        bool Match((HumanDataHair Src, HumanDataHair Dst) tuple) => Hair == tuple.Src;
-        bool Match((HumanDataClothes Src, HumanDataClothes Dst) tuple) => Clothes == tuple.Src;
-        bool Match((HumanDataAccessory Src, HumanDataAccessory Dst) tuple) => Acs == tuple.Src;
+        bool Match((HumanDataBodyMakeup Src, HumanDataBodyMakeup Dst) tuple) =>
+            Il2CppEquals.Apply(Body, tuple.Src);
+        bool Match((HumanDataFaceMakeup Src, HumanDataFaceMakeup Dst) tuple) =>
+            Il2CppEquals.Apply(Face, tuple.Src);
+        bool Match((HumanDataHair Src, HumanDataHair Dst) tuple) =>
+            Il2CppEquals.Apply(Hair, tuple.Src);
+        bool Match((HumanDataClothes Src, HumanDataClothes Dst) tuple) =>
+            Il2CppEquals.Apply(Clothes, tuple.Src);
+        bool Match((HumanDataAccessory Src, HumanDataAccessory Dst) tuple) =>
+            Il2CppEquals.Apply(Accessory, tuple.Src);
+        bool Match((Il2CppBytes Src, HumanDataCoordinate Dst) tuple) =>
+            Il2CppEquals.Apply(Bytes, tuple.Src);
         bool Match((HumanDataCoordinate Src, Il2CppBytes Dst) tuple) => Match(tuple.Src);
-        bool Match((Il2CppBytes Src, HumanDataCoordinate Dst) tuple) => Bytes == tuple.Src;
         bool Match(Human human) => Match(human.coorde.Now);
         bool Match(HumanDataCoordinate data) =>
-            (Body == data.BodyMakeup) || (Face == data.FaceMakeup) || (Hair == data.Hair) || (Clothes == data.Clothes) || (Acs == data.Accessory);
+            Il2CppEquals.Apply(Body, data.BodyMakeup) ||
+            Il2CppEquals.Apply(Face, data.FaceMakeup) ||
+            Il2CppEquals.Apply(Hair, data.Hair) ||
+            Il2CppEquals.Apply(Clothes, data.Clothes) ||
+            Il2CppEquals.Apply(Accessory, data.Accessory);
         void Resolve(HumanDataBodyMakeup data) => (Body, Limit) = (data, Limit | CoordLimit.BodyMakeup);
         void Resolve(HumanDataFaceMakeup data) => (Face, Limit) = (data, Limit | CoordLimit.FaceMakeup);
         void Resolve(HumanDataHair data) => (Hair, Limit) = (data, Limit | CoordLimit.Hair);
         void Resolve(HumanDataClothes data) => (Clothes, Limit) = (data, Limit | CoordLimit.Clothes);
-        void Resolve(HumanDataAccessory data) => (Acs, Limit) = (data, Limit | CoordLimit.Accessory);
+        void Resolve(HumanDataAccessory data) => (Accessory, Limit) = (data, Limit | CoordLimit.Accessory);
         void Resolve(Il2CppBytes data) => Bytes = data;
         void Resolve(HumanDataCoordinate data) =>
-            (Body, Face, Hair, Clothes, Acs) = (data.BodyMakeup, data.FaceMakeup, data.Hair, data.Clothes, data.Accessory);
+            (Body, Face, Hair, Clothes, Accessory) = (data.BodyMakeup, data.FaceMakeup, data.Hair, data.Clothes, data.Accessory);
         public void Dispose() => Subscription.Dispose();
     }
     public static partial class Extension

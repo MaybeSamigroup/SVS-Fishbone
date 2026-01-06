@@ -45,54 +45,49 @@ namespace Fishbone
 
     public static partial class Extension
     {
-        public static IObservable<(ZipArchive Value, ActorIndex Index)> OnSaveActor =
-            Observable.Create<(ZipArchive, ActorIndex)>(observer => Hooks.OnSaveActor.Subscribe(actor => Save(actor, observer)));
-
-        public static IObservable<Human> OnPrepareSaveChara =>
-            OnSaveCustomChara.Select(_ => HumanCustom.Instance.Human)
-                .Merge(OnCopyCustomToActor.Select(_ => HumanCustom.Instance.Human));
-
-        public static IObservable<Human> OnPrepareSaveCoord =>
-            Hooks.OnChangeCustomCoord.Select(_ => HumanCustom.Instance.Human);
-
-        public static IObservable<(ZipArchive Value, Human Human)> OnSaveCustomChara =>
-            Observable.Create<ZipArchive>(observer =>
-                Hooks.OnSaveCustomChara.Subscribe(path => Save(path, observer)))
-                .Select(archive => (archive, HumanCustom.Instance.Human));
-
-        public static IObservable<(ZipArchive Value, Human Human)> OnSaveCustomCoord =>
-            Observable.Create<ZipArchive>(observer =>
-                Hooks.OnSaveCustomCoord.Subscribe(path => Save(path, observer)))
-                .Select(archive => (archive, HumanCustom.Instance.Human));
-
         public static IObservable<(ZipArchive Output, ZipArchive Input, HumanData Data)> OnConvertChara =>
-            Observable.Create<(ZipArchive, ZipArchive, HumanData)>(observer =>
-                Hooks.OnConvertChara.Subscribe(tuple => Convert(tuple.Path, tuple.Data, observer)));
+            ConvertChara.AsObservable().Select(pair => (pair.Output, pair.Value.Input, pair.Value.Data));
         
         public static IObservable<(ZipArchive Output, ZipArchive Input, HumanDataCoordinate Data)> OnConvertCoord =>
-            Observable.Create<(ZipArchive, ZipArchive, HumanDataCoordinate)>(observer =>
-                Hooks.OnConvertCoord.Subscribe(tuple => Convert(tuple.Path, tuple.Data, observer)));
+            ConvertCoord.AsObservable().Select(pair => (pair.Output, pair.Value.Input, pair.Value.Data));
+
+        public static IObservable<Human> OnPrepareSaveChara =>
+            PrepareSaveChara.AsObservable().Merge(OnCopyCustomToActor.Select(_ => HumanCustom.Instance.Human));
+
+        public static IObservable<Human> OnPrepareSaveCoord =>
+            PrepareSaveCoord.AsObservable().Merge(Hooks.OnChangeCustomCoord.Select(_ => HumanCustom.Instance.Human));
+
+        public static IObservable<(ZipArchive Archive, Human Human)> OnSaveCustomChara => SaveCustomChara.AsObservable();
+
+        public static IObservable<(ZipArchive Archive, Human Human)> OnSaveCustomCoord => SaveCustomCoord.AsObservable();
+
+        public static IObservable<(ZipArchive Archive, ActorIndex Index)> OnSaveActor => SaveActor.AsObservable();
 
         public static IObservable<Human> OnLoadCustomChara =>
-            OnTrackCustom.SelectMany(tuple => tuple.Track.OnResolve.Select(pair => pair.Human));
+            OnTrackCustom.SelectMany(tuple => tuple.Track.OnResolve.Select(pair => pair.Human))
+                .Merge(OnActorHumanizeInternal.Where(_ => CharaLoadTrack.Mode == CharaLoadTrack.FlagAware).Select(pair => pair.Human));
 
         public static IObservable<(int, int)> OnLoadActorChara =>
             OnTrackActor.SelectMany(tuple => tuple.Track.OnResolve);
 
         public static IObservable<(Human Human, ActorIndex Index)> OnActorHumanize =>
-            OnActorHumanizeInternal;
+            OnActorHumanizeInternal.Where(_ => CharaLoadTrack.Mode == CharaLoadTrack.Ignore);
 
         public static IObservable<Human> OnLoadChara =>
             OnLoadCustomChara.Merge(OnActorHumanize.Select(tuple => tuple.Human));
 
         public static IObservable<Human> OnLoadCoord =>
-            OnTrackCoord.SelectMany(tuple => tuple.Track.OnResolve.Select(pair => pair.Human));
+            OnLoadCustomCoord.Merge(OnLoadActorCoord);
 
         public static IObservable<Human> OnLoadCustomCoord =>
-            OnLoadCoord.Where(_ => CharaLoadTrack.Mode == CharaLoadTrack.FlagAware);
+            Hooks.OnChangeCustomCoord.Select(pair => pair.Human)
+                .Merge(OnTrackCoord.SelectMany(tuple => tuple.Track.OnResolve
+                    .Where(_ => CharaLoadTrack.Mode == CharaLoadTrack.FlagAware).Select(pair => pair.Human)));
 
         public static IObservable<Human> OnLoadActorCoord =>
-            OnLoadCoord.Where(_ => CharaLoadTrack.Mode != CharaLoadTrack.FlagAware);
+            Hooks.OnChangeActorCoord.Select(pair => pair.Human)
+                .Merge(OnTrackCoord.SelectMany(tuple => tuple.Track.OnResolve
+                    .Where(_ => CharaLoadTrack.Mode != CharaLoadTrack.FlagAware).Select(pair => pair.Human)));
 
         public static IDisposable[] Register<T, U>()
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
@@ -108,6 +103,7 @@ namespace Fishbone
             OnCopyCustomToActor.Subscribe(Extension<T, U>.CustomToActor),
             OnCopyActorToCustom.Subscribe(Extension<T, U>.ActorToCustom),
             Extension<T, U>.OnLoadCoordInternal.Subscribe(tuple => Extension<T, U>.Humans.NowCoordinate[tuple.Human, tuple.Limit] = tuple.Value),
+            OnActorHumanize.Subscribe(tuple => Extension<T,U>.Indices.NowCoordinate[tuple.Index] = Extension<T, U>.Indices[tuple.Index, tuple.Human.data.Status.coordinateType]),
             OnChangeActorCoord.Subscribe(tuple => Extension<T, U>.Indices.NowCoordinate[tuple.Index] =  Extension<T, U>.Indices[tuple.Index, tuple.CoordinateType])
         ];
 

@@ -16,6 +16,7 @@ using UnityEngine;
 using HarmonyLib;
 using BepInEx;
 using BepInEx.Unity.IL2CPP;
+using Il2CppObjectBase = Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase;
 
 namespace CoastalSmell
 {
@@ -210,6 +211,25 @@ namespace CoastalSmell
             for (var index = 0; index < count; index++) yield return items[index];
         }
         #endregion
+    }
+
+    public class Il2CppEquals : IEqualityComparer<Il2CppObjectBase>
+    {
+        Il2CppEquals() { }
+        public static Il2CppEquals Instance = new();
+        public static Func<T, bool> Apply<T>(T obj1) where T : Il2CppObjectBase =>
+            obj2 => Instance.Equals(obj1, obj2);
+        public static bool Apply<T>(T obj1, T obj2) where T : Il2CppObjectBase =>
+            Instance.Equals(obj1, obj2);
+        public bool Equals(Il2CppObjectBase car, Il2CppObjectBase cdr) =>
+            (car, cdr) switch
+            {
+                (null, null) => true,
+                (null, _) or (_, null) => false,
+                (_, _) => (car.Pointer, car.ObjectClass) == (cdr.Pointer, car.ObjectClass)
+            };
+
+        public int GetHashCode(Il2CppObjectBase obj) => obj.Pointer.GetHashCode();
     }
     public static partial class Hooks
     {

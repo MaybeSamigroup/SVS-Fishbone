@@ -31,13 +31,11 @@ namespace Fishbone
 
     public static partial class Extension
     {
-        public static IObservable<Human> OnPrepareSaveChara =>
-            OnSaveChara.Select(tuple => tuple.Human);
+        public static IObservable<Human> OnPrepareSaveChara => PrepareSaveChara.AsObservable();
 
-        public static IObservable<(ZipArchive Value, Human Human)> OnSaveChara =
-            Observable.Create<(ZipArchive, Human)>(observer => Hooks.OnSaveHuman.Subscribe(actor => Save(actor, observer)));
+        public static IObservable<(ZipArchive Archive, Human Human)> OnSaveChara => SaveChara.AsObservable();
 
-        public static IObservable<Human> OnLoadChara =
+        public static IObservable<Human> OnLoadChara =>
             OnTrackChara.SelectMany(tuple => tuple.Track.OnResolve);
 
         public static IObservable<Human> OnLoadCoord =>

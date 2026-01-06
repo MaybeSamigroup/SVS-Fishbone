@@ -18,20 +18,26 @@ using ActorIndex = (int, int);
 
 namespace Fishbone
 {
-    #region Save
+    #region Save and Conversion
     static partial class Hooks
     {
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(ConvertHumanDataScene), nameof(ConvertHumanDataScene.Start))]
+        static void ConvertHumanDataSceneConvertAsyncPrefix(ConvertHumanDataScene __instance) =>
+            __instance.OnDestroyAsObservable().With(EnableConversion).Subscribe(_ => DisableConversion());
+
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.SaveCharaFileBeforeAction))]
-        static void HumanDataSaveCharaFileBeforeAction(HumanData __instance, string path) => SaveChara.OnNext((__instance, path));
+        static void HumanDataSaveCharaFileBeforeAction(HumanData __instance, string path) => OnSaveChara(__instance, path);
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.SaveFile))]
-        static void HumanDataCoordinateSaveFilePostfix(HumanDataCoordinate __instance, string path) => SaveCoord.OnNext((__instance, path));
+        static void HumanDataCoordinateSaveFilePostfix(HumanDataCoordinate __instance, string path) => OnSaveCoord(__instance, path);
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(ActorData), nameof(ActorData.SerializeHumanData))]
-        static void ActorSerializeHumanDataPrefix(ActorData __instance) => SaveActor.OnNext(__instance);
+        static void ActorSerializeHumanDataPrefix(ActorData __instance) =>
+            (CharaLoadTrack.Mode == CharaLoadTrack.Ignore).Maybe(() => Extension.Save(__instance));
     }
     #endregion
 
@@ -46,7 +52,7 @@ namespace Fishbone
                 .Merge(SceneSingletonExtension<FreeHScene>.OnDestroy)
                 .Merge(SceneSingletonExtension<PrologueScene>.OnStartup
                     .Where(scene => scene.SaveData.TutorialProgress is 0).Select(_ => Unit.Default));
-                
+
         static bool ConvertFilePathAware = false;
 
         [HarmonyPrefix, HarmonyWrapSafe]
@@ -74,7 +80,9 @@ namespace Fishbone
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(ActorData), nameof(ActorData.DeserializeHumanData))]
-        static void ActorDataDeserializeHumanDataPrefix() => CharaLoadTrack.Mode = CharaLoadTrack.FlagIgnore;
+        static void ActorDataDeserializeHumanDataPrefix() =>
+            (CharaLoadTrack.Mode == CharaLoadTrack.Ignore)
+                .Maybe(() => CharaLoadTrack.Mode = CharaLoadTrack.FlagIgnore);
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(ActorData), nameof(ActorData.DeserializeHumanData))]
@@ -125,18 +133,6 @@ namespace Fishbone
         static void ClothesCoordeCacheCommandChangeAll(HumanCloth.ClothesCoordeCacheCommand __instance) =>
             (CharaLoadTrack.Mode != CharaLoadTrack.FlagAware)
                 .Maybe(F.Apply(ChangeActorCoordinate.OnNext, (__instance._cloth._human, __instance._cloth._human.data.Status.coordinateType)));
-    }
-    #endregion
-
-    #region Conversion
-    static partial class Hooks
-    {
-        [HarmonyPrefix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(ConvertHumanDataScene), nameof(ConvertHumanDataScene.Start))]
-        static void ConvertHumanDataSceneConvertAsyncPrefix(ConvertHumanDataScene __instance) =>
-            (InConversion, CharaLoadTrack.Mode, _) = (true, CharaLoadTrack.FlagIgnore,
-                __instance.OnDestroyAsObservable()
-                    .Subscribe(_ => (InConversion, CharaLoadTrack.Mode) = (false, CharaLoadTrack.Ignore)));
     }
     #endregion
 

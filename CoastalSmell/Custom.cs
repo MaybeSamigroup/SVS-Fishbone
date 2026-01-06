@@ -38,7 +38,7 @@ namespace CoastalSmell
         internal static Subject<(string Bundle, string Asset, GameObject Prefab)> UIPrefab = new ();
 
 #if DEBUG
-        static Hooks() => UIPrefab.Subscribe(tuple => Plugin.Instance.Log.LogInfo($"{tuple.Asset},{tuple.Bundle}"));
+        static Hooks() => UIPrefab.Subscribe(tuple => Plugin.Instance.Log.LogDebug($"{tuple.Asset},{tuple.Bundle}"));
 #endif
 
         [HarmonyPostfix]

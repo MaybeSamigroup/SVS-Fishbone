@@ -13,23 +13,28 @@ using CoastalSmell;
 
 namespace Fishbone
 {
-    #region Save
+    #region Save and Conversion
     static partial class Hooks
     {
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(SV.ConvertHumanDataScene), nameof(SV.ConvertHumanDataScene.Start))]
+        static void ConvertHumanDataSceneConvertAsyncPrefix(SV.ConvertHumanDataScene __instance) =>
+            __instance.OnDestroyAsObservable().With(EnableConversion).Subscribe(_ => DisableConversion());
+
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.SaveCharaFileBeforeAction))]
-        static void HumanDataSaveCharaFileBeforeAction(HumanData __instance, string path) => SaveChara.OnNext((__instance, path));
+        static void HumanDataSaveCharaFileBeforeAction(HumanData __instance, string path) => OnSaveChara(__instance, path);
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanDataCoordinate), nameof(HumanDataCoordinate.SaveFile))]
-        static void HumanDataCoordinateSaveFilePostfix(HumanDataCoordinate __instance, string path) => SaveCoord.OnNext((__instance, path));
+        static void HumanDataCoordinateSaveFilePostfix(HumanDataCoordinate __instance, string path) => OnSaveCoord(__instance, path);
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(WorldData), nameof(WorldData.Save), typeof(string))]
         static void WorldSavePrefix(WorldData __instance) =>
             __instance.Charas.Yield()
                 .Where(entry => entry.Value != null)
-                .Select(entry => entry.Value).ForEach(SaveActor.OnNext);
+                .Select(entry => entry.Value).ForEach(Extension.Save);
     }
     #endregion
 
@@ -104,21 +109,8 @@ namespace Fishbone
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanCoordinate), nameof(HumanCoordinate.ChangeCoordinateType), typeof(ChaFileDefine.CoordinateType), typeof(bool))]
-        static void HumanCoordinateChangeCoordinateTypePostfix(HumanCoordinate __instance, ChaFileDefine.CoordinateType type, bool changeBackCoordinateType) =>
-            (changeBackCoordinateType || __instance.human.data.Status.coordinateType != (int)type)
-                .Maybe(F.Apply(ChangeActorCoordinate.OnNext, (__instance.human, (int)type)));
-    }
-    #endregion
-
-    #region Conversion
-    static partial class Hooks
-    {
-        [HarmonyPrefix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(SV.ConvertHumanDataScene), nameof(SV.ConvertHumanDataScene.Start))]
-        static void ConvertHumanDataSceneConvertAsyncPrefix(SV.ConvertHumanDataScene __instance) =>
-            (InConversion, CharaLoadTrack.Mode, _) = (true, CharaLoadTrack.FlagIgnore,
-                __instance.OnDestroyAsObservable()
-                    .Subscribe(_ => (InConversion, CharaLoadTrack.Mode) = (false, CharaLoadTrack.Ignore)));
+        static void HumanCoordinateChangeCoordinateTypePostfix(HumanCoordinate __instance, ChaFileDefine.CoordinateType type) =>
+            (CharaLoadTrack.Mode != CharaLoadTrack.FlagAware).Maybe(F.Apply(ChangeActorCoordinate.OnNext, (__instance.human, (int)type)));
     }
     #endregion
 }
