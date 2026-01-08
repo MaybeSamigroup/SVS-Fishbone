@@ -57,9 +57,9 @@ namespace Fishbone
         public static IObservable<Human> OnPrepareSaveCoord =>
             PrepareSaveCoord.AsObservable().Merge(Hooks.OnChangeCustomCoord.Select(_ => HumanCustom.Instance.Human));
 
-        public static IObservable<(ZipArchive Archive, Human Human)> OnSaveCustomChara => SaveCustomChara.AsObservable();
+        public static IObservable<(ZipArchive Archive, Human Human)> OnSaveChara => SaveChara.AsObservable();
 
-        public static IObservable<(ZipArchive Archive, Human Human)> OnSaveCustomCoord => SaveCustomCoord.AsObservable();
+        public static IObservable<(ZipArchive Archive, Human Human)> OnSaveCoord => SaveCoord.AsObservable();
 
         public static IObservable<(ZipArchive Archive, ActorIndex Index)> OnSaveActor => SaveActor.AsObservable();
 
@@ -92,8 +92,8 @@ namespace Fishbone
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() => [
             OnSaveActor.Subscribe(Extension<T, U>.SaveActorChara),
-            OnSaveCustomChara.Subscribe(Extension<T, U>.SaveCustomChara),
-            OnSaveCustomCoord.Subscribe(Extension<T, U>.SaveCustomCoord),
+            OnSaveChara.Subscribe(Extension<T, U>.SaveCustomChara),
+            OnSaveCoord.Subscribe(Extension<T, U>.SaveCustomCoord),
             Hooks.OnInitializeActors.Subscribe(Extension<T, U>.ClearActors),
             OnInitializeCustom.Subscribe(Extension<T, U>.ClearCustom),
             Extension<T, U>.OnLoadCustomChara.Subscribe(tuple => Extension<T, U>.Humans[tuple.Human, tuple.Limit] = tuple.Value),
@@ -108,7 +108,7 @@ namespace Fishbone
         public static IDisposable[] Register<T>()
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() => [
             OnSaveActor.Subscribe(Extension<T>.SaveActorChara),
-            OnSaveCustomChara.Subscribe(Extension<T>.SaveCustomChara),
+            OnSaveChara.Subscribe(Extension<T>.SaveCustomChara),
             Hooks.OnInitializeActors.Subscribe(Extension<T>.ClearActors),
             OnInitializeCustom.Subscribe(Extension<T>.ClearCustom),
             Extension<T>.OnLoadCustomChara.Subscribe(tuple => Extension<T>.Humans[tuple.Human, tuple.Limit] = tuple.Value),

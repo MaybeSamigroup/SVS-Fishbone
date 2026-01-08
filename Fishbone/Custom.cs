@@ -73,7 +73,7 @@ namespace Fishbone
         static IEnumerable<ActorIndex> IndexInList(Actor actor, int group,
             Il2CppSystem.Collections.Generic.List<FreeHScene.CharaInfo> infos) =>
             Enumerable.Range(0, infos.Count)
-                .Where(index => actor == infos[index].ActorData)
+                .Where(index => Il2CppEquals.Apply(actor, infos[index].ActorData))
                 .Select(index => (group, index));
 
         internal static IEnumerable<Actor> CurrentActors() =>
@@ -223,18 +223,18 @@ namespace Fishbone
         static Subject<(ZipArchive, ActorIndex)> SaveActor = new();
         static Subject<Human> PrepareSaveChara = new();
         static Subject<Human> PrepareSaveCoord = new();
-        static Subject<(ZipArchive, Human)> SaveCustomChara = new ();
-        static Subject<(ZipArchive, Human)> SaveCustomCoord = new ();
+        static Subject<(ZipArchive, Human)> SaveChara = new ();
+        static Subject<(ZipArchive, Human)> SaveCoord = new ();
         static Subject<(ZipArchive Output, (ZipArchive Input, HumanData Data) Value)> ConvertChara = new();
         static Subject<(ZipArchive Output, (ZipArchive Input, HumanDataCoordinate Data) Value)> ConvertCoord = new();
         internal static void Save(Actor actor) =>
             Implant(actor.ToHumanData(), ToBinary(SaveActor, actor.ToIndex()));
         internal static void Save(HumanData _, string path) =>
             File.WriteAllBytes(path, Encode.Implant(File.ReadAllBytes(path),
-                ToBinary(SaveCustomChara, HumanCustom.Instance.Human.With(PrepareSaveChara.OnNext))));
+                ToBinary(SaveChara, HumanCustom.Instance.Human.With(PrepareSaveChara.OnNext))));
         internal static void Save(HumanDataCoordinate _, string path) =>
             File.WriteAllBytes(path, Encode.Implant(File.ReadAllBytes(path),
-                ToBinary(SaveCustomCoord, HumanCustom.Instance.Human.With(PrepareSaveCoord.OnNext))));
+                ToBinary(SaveCoord, HumanCustom.Instance.Human.With(PrepareSaveCoord.OnNext))));
         internal static void Convert(HumanData data, string path) =>
             File.WriteAllBytes(path, Convert(data, File.ReadAllBytes(path)));
         internal static byte[] Convert(HumanData data, byte[] binary) =>
@@ -346,7 +346,7 @@ namespace Fishbone
     {
         internal static IObservable<(CustomTrack Track, HumanData Data, ZipArchive Value)> OnTrackCustom =>
             OnPreprocessChara.Where(_ => CharaLoadTrack.Mode == CharaLoadTrack.FlagAware)
-                .Select(tuple => (new CustomTrack(tuple.Data), tuple.Data, tuple.Value));
+                .Select(tuple => (new CustomTrack(tuple.Data), tuple.Data, tuple.Archive));
     }
     public static partial class Extension<T, U>
     {
@@ -375,7 +375,7 @@ namespace Fishbone
     {
         internal static IObservable<(ActorTrack Track, HumanData Data, ZipArchive Value)> OnTrackActor =>
             OnPreprocessChara.Where(_ => CharaLoadTrack.Mode == CharaLoadTrack.FlagIgnore)
-                .Select(tuple => (new ActorTrack(tuple.Data), tuple.Data, tuple.Value));
+                .Select(tuple => (new ActorTrack(tuple.Data), tuple.Data, tuple.Archive));
     }
     public static partial class Extension<T, U>
     {
@@ -491,8 +491,8 @@ namespace Fishbone
             OnCopyCustomToActor.Subscribe(_ => Plugin.Instance.Log.LogDebug("copy custom to actor")),
             OnPrepareSaveChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("prepare save chara")),
             OnPrepareSaveCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("prepare save coord")),
-            OnSaveCustomChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("save chara")),
-            OnSaveCustomCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("save coord")),
+            OnSaveChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("save chara")),
+            OnSaveCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("save coord")),
             OnConvertChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("convert chara")),
             OnConvertCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("convert coord")),
             OnSaveActor.Subscribe(_ => Plugin.Instance.Log.LogDebug("save actor")),

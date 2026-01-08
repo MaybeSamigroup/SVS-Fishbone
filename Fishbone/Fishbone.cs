@@ -18,8 +18,8 @@ namespace Fishbone
     // Extension events and helpers
     public static partial class Extension
     {
-        public static IObservable<(HumanData Data, ZipArchive Value)> OnPreprocessChara => CharaLoadTrack.OnLoadComplete;
-        public static IObservable<(HumanDataCoordinate Data, ZipArchive Value)> OnPreprocessCoord => CoordLoadTrack.OnLoadComplete;
+        public static IObservable<(HumanData Data, ZipArchive Archive)> OnPreprocessChara => CharaLoadTrack.OnLoadComplete;
+        public static IObservable<(HumanDataCoordinate Data, ZipArchive Archive)> OnPreprocessCoord => CoordLoadTrack.OnLoadComplete;
         public static Dictionary<K, V> Merge<K, V>(this Dictionary<K, V> mods, K index, V mod) =>
             mods == null ? new() { [index] = mod } :
                 mods.Where(entry => !index.Equals(entry.Key))
@@ -132,10 +132,10 @@ namespace Fishbone
             Json<U>.Load.Apply(Plugin.Instance.Log.LogError);
         public static IDisposable Translate<V>(string path, Func<V, T> map) where V : new() =>
             Extension.OnPreprocessChara
-                .Subscribe(tuple => TryGetEntry(tuple.Value, path, out var entry).Maybe(F.Apply(Translate, map, tuple.Value, entry)));
+                .Subscribe(tuple => TryGetEntry(tuple.Archive, path, out var entry).Maybe(F.Apply(Translate, map, tuple.Archive, entry)));
         public static IDisposable Translate<V>(string path, Func<V, U> map) where V : new() =>
             Extension.OnPreprocessCoord
-                .Subscribe(tuple => TryGetEntry(tuple.Value, path, out var entry).Maybe(F.Apply(Translate, map, tuple.Value, entry)));
+                .Subscribe(tuple => TryGetEntry(tuple.Archive, path, out var entry).Maybe(F.Apply(Translate, map, tuple.Archive, entry)));
     }
 
     // Attribute for simple extensions
@@ -176,8 +176,8 @@ namespace Fishbone
             Json<T>.Load.Apply(Plugin.Instance.Log.LogError);
         public static IDisposable Translate<V>(string path, Func<V, T> map) where V : new() =>
             Extension.OnPreprocessChara.Subscribe(tuple => 
-                TryGetEntry(tuple.Value, path, out var entry)
-                    .Maybe(F.Apply(Translate, map, tuple.Value, entry)));
+                TryGetEntry(tuple.Archive, path, out var entry)
+                    .Maybe(F.Apply(Translate, map, tuple.Archive, entry)));
     }
     public static partial class Hooks
     {

@@ -189,25 +189,14 @@ namespace CoastalSmell
             pivot ?? cmp.pivot
         ));
 
-        public static UIAction RtZero = Rt(
-            pivot: new(0, 0),
-            sizeDelta: new(0, 0),
-            anchorMin: new(0, 0),
-            anchorMax: new(0, 0),
-            offsetMin: new(0, 0),
-            offsetMax: new(0, 0),
-            anchoredPosition: new(0, 0)
-        );
-
         public static UIAction RtFill = Rt(
-            pivot: new(0, 0),
+            pivot: new(0, 1),
             sizeDelta: new(0, 0),
             anchorMin: new(0, 0),
             anchorMax: new(1, 1),
             offsetMin: new(0, 0),
             offsetMax: new(0, 0),
-            anchoredPosition: new(0, 0)
-        );
+            anchoredPosition: new (0, 0));
 
         public static RectOffset Offset(int left = 0, int right = 0, int top = 0, int bottom = 0) =>
             new() { left = left, right = right, top = top, bottom = bottom };
@@ -285,7 +274,8 @@ namespace CoastalSmell
             reverseArrangement, spacing, padding, childAlignment);
 
         public static UIAction Size(float? width = null, float? height = null) =>
-            Component<LayoutElement>(cmp => (cmp.preferredWidth, cmp.preferredHeight) = (cmp.minWidth = width ?? cmp.preferredWidth, cmp.minHeight = height ?? cmp.preferredHeight));
+            Component<LayoutElement>(cmp => (cmp.preferredWidth, cmp.preferredHeight) =
+                (cmp.minWidth = width ?? cmp.preferredWidth, cmp.minHeight = height ?? cmp.preferredHeight));
 
         public static UIAction Fitter(
             ContentSizeFitter.FitMode horizontal = ContentSizeFitter.FitMode.PreferredSize,
@@ -361,7 +351,7 @@ namespace CoastalSmell
 
         public static UIAction AssignSprites<T>(this SpriteState spriteState) where T : Selectable =>
             Component<Image, T>((image, cmp) =>
-                (cmp.image, cmp.spriteState, cmp.transition) =
+                (cmp.targetGraphic, cmp.spriteState, cmp.transition) =
                 (image, spriteState, Selectable.Transition.SpriteSwap));
 
         public static UIAction ToggleGroup(bool allowSwitchOff = false) =>
@@ -377,34 +367,60 @@ namespace CoastalSmell
                     Component<GraphicRaycaster>()));
 
         public static UIAction ClearPanel =
-            Image(color: new(0.0f, 0.0f, 0.0f, 0.0f));
+            Image(color: new(0.0f, 0.0f, 0.0f, 0.0f), alphaHit: 1);
 
         public static UIAction ColorPanel =
-            Image(color: new(0.5f, 0.5f, 0.5f, 0.7f), sprite: BorderSprites.ColorBg.Get());
+            Image(color: new(0.5f, 0.5f, 0.5f, 0.7f), sprite: BorderSprites.ColorBg.Get(), alphaHit: 1);
 
-        public static UIAction ScrollV(float width, float height, UIAction action) =>
+        public static UIAction Scroll(float width, float height, UIAction action) =>
             Size(width: width, height: height) +
-            LayoutH(childForceExpandHeight: true) +
             Component<ScrollRect>(cmp =>
-                (cmp.horizontal, cmp.vertical, cmp.verticalScrollbarVisibility, cmp.scrollSensitivity) =
-                    (false, true, ScrollRect.ScrollbarVisibility.AutoHide, Math.Min(200, height / 2))) +
-            "ViewPort".AsChild(
-                Size(width: width - 5, height: height) +
-                Component<RectMask2D>() + action +
+                (cmp.horizontal, cmp.vertical,
+                    cmp.horizontalScrollbarVisibility,
+                    cmp.verticalScrollbarVisibility,
+                    cmp.movementType, cmp.scrollSensitivity) =
+                    (true, true,
+                        ScrollRect.ScrollbarVisibility.AutoHide,
+                        ScrollRect.ScrollbarVisibility.AutoHide,
+                        ScrollRect.MovementType.Clamped, Math.Min(200, height / 2))) +
+            "ViewPort".AsChild(Rt(
+                    pivot: new (0, 1),
+                    sizeDelta: new (width - 5, height - 5),
+                    anchorMin: new (0, 1),
+                    anchorMax: new (0, 1),
+                    offsetMin: new (0, 0),
+                    offsetMax: new (0, 0),
+                    anchoredPosition: new (0, 1)) + 
+                Component<RectMask2D>() + action + 
                 Component<RectTransform, ScrollRect>((rect, scroll) => scroll.viewport = rect) +
-                (Component<RectTransform, ScrollRect>((rect, scroll) =>
-                    (scroll.content, scroll.normalizedPosition) = (rect, new(0, 1))) + Rt(
-                    anchorMin: new(0, 1),
-                    anchorMax: new(0, 1),
-                    offsetMin: new(0, 0),
-                    offsetMax: new(0, 0),
-                    pivot: new(0, 1)
-                )).At(0)) +
-            "Scrollbar".AsChild(
-                Size(width: 5, height: height) +
+                (Component<RectTransform, ScrollRect>((rect, scroll) => scroll.content = rect) + Fitter() + RtFill).At(0)) +
+            "ScrollbarV".AsChild(Rt(
+                    pivot: new (1, 1),
+                    sizeDelta: new (5, height - 5),
+                    anchorMin: new (1, 1),
+                    anchorMax: new (1, 1),
+                    offsetMin: new (0, 0),
+                    offsetMax: new (0, 0),
+                    anchoredPosition: new (1, 1)) + 
                 Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get()) +
                 Component<Scrollbar, ScrollRect>((scroll, rect) =>
                     (scroll.direction, rect.verticalScrollbar) = (Scrollbar.Direction.BottomToTop, scroll)) +
+                "Slider".AsChild(
+                    RtFill +
+                    "Handle".AsChild(RtFill +
+                        Image(color: new(1, 1, 1, 1), sprite: BorderSprites.ColorBg.Get()) +
+                        Component<RectTransform, Scrollbar>((rect, scroll) => scroll.handleRect = rect)))) +
+            "ScrollbarH".AsChild(Rt(
+                    pivot: new (0, 0),
+                    sizeDelta: new (0, 5),
+                    anchorMin: new (0, 0),
+                    anchorMax: new (1, 0),
+                    offsetMin: new (0, 0),
+                    offsetMax: new (0, 0),
+                    anchoredPosition: new (0, 0)) + 
+                Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get()) +
+                Component<Scrollbar, ScrollRect>((scroll, rect) =>
+                    (scroll.direction, rect.horizontalScrollbar) = (Scrollbar.Direction.LeftToRight, scroll)) +
                 "Slider".AsChild(
                     RtFill +
                     "Handle".AsChild(RtFill +
@@ -424,21 +440,52 @@ namespace CoastalSmell
         public static UIAction Section(float width, float height, Color bg, UIAction action) =>
             Size(width: width, height: height) + Image(color: bg) + "Label".AsChild(RtFill + Font(size: height) + action);
 
+        static float ScrollPoint(float current, float limit, float delta) =>
+            Mathf.Repeat(Mathf.MoveTowards(current, limit * 2, delta), limit);
+
+        static void ScrollPosition(float delta, float limit, RectTransform value) =>
+            value.anchoredPosition = new(- ScrollPoint(- value.anchoredPosition.x, limit, delta), 0);
+
+        static void ScrollText(this TextMeshProUGUI text, float delta) =>
+            ScrollPosition(delta * 30f, text.renderedWidth + 30f, text.rectTransform);
+
+        static void PrepareScrollText(TextMeshProUGUI text, RectMask2D mask) =>
+            mask.OnPointerEnterAsObservable()
+                .Where(_ => text.renderedWidth > mask.canvasRect.width)
+                .Select(_ => new CompositeDisposable(
+                    mask.OnUpdateAsObservable()
+                        .Select(_ => Time.deltaTime).Subscribe(text.ScrollText),
+                    Disposable.Create(F.Apply(UnityEngine.Object.Destroy,
+                        UnityEngine.Object.Instantiate(text.gameObject, text.transform)
+                            .With(Rt(anchoredPosition: new(text.renderedWidth + 30f, 0))))),
+                    Disposable.Create(() => text.rectTransform.anchoredPosition = new (0, 0))
+                )).Subscribe(subscription => mask.OnPointerExitAsObservable().Subscribe(_ => subscription.Dispose()));
+
+        public static UIAction ScrollText(UIAction action) =>
+            Image(color: new(0, 0, 0, 0)) +
+            Component<RectMask2D>() +
+            "Value".AsChild(RtFill + Font() +
+                Fitter(vertical: ContentSizeFitter.FitMode.Unconstrained) +
+                action + Component<TextMeshProUGUI, RectMask2D>(PrepareScrollText));
+
+        public static UIAction ScrollLabel(float width, float height, UIAction action) =>
+            Size(width: width, height: height) + ScrollText(action);
+
+
         public static UIAction Input(float width, float height, UIAction action) =>
             Size(width: width, height: height) +
             Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get()) +
             InputField() + AssignSprites<TMP_InputField>(InputSprites) +
-            "TextArea".AsChild(
-                RtFill +
+            "TextArea".AsChild(RtFill +
                 Component<RectMask2D>() + 
                 Component<RectTransform, TMP_InputField>((rect, input) => input.textViewport = rect) +
-                "Charet".AsChild(
-                    Component<TMP_SelectionCaret>() + RtFill +
+                "Charet".AsChild(RtFill +
+                    Component<TMP_SelectionCaret>() +
                     Component<RectTransform, TMP_InputField>((rect, input) => input.caretRectTrans = rect) +
                     Component<TMP_SelectionCaret, RectMask2D>((caret, mask) => caret.m_ParentMask = mask)) +
-                "Content".AsChild(
+                "Content".AsChild(RtFill +
                     Font(auto: false, size: 16) +
-                    Text(margin: new(5, 0, 5, 0), hrAlign: HorizontalAlignmentOptions.Right) + RtFill +
+                    Text(margin: new(5, 0, 5, 0), hrAlign: HorizontalAlignmentOptions.Right) +
                     Component<TextMeshProUGUI, TMP_InputField>((label, input) => input.textComponent = label) + action));
 
         public static UIAction Check(float width, float height) =>
@@ -447,11 +494,11 @@ namespace CoastalSmell
             Component<Toggle>(cmp => (cmp.isOn, cmp.transition) = (false, Selectable.Transition.SpriteSwap)) +
             "Toggle".AsChild(
                 Size(width: 18, height: 18) +
-                Image(color: new(1, 1, 1, 1), sprite: BorderSprites.LightBg.Get(), alphaHit: 0) +
+                Image(color: new(1, 1, 1, 1), sprite: BorderSprites.LightBg.Get()) +
                 "State".AsChild(
                     RtFill +
-                    Image(color: new(1, 1, 1, 1), sprite: SimpleSprites.CheckOn.Get(), alphaHit: 0) +
-                    Component<Image, Toggle>((image, cmp) => (cmp.image, cmp.graphic) = (image, image))));
+                    Image(color: new(1, 1, 1, 1), sprite: SimpleSprites.CheckOn.Get()) +
+                    Component<Image, Toggle>((image, cmp) => cmp.graphic = image)));
 
         public static UIAction Slider(float width, float height) =>
             Size(width: width, height: height) +
@@ -477,9 +524,7 @@ namespace CoastalSmell
                 Image(type: UnityEngine.UI.Image.Type.Tiled, color: new(1, 1, 1, 1), sprite: SimpleSprites.AlphaSample.Get()) +
                 Component<Button>() +
                 Component<Button, ThumbnailColor>((cmp, color) => color._button = cmp) +
-                "Sample".AsChild(
-                    RtFill +
-                    Image(color: new(1, 1, 1, 1)) +
+                "Sample".AsChild(RtFill + Image(color: new(1, 1, 1, 1)) +
                     Component<Image, ThumbnailColor>((image, color) => color._graphicColor = image)));
 
         static SpriteState ToggleSprites => new SpriteState()
@@ -490,14 +535,12 @@ namespace CoastalSmell
 
         public static UIAction Toggle(float width, float height, UIAction action) =>
             Size(width: width, height: height) +
-            Image(color: new(1, 1, 1, 1), sprite: SimpleSprites.ToggleBg.Get(), alphaHit: 0) +
+            Image(color: new(1, 1, 1, 1), sprite: SimpleSprites.ToggleBg.Get()) +
             Component<Toggle>() + AssignSprites<Toggle>(ToggleSprites) +
-            "State".AsChild(
-                RtFill +
-                LayoutH(padding: Offset(10, 0)) +
-                Image(color: new(1, 1, 1, 1), sprite: SimpleSprites.ToggleOn.Get(), alphaHit: 0) +
-                Component<Image, Toggle>((image, toggle) => toggle.graphic = image) +
-                "Label".AsChild(RtFill + Font(size: height) + action));
+            "Check".AsChild(RtFill +
+                Image(color: new(1, 1, 1, 1), sprite: SimpleSprites.ToggleOn.Get()) +
+                Component<Image, Toggle>((image, toggle) => toggle.graphic = image)) +
+            "Label".AsChild(RtFill + ScrollText(action));
 
         static SpriteState ButtonSprites => new SpriteState()
         {
@@ -509,20 +552,13 @@ namespace CoastalSmell
 
         public static UIAction Button(float width, float height, UIAction action) =>
             Size(width: width, height: height) +
-            Image(color: new(1, 1, 1, 1), sprite: BorderSprites.ButtonBg.Get(), alphaHit: 0) +
+            Image(color: new(1, 1, 1, 1), sprite: BorderSprites.ButtonBg.Get()) +
             Component<Button>() + AssignSprites<Button>(ButtonSprites) +
-            "Label".AsChild(
-                RtFill +
-                Font(size: height) +
-                Text(
-                    hrAlign: HorizontalAlignmentOptions.Center,
-                    vtAlign: VerticalAlignmentOptions.Middle,
-                    margin: new(5, 0, 5, 0)
-                ) + action);
+            "Label".AsChild(RtFill + Font() + Text(hrAlign: HorizontalAlignmentOptions.Center, margin: new(5, 0, 5, 0)) + action);
 
         public static UIAction Dropdown(float width, float height, UIAction action) =>
             Size(width: width, height: height) +
-            Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get(), alphaHit: 0) +
+            Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get()) +
             Component<TMP_Dropdown>() + AssignSprites<TMP_Dropdown>(InputSprites) +
             "Label".AsChild(
                 RtFill +
@@ -530,29 +566,31 @@ namespace CoastalSmell
                 Text(
                     hrAlign: HorizontalAlignmentOptions.Left,
                     vtAlign: VerticalAlignmentOptions.Middle,
-                    margin: new(5, 0, 5, 0)
-                ) +
+                    margin: new(5, 0, 5, 0)) +
                 Component<TextMeshProUGUI, TMP_Dropdown>((text, dropdown) => dropdown.captionText = text) + action) +
             "Template".AsChild(
-                RtZero +
-                ScrollV(width, height * 10, "Options".AsChild(
-                    RtFill +
-                    Fitter() +
-                    LayoutV() +
+                Rt(pivot: new(0, 1),
+                    anchorMin: new (0, 0),
+                    anchorMax: new (1, 0),
+                    offsetMin: new (0, 0),
+                    offsetMax: new (0, 0),
+                    sizeDelta: new(0, 0),
+                    anchoredPosition: new(0, 0)) +
+                Scroll(width, height * 10, "Options".AsChild(
+                    LayoutV(padding: Offset(5, 5)) +
                     ColorPanel +
-                    "Option".AsChild(Toggle(width - 5, height,
-                        Component<TextMeshProUGUI, TMP_Dropdown>((label, dropdown) => dropdown.itemText = label))))
-                ) + Component<RectTransform, TMP_Dropdown>((rect, dropdown) => dropdown.template = rect));
+                    "Item".AsChild(Toggle(width: width - 15, height: height, Font() +
+                        Component<TextMeshProUGUI, TMP_Dropdown>((label, dropdown) => dropdown.itemText = label)) + AssignSprites<Toggle>(InputSprites)))) +
+                Component<RectTransform, TMP_Dropdown>((rect, dropdown) => dropdown.template = rect));
 
         public static UIAction Window(float width, float height, UIAction action) =>
             ClearPanel +
-            LayoutV(spacing: 6, padding: Offset(6, 6)) +
+            LayoutV(spacing: 5, padding: Offset(5, 5)) +
             Component<UI_DragWindow>() +
             "Title".AsChild(
                 Size(width: width, height: 30) +
-                LayoutH(padding: Offset(20, 0)) +
                 Image(color: new(1, 1, 1, 1), sprite: BorderSprites.ColorBg.Get()) +
-                "Label".AsChild(Font() + action));
+                LayoutH(padding: Offset(20, 0)) + "Label".AsChild(Font() + action));
 
         static TMP_FontAsset FontAsset;
         static void Initialize(GameObject go) =>
@@ -610,13 +648,13 @@ namespace CoastalSmell
                     UGUI.Root.AsParent() +
                     UGUI.GameObject(active: config.State.Value) +
                     UGUI.Rt(
-                        anchoredPosition: new(config.AnchorX.Value, config.AnchorY.Value),
-                        sizeDelta: new(width + 12, height + 48),
-                        anchorMin: new(0, 1),
-                        anchorMax: new(0, 1),
-                        offsetMin: new(0, 0),
-                        offsetMax: new(0, 0),
-                        pivot: new(0, 1)) +
+                        pivot: new (0, 1),
+                        anchorMin: new (0, 1),
+                        anchorMax: new (0, 1),
+                        offsetMin: new (0, 0),
+                        offsetMax: new (0, 0),
+                        sizeDelta: new(width + 10, height + 45),
+                        anchoredPosition: new(config.AnchorX.Value, config.AnchorY.Value)) +
                     UGUI.Window(width, height,
                         UGUI.Text(text: name) +
                         UGUI.Component<TextMeshProUGUI>(text => TitleUI = text))

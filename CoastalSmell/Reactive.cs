@@ -5,6 +5,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Events;
+using UnityEngine.EventSystems;
 #if Aicomi
 using Il2CppSystem.Threading;
 using Rx = R3;
@@ -97,5 +98,9 @@ namespace CoastalSmell
             Rx.Triggers.ObservableTriggerExtensions
                 .GetOrAddComponent<Rx.Triggers.ObservableDestroyTrigger>(go)
                 .OnDestroyAsObservable().Wrap();
+        public static IObservable<PointerEventData> OnPointerEnterAsObservable(this UIBehaviour ui) =>
+            Rx.Triggers.ObservableTriggerExtensions.OnPointerEnterAsObservable(ui).Wrap();
+        public static IObservable<PointerEventData> OnPointerExitAsObservable(this UIBehaviour ui) =>
+            Rx.Triggers.ObservableTriggerExtensions.OnPointerExitAsObservable(ui).Wrap(); 
     }
 }

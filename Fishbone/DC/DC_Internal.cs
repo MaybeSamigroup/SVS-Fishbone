@@ -75,13 +75,13 @@ namespace Fishbone
     }
     public static partial class Extension<T, U>
     {
-        internal static void SaveChara((ZipArchive Value, Human Human) tuple) =>
-            SaveChara(tuple.Value, Humans[tuple.Human]);
+        internal static void SaveChara((ZipArchive Archive, Human Human) tuple) =>
+            SaveChara(tuple.Archive, Humans[tuple.Human]);
     }
     public static partial class Extension<T>
     {
-        internal static void SaveChara((ZipArchive Value, Human Human) tuple) =>
-            SaveChara(tuple.Value, Values[tuple.Human]);
+        internal static void SaveChara((ZipArchive Archive, Human Human) tuple) =>
+            SaveChara(tuple.Archive, Values[tuple.Human]);
     }
 
     class CharaCopyTrack : IDisposable
@@ -109,7 +109,7 @@ namespace Fishbone
     {
         internal static IObservable<(CharaCopyTrack Track, HumanData Data, ZipArchive Value)> OnTrackChara =>
             OnPreprocessChara.Where(_ => CharaLoadTrack.Mode == CharaLoadTrack.FlagAware)
-                .Select(tuple => (new CharaCopyTrack(tuple.Data), tuple.Data, tuple.Value));
+                .Select(tuple => (new CharaCopyTrack(tuple.Data), tuple.Data, tuple.Archive));
     }
     public static partial class Extension<T, U>
     {
