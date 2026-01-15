@@ -1,60 +1,74 @@
 # SVS-Fishbone
 
+## Table of Contents
+
+- [Fishbone](#fishbone)
+- [CoastalSmell](#coastalsmell)
+- [Extractor](#extractor)
+- [Prerequisites and Installation](#prerequisites-and-installation)
+  - [Aicomi](#aicomi)
+  - [SamabakeScramble](#samabakescramble)
+  - [DigitalCraft](#digitalcraft-standalonedigitalcraft-with-honeycome)
+- [Migration between versions](#migration-between-versions)
+- [How It Works](#how-it-works)
+- [How to Use](#how-to-use)
+
 ## Fishbone
 
 Plugin API to serialize and deserialize character or coordinate-bound extension data, for Aicomi, SamabakeScramble and DigitalCraft.
 
 ## CoastalSmell
 
-Plugin API to generate UnityUI component in runtime and syntax suggers, for Aicomi, SamabakeScramble and DigitalCraft.
+Plugin API to provide syntax sugars, common observable resources, and runtime UnityUI component generators, for Aicomi, SamabakeScramble and DigitalCraft.
+
+Binary releases contain required [Reactive Extensions for .NET](https://github.com/dotnet/reactive) distributed under MIT license.
 
 ## Extractor
 
-Extension data extractor from Drag & Dropped Chracacter and Coordinate cards.
+Extension data extractor from Drag & Dropped Characacter and Coordinate cards.
 
-Extension data will extracted as same name zip file in same folder of source file.
+Extension data will be extracted as zip file with the same name in the same folder as source file.
 
-## Prerequisites (Aicomi)
+## Prerequisites and Installation
 
-- [BepInEx](https://github.com/BepInEx/BepInEx)
-  - [Bleeding Edge (BE) build](https://builds.bepinex.dev/projects/bepinex_be) #738 or later
+### Aicomi
 
-Confirmed working under Aicomi 1.0.2.
+Confirmed working under Aicomi 1.0.7.
 
-## Installation (Aicomi)
+#### Prerequisites (Aicomi)
+
+- [HF Patch for Aicomi](https://github.com/ManlyMarco/AC-HF_Patch)
+
+#### Installation (Aicomi)
 
 Extract the [latest release](https://github.com/MaybeSamigroup/SVS-Fishbone/releases/latest) AC_Fishbone.zip to your Aicomi install directory.
 
-## Prerequisites (SamabakeScramble)
-
-- [HF Patch for Summer Vacation Scramble](https://github.com/ManlyMarco/SVS-HF_Patch)
+### SamabakeScramble
 
 Confirmed working under SamabakeScramble 1.1.6.
 
-## Installation (SamabakeScramble)
+#### Prerequisites (SamabakeScramble)
+
+- [HF Patch for Summer Vacation Scramble](https://github.com/ManlyMarco/SVS-HF_Patch)
+
+#### Installation (SamabakeScramble)
 
 Extract the [latest release](https://github.com/MaybeSamigroup/SVS-Fishbone/releases/latest) SVS_Fishbone.zip to your SamabakeScramble install directory.
 
-## Prerequisites (DigitalCraft with HoneyCome)
+### DigitalCraft Standalone/DigitalCraft with HoneyCome
 
-- [HF patch for HoneyCome and DigitalCraft](https://github.com/ManlyMarco/HC-HF_Patch)
+Confirmed working under DigitalCraft Standalone 3.0.0.
 
-## Installation (DigitalCraft with HoneyCome)
-
-Extract the [latest release](https://github.com/MaybeSamigroup/SVS-Fishbone/releases/latest) DC_Fishbone.zip to your HoneyCome install directory.
-
-## Prerequisites (DigitalCraft Standalone)
-
-Confirmed working under DigitalCraft 2.0.0.
+#### Prerequisites (DigitalCraft)
 
 - [BepInEx](https://github.com/BepInEx/BepInEx)
-  - [Bleeding Edge (BE) build](https://builds.bepinex.dev/projects/bepinex_be) #697 or later
+  - [Bleeding Edge (BE) build](https://builds.bepinex.dev/projects/bepinex_be) #752 or later
 
-## Installation (DigitalCraft Standalone)
+#### Installation (DigitalCraft)
 
-Extract BepinEx bleeding edge build into Digital Craft install directory.
+Extract BepInEx bleeding edge build into DigitalCraft install directory.
 
-Move these files from install directory to where executable placed directory. (directory named DigitalCraft under install directory; where you found DigitalCraft.exe)
+Move these files from install directory to directory where the executable is placed. (directory named DigitalCraft under install directory; where you found DigitalCraft.exe)
 
 1. .doorstop_version
 1. winhttp.dll
@@ -86,24 +100,26 @@ enabled = true
 +corlib_dir = ..\dotnet
 ```
 
-Extract the [latest release](https://github.com/MaybeSamigroup/SVS-Fishbone/releases/latest) DigitalCraft.zip to your DigitalCraft install directory.
+Extract the [latest release](https://github.com/MaybeSamigroup/SVS-Fishbone/releases/latest) DC_Fishbone.zip to your DigitalCraft install directory.
 
-## Migration from 1.x.x to 2.x.x
+## Migration between versions
+
+### Migration from 1.x.x to 2.x.x
 
 Remove Fishbone.dll from BepinEx/plugins.
 
 Plugin assembly names are now SVS_Fishbone.dll and DC_Fishbone.dll.
 
-Cards made with 1.x.x is still supported to load in SVS, but not in DC.
+Cards made with 1.x.x are still supported to load in SVS, but not in DC.
 
-To use them in DC, should saved agein with 2.x.x.
+To use them in DC, should be saved agein with 2.x.x.
 
-## Migration from 2.x.x to 3.x.x
+### Migration from 2.x.x to 3.x.x
 
 These directories contained in previous releases are no longer used.
 Please move it contents to new one and delete it.
 
-- (GameRoot)/UserData/plugins/SamabakeScramble.CoastallSmell
+- (GameRoot)/UserData/plugins/SamabakeScramble.CoastalSmell
 
 ## How it works
 
@@ -112,4 +128,4 @@ This allows arbitrary plugin data to be stored and retrieved alongside character
 
 ## How to use
 
-refer the [Framework introduction](https://github.com/MaybeSamigroup/SVS-Fishbone/wiki)
+Refer to the [Framework introduction](https://github.com/MaybeSamigroup/SVS-Fishbone/wiki)

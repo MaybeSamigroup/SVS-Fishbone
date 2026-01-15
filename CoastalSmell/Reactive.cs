@@ -75,13 +75,19 @@ namespace CoastalSmell
             ui.onValueChanged.AsObservable();
 
         public static IObservable<Unit> OnUpdateAsObservable(this Component cmp) =>
-            Rx.Triggers.ObservableTriggerExtensions.UpdateAsObservable(cmp).Wrap();
+            cmp.gameObject.OnUpdateAsObservable();
         public static IObservable<Unit> OnEnableAsObservable(this Component cmp) =>
-            Rx.Triggers.ObservableTriggerExtensions.OnEnableAsObservable(cmp).Wrap(); 
+            cmp.gameObject.OnEnableAsObservable();
         public static IObservable<Unit> OnDisableAsObservable(this Component cmp) =>
-            Rx.Triggers.ObservableTriggerExtensions.OnEnableAsObservable(cmp).Wrap(); 
+            cmp.gameObject.OnDisableAsObservable();
         public static IObservable<Unit> OnDestroyAsObservable(this Component cmp) =>
-            Rx.Triggers.ObservableTriggerExtensions.OnDestroyAsObservable(cmp).Wrap();
+            cmp.gameObject.OnDestroyAsObservable();
+        public static IObservable<Unit> OnTransformChildrenChangedAsObservable(this Component cmp) =>
+            cmp.gameObject.OnTransformChildrenChangedAsObservable(); 
+        public static IObservable<PointerEventData> OnPointerEnterAsObservable(this Component cmp) =>
+            cmp.gameObject.OnPointerEnterAsObservable();
+        public static IObservable<PointerEventData> OnPointerExitAsObservable(this Component cmp) =>
+            cmp.gameObject.OnPointerExitAsObservable();
         public static IObservable<Unit> OnUpdateAsObservable(this GameObject go) =>
             Rx.Triggers.ObservableTriggerExtensions
                 .GetOrAddComponent<Rx.Triggers.ObservableUpdateTrigger>(go)
@@ -98,9 +104,18 @@ namespace CoastalSmell
             Rx.Triggers.ObservableTriggerExtensions
                 .GetOrAddComponent<Rx.Triggers.ObservableDestroyTrigger>(go)
                 .OnDestroyAsObservable().Wrap();
-        public static IObservable<PointerEventData> OnPointerEnterAsObservable(this UIBehaviour ui) =>
-            Rx.Triggers.ObservableTriggerExtensions.OnPointerEnterAsObservable(ui).Wrap();
-        public static IObservable<PointerEventData> OnPointerExitAsObservable(this UIBehaviour ui) =>
-            Rx.Triggers.ObservableTriggerExtensions.OnPointerExitAsObservable(ui).Wrap(); 
+        public static IObservable<PointerEventData> OnPointerEnterAsObservable(this GameObject go) =>
+            Rx.Triggers.ObservableTriggerExtensions
+                .GetOrAddComponent<Rx.Triggers.ObservablePointerEnterTrigger>(go)
+                .OnPointerEnterAsObservable().Wrap();
+        public static IObservable<PointerEventData> OnPointerExitAsObservable(this GameObject go) =>
+            Rx.Triggers.ObservableTriggerExtensions
+                .GetOrAddComponent<Rx.Triggers.ObservablePointerExitTrigger>(go)
+                .OnPointerExitAsObservable().Wrap();
+        public static IObservable<Unit> OnTransformChildrenChangedAsObservable(this GameObject go) =>
+            Rx.Triggers.ObservableTriggerExtensions
+                .GetOrAddComponent<Rx.Triggers.ObservableTransformChangedTrigger>(go)
+                .OnTransformChildrenChangedAsObservable().Wrap();
+
     }
 }

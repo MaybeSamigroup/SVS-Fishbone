@@ -64,7 +64,8 @@ namespace Fishbone
         public static IObservable<(ZipArchive Archive, ActorIndex Index)> OnSaveActor => SaveActor.AsObservable();
 
         public static IObservable<Human> OnLoadCustomChara =>
-            OnTrackCustom.SelectMany(tuple => tuple.Track.OnResolve.Select(pair => pair.Human))
+            OnHumanCustomReload
+                .Merge(OnTrackCustom.SelectMany(tuple => tuple.Track.OnResolve.Select(pair => pair.Human)))
                 .Merge(OnActorHumanizeInternal.Where(_ => CharaLoadTrack.Mode == CharaLoadTrack.FlagAware).Select(pair => pair.Human));
 
         public static IObservable<int> OnLoadActorChara =>

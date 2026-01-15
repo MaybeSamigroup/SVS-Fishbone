@@ -115,9 +115,11 @@ namespace CoastalSmell
             go => action(go.GetComponent<T>() ?? go.AddComponent<T>(), go.GetComponent<U>() ?? go.GetComponentInParent<U>(true));
 
         public static UIAction GameObject(string name = null, bool active = true) =>
-            name is null ? new UIAction(go => go.SetActive(active)) : new UIAction(go => go.name = name) + new UIAction(go => go.SetActive(active));
+            name is null ? new UIAction(go => go.SetActive(active)) : 
+                new UIAction(go => go.name = name) + new UIAction(go => go.SetActive(active));
 
         public static UIAction AdjustScale = Component<Transform>(tf => tf.localScale = new(1.0f, 1.0f));
+
         public static UIAction AsParent(this GameObject parent) => parent.transform.AsParent();
 
         public static UIAction AsParent(this Transform parent) => (go => go.transform.SetParent(parent)) + AdjustScale;
@@ -127,7 +129,7 @@ namespace CoastalSmell
         public static UIAction AsChild(this Transform child) => go => child.SetParent(go.transform);
 
         public static UIAction AsChild(this string name, UIAction action) =>
-            go => new GameObject(name).With(go.transform.AsParent() + AdjustScale + action);
+            go => (go.transform.Find(name) ?? new GameObject(name).transform).With(go.transform.AsParent() + AdjustScale + action);
 
         public static UIAction Canvas(RenderMode? renderMode = RenderMode.ScreenSpaceOverlay) =>
             Component<Canvas>(cmp => (cmp.renderMode, cmp.sortingOrder) = (renderMode ?? cmp.renderMode, 1));
@@ -438,7 +440,8 @@ namespace CoastalSmell
             Size(width: width, height: height) + Font(size: height);
 
         public static UIAction Section(float width, float height, Color bg, UIAction action) =>
-            Size(width: width, height: height) + Image(color: bg) + "Label".AsChild(RtFill + Font(size: height) + action);
+            Size(width: width, height: height) + Image(color: bg) 
+                + "Label".AsChild(RtFill + Font(size: height) + action);
 
         static float ScrollPoint(float current, float limit, float delta) =>
             Mathf.Repeat(Mathf.MoveTowards(current, limit * 2, delta), limit);
@@ -451,7 +454,7 @@ namespace CoastalSmell
 
         static void PrepareScrollText(TextMeshProUGUI text, RectMask2D mask) =>
             mask.OnPointerEnterAsObservable()
-                .Where(_ => text.renderedWidth > mask.canvasRect.width)
+                .Where(_ => text.renderedWidth + text.margin.x + text.margin.z > mask.canvasRect.width)
                 .Select(_ => new CompositeDisposable(
                     mask.OnUpdateAsObservable()
                         .Select(_ => Time.deltaTime).Subscribe(text.ScrollText),
@@ -461,16 +464,15 @@ namespace CoastalSmell
                     Disposable.Create(() => text.rectTransform.anchoredPosition = new (0, 0))
                 )).Subscribe(subscription => mask.OnPointerExitAsObservable().Subscribe(_ => subscription.Dispose()));
 
-        public static UIAction ScrollText(UIAction action) =>
+        public static UIAction ScrollText(UIAction action = null) =>
             Image(color: new(0, 0, 0, 0)) +
             Component<RectMask2D>() +
             "Value".AsChild(RtFill + Font() +
                 Fitter(vertical: ContentSizeFitter.FitMode.Unconstrained) +
-                action + Component<TextMeshProUGUI, RectMask2D>(PrepareScrollText));
+                (action ?? Identity) + Component<TextMeshProUGUI, RectMask2D>(PrepareScrollText));
 
-        public static UIAction ScrollLabel(float width, float height, UIAction action) =>
-            Size(width: width, height: height) + ScrollText(action);
-
+        public static UIAction ScrollLabel(float width, float height, UIAction action = null) =>
+            Size(width: width, height: height) + ScrollText(action ?? Identity);
 
         public static UIAction Input(float width, float height, UIAction action) =>
             Size(width: width, height: height) +
@@ -540,7 +542,7 @@ namespace CoastalSmell
             "Check".AsChild(RtFill +
                 Image(color: new(1, 1, 1, 1), sprite: SimpleSprites.ToggleOn.Get()) +
                 Component<Image, Toggle>((image, toggle) => toggle.graphic = image)) +
-            "Label".AsChild(RtFill + ScrollText(action));
+            "Label".AsChild(RtFill + ScrollText(Text(margin: new (10, 0, 10, 0)) + action));
 
         static SpriteState ButtonSprites => new SpriteState()
         {
@@ -559,15 +561,15 @@ namespace CoastalSmell
         public static UIAction Dropdown(float width, float height, UIAction action) =>
             Size(width: width, height: height) +
             Image(color: new(1, 1, 1, 1), sprite: BorderSprites.Border.Get()) +
-            Component<TMP_Dropdown>() + AssignSprites<TMP_Dropdown>(InputSprites) +
-            "Label".AsChild(
-                RtFill +
-                Font(size: height) +
-                Text(
-                    hrAlign: HorizontalAlignmentOptions.Left,
-                    vtAlign: VerticalAlignmentOptions.Middle,
-                    margin: new(5, 0, 5, 0)) +
-                Component<TextMeshProUGUI, TMP_Dropdown>((text, dropdown) => dropdown.captionText = text) + action) +
+            Component<TMP_Dropdown>(cmp => cmp.OnTransformChildrenChangedAsObservable()
+                .Where(_ => cmp.transform.childCount > 2)
+                .Select(_ => cmp.transform.GetChild(2).Find("ViewPort").Find("Options"))
+                .SelectMany(tf => tf.OnTransformChildrenChangedAsObservable().Select(_ => tf))
+                .Subscribe(tf => tf.GetChild(tf.childCount - 1)
+                    .With(Component<TextMeshProUGUI, RectMask2D>(PrepareScrollText).At("Label", "Value")))) +
+            AssignSprites<TMP_Dropdown>(InputSprites) +
+            "Label".AsChild(RtFill + ScrollText(Text(margin: new(10, 0, 10, 0)) +
+                Component<TextMeshProUGUI, TMP_Dropdown>((text, dropdown) => dropdown.captionText = text))) +
             "Template".AsChild(
                 Rt(pivot: new(0, 1),
                     anchorMin: new (0, 0),
@@ -577,11 +579,18 @@ namespace CoastalSmell
                     sizeDelta: new(0, 0),
                     anchoredPosition: new(0, 0)) +
                 Scroll(width, height * 10, "Options".AsChild(
-                    LayoutV(padding: Offset(5, 5)) +
-                    ColorPanel +
-                    "Item".AsChild(Toggle(width: width - 15, height: height, Font() +
-                        Component<TextMeshProUGUI, TMP_Dropdown>((label, dropdown) => dropdown.itemText = label)) + AssignSprites<Toggle>(InputSprites)))) +
-                Component<RectTransform, TMP_Dropdown>((rect, dropdown) => dropdown.template = rect));
+                    LayoutV(padding: Offset(5, 5)) + ColorPanel +
+                    "Item".AsChild(
+                        Size(width: width - 15, height: height) +
+                        Image(color: new(1, 1, 1, 1), sprite: SimpleSprites.ToggleBg.Get()) +
+                        Component<Toggle>() + AssignSprites<Toggle>(InputSprites) +
+                        "Check".AsChild(RtFill +
+                            Image(color: new(1, 1, 1, 1), sprite: SimpleSprites.ToggleOn.Get()) +
+                            Component<Image, Toggle>((image, toggle) => toggle.graphic = image)) +
+                        "Label".AsChild(RtFill + ScrollText(Text(margin: new (10, 0, 10, 0)) +
+                            Component<TextMeshProUGUI, TMP_Dropdown>((label, dropdown) => dropdown.itemText = label)))))) +
+                Component<RectTransform, TMP_Dropdown>((rect, dropdown) => dropdown.template = rect)) +
+            action;
 
         public static UIAction Window(float width, float height, UIAction action) =>
             ClearPanel +

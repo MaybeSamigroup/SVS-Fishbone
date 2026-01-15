@@ -16,12 +16,15 @@
         <Compile Include="../IOHelper.cs"/>
         <Compile Include="../UIHelper.cs"/>
         <UITexture Include="Resource/*.*"/>
+        <NetDll Include="../../Resource/*.*"/>
     </ItemGroup>
     <Target Name="Deploy" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">
+        <Copy SourceFiles="@(NetDll)" DestinationFolder="$(GamePath)/dotnet/"/>
         <Copy SourceFiles="@(UITexture)" DestinationFolder="$(GamePath)/UserData/plugins/$(PluginName)"/>
         <Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="$(GamePath)/BepInEx/plugins/" />
     </Target>
     <Target Name="Release" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+        <Copy SourceFiles="@(NetDll)" DestinationFolder="../../Release/$(GameName)/dotnet"/>
         <Copy SourceFiles="@(UITexture)" DestinationFolder="../../Release/$(GameName)/UserData/plugins/$(PluginName)"/>
         <Copy SourceFiles="$(OutputPath)/$(AssemblyName).dll" DestinationFolder="../../Release/$(GameName)/BepinEx/plugins"/>
     </Target>

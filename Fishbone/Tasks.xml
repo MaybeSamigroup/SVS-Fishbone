@@ -14,14 +14,11 @@
         <Compile Include="../$(PluginName).cs"/>
         <Compile Include="../Internal.cs"/>
         <Compile Include="../../Png.cs"/>
-        <NetDll Include="../../Resource/*.*"/>
     </ItemGroup>
     <Target Name="Deploy" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">
         <Copy SourceFiles="$(OutputPath)/$(AssemblyName).dll" DestinationFolder="$(GamePath)/BepInEx/plugins/" />
-        <Copy SourceFiles="@(NetDll)" DestinationFolder="$(GamePath)/dotnet/"/>
     </Target>
     <Target Name="Release" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
-        <Copy SourceFiles="@(NetDll)" DestinationFolder="../../Release/$(GameName)/dotnet"/>
         <Copy SourceFiles="$(OutputPath)/$(AssemblyName).dll" DestinationFolder="../../Release/$(GameName)/BepinEx/plugins"/>
         <ZipDirectory SourceDirectory="../../Release/$(GameName)" Overwrite="true" DestinationFile="../../$(AssemblyName).zip"/>
     </Target>

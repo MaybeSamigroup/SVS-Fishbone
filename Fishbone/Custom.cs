@@ -14,6 +14,7 @@ using CharacterCreation;
 #if Aicomi
 using ILLGAMES.Rigging;
 using ILLGAMES.Extensions;
+using ILLGAMES.Unity.Animations;
 using AC.User;
 using AC.Scene.FreeH;
 using Actor = AC.User.ActorData;
@@ -21,6 +22,7 @@ using ActorIndex = (int, int);
 #else
 using ILLGames.Rigging;
 using ILLGames.Extensions;
+using ILLGames.Unity.Animations;
 using Actor = SaveData.Actor;
 using ActorIndex = int;
 #endif
@@ -281,17 +283,19 @@ namespace Fishbone
     #region Special for SardineTail
     public static partial class Extension
     {
+        static Subject<Human> OnHumanCustomReload = new Subject<Human>();
         static void HumanCustomReload(HumanCustom custom) =>
-            (custom?.Human is not null)
-                .Maybe(F.Apply(HumanCustomReload, custom, custom.Human));
+            (custom?.Human is not null).Maybe(F.Apply(HumanCustomReload, custom, custom.Human));
         static void HumanCustomReload(HumanCustom custom, Human human) =>
-            (custom?._motionIK is not null).With(human.Load)
-                .Maybe(F.Apply(HumanCustomReload, custom, human, custom._motionIK));
-        static void HumanCustomReload(HumanCustom custom, Human human, MotionIK motionIK)
-        {
+            (custom?._motionIK is not null)
+                .With(F.Apply(OnHumanCustomReload.OnNext, human))
+                .With(human.Load).Maybe(
+                    F.Apply(HumanCustomReloadMotion, custom, human, custom._motionIK) +
+                    F.Apply(custom.LoadPlayAnimation, custom.NowPose, new Il2CppSystem.Nullable<float>() { value = 0.0f }) +
+                    F.Apply(custom.StateSetting.Look.ChangeLookEyes, custom.StateSetting.Look.Eyes, false) +
+                    F.Apply(custom.StateSetting.Look.ChangeLookNeck, custom.StateSetting.Look.Neck, false));
+        static void HumanCustomReloadMotion(HumanCustom custom, Human human, MotionIK motionIK) =>
             custom._motionIK = new MotionIK(human, custom._motionIK._data);
-            custom.LoadPlayAnimation(custom.NowPose, new() { value = 0.0f });
-        }
     }
     #endregion
 
