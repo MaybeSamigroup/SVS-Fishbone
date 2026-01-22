@@ -231,14 +231,12 @@ namespace CoastalSmell
 
         public int GetHashCode(Il2CppObjectBase obj) => obj.Pointer.GetHashCode();
     }
-    public static partial class Hooks
+    static partial class Hooks
     {
         static Subject<GameObject> FontInitialize = new();
-        static Subject<Unit> CommonSpaceInitialize = new();
+        internal static Subject<Unit> CommonSpaceInitialize = new();
         internal static IObservable<GameObject> OnFontInitialize =>
             FontInitialize.AsObservable().FirstAsync();
-        internal static IObservable<Transform> OnCommonSpaceInitialize =>
-            CommonSpaceInitialize.AsObservable().Select(_ => Manager.Scene.CommonSpace.transform).FirstAsync();
 
         [HarmonyPostfix]
         [HarmonyWrapSafe]
