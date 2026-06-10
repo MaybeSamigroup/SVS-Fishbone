@@ -6,6 +6,14 @@ using ILLGames.Unity.UI.ColorPicker;
 
 namespace CoastalSmell
 {
+    public static class DigitalCraftExtension
+    {
+        public static IObservable<MainScene> OnSceneStartup =>
+            Hooks.OnSceneLoaded.Where("Main".Equals).Select(_ => MainScene.Instance);
+        public static IObservable<Unit> OnSceneDestroy =>
+            OnSceneStartup.SelectMany(scene => scene.OnDestroyAsObservable());
+    }
+
     public static partial class UGUI
     {
         static Action<Unit> ColorPaletteSetup(string name, Func<Color> getColor, Action<Color> setColor, bool useAlpha, bool autoOpen) =>

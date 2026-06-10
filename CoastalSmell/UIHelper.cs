@@ -73,23 +73,30 @@ namespace CoastalSmell
         public static Func<Vector4, string, Sprite> ToBorderSprite =
             (border, path) => Texture2DToBorderSprite(border, ToTexture2D(path));
         internal static IDisposable Initialize() =>
-            UGUI.OnCommonSpaceInitialize.Subscribe(tf => tf.With(Plugin.Name.AsChild(InitializeSprites.Aggregate())));
+            UGUI.Ready.Subscribe(tf => tf.With(Plugin.Name.AsChild(InitializeSprites.Aggregate())));
     }
 
     public delegate void UIAction(GameObject go);
 
     public static partial class UGUI
     {
-        public static IObservable<Transform> OnCommonSpaceInitialize =>
-            Hooks.CommonSpaceInitialize.AsObservable()
-                .Select(_ => Manager.Scene.CommonSpace.transform).FirstAsync();
+        [Obsolete]
+        public static IObservable<Transform> OnCommonSpaceInitialize => Ready;
+
+        public static IObservable<Transform> Ready =>
+            Hooks.OnFontInitialize.AsObservable().Select(_ => Manager.Scene.CommonSpace.transform);
+
         public static UIAction Identity = new UIAction(F.Ignoring<GameObject>(F.DoNothing));
 
         public static Transform TransformAt(this Transform tf, params int[] indices) =>
             indices.Length == 0 ? tf : tf.GetChild(indices[0]).TransformAt(indices[1..]);
 
         public static Transform TransformAt(this Transform tf, params string[] paths) =>
-            paths.Length == 0 ? tf : tf.Find(paths[0]).TransformAt(paths[1..]);
+            paths.Length == 0 ? tf : tf.Find(paths[0]) switch
+            {
+                var child when child is not null => child.TransformAt(paths[1..]),
+                _ => throw new NullReferenceException(string.Join(",", paths))
+            };
 
         public static Transform TransformAt(this GameObject go, params int[] indices) =>
             go.transform.TransformAt(indices);
@@ -624,8 +631,8 @@ namespace CoastalSmell
                 LayoutH(padding: Offset(20, 0)) + "Label".AsChild(Font() + action));
 
         static TMP_FontAsset FontAsset;
-        static void Initialize(GameObject go) =>
-            FontAsset = go.GetComponentsInChildren<TextMeshProUGUI>(true).First(tmp => tmp.font != null).font;
+        static void Initialize(TMP_FontAsset font) =>
+            (FontAsset = font).With(() => Plugin.Instance.Log.LogInfo("font initialize")); 
         internal static IDisposable Initialize() =>
             Hooks.OnFontInitialize.Subscribe(Initialize);
     }
@@ -691,6 +698,4 @@ namespace CoastalSmell
                         UGUI.Component<TextMeshProUGUI>(text => TitleUI = text))
             ).AsParent() + UGUI.Size(width, height));
     }
-
-
 }

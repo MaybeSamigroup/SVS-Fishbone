@@ -3,7 +3,6 @@ using System.Linq;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
-using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using Character;

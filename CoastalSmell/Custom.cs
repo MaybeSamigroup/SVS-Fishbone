@@ -51,7 +51,8 @@ namespace CoastalSmell
         [HarmonyWrapSafe]
         [HarmonyPatch(typeof(CategoryViewBinderBase), nameof(CategoryViewBinderBase.SetResult))]
         static void NotifyUIPrefabBind(CategoryViewBinderBase __instance, GameObject o) =>
-            UIPrefab.OnNext((CategoryView.GetBundlePath(HumanCustom.Instance.SelectionTop._openIndex, __instance.GetFile()), __instance.GetFile(), o));
+            UIPrefab.OnNext((CategoryView.GetBundlePath(HumanCustom.Instance
+                .SelectionTop._openIndex, __instance.GetFile()), __instance.GetFile(), o));
 
         internal static Subject<HumanBody> BodyChange = new ();
         internal static Subject<HumanFace> FaceChange = new ();

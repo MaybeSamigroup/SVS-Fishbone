@@ -12,11 +12,11 @@ using ILLGAMES.Unity.Component;
 using ILLGames.Unity.Component;
 #endif
 using Cysharp.Threading.Tasks;
-using UnityEngine;
 using HarmonyLib;
 using BepInEx;
 using BepInEx.Unity.IL2CPP;
 using Il2CppObjectBase = Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase;
+using TMPro;
 
 namespace CoastalSmell
 {
@@ -233,22 +233,20 @@ namespace CoastalSmell
     }
     static partial class Hooks
     {
-        static Subject<GameObject> FontInitialize = new();
-        internal static Subject<Unit> CommonSpaceInitialize = new();
-        internal static IObservable<GameObject> OnFontInitialize =>
-            FontInitialize.AsObservable().FirstAsync();
+        internal static IObservable<TMP_FontAsset> OnFontInitialize =>
+            OnSceneLoaded.Where("Title".Equals)
+                .SelectMany(Manager.Scene.GetRootGameObjects)
+                .SelectMany(go => go.GetComponentsInChildren<TextMeshProUGUI>(true))
+                .Where(cmp => cmp.font != null).Select(cmp => cmp.font).FirstAsync();
+        internal static IObservable<string> OnSceneLoaded =>
+            SceneLoaded.AsObservable();
+        static Subject<string> SceneLoaded = new ();
 
         [HarmonyPostfix]
         [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(Manager.Scene), nameof(Manager.Scene.CreateSpace))]
-        static void NotifyCommonSpaceInitialize() =>
-            CommonSpaceInitialize.OnNext(Unit.Default);
-
-        [HarmonyPostfix]
-        [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(Localize.Translate.Manager), nameof(Localize.Translate.Manager.BindFont), typeof(GameObject), typeof(int))]
-        static void NotifyTranslateReady(GameObject target) =>
-            FontInitialize.OnNext(target);
+        [HarmonyPatch(typeof(Manager.Scene), nameof(Manager.Scene.LoadStart), typeof(Manager.Scene.Data), typeof(bool))]
+        static void OnLoadStart(Manager.Scene.Data data, ref UniTask __result) =>
+            __result = __result.ContinueWith(F.Apply(SceneLoaded.OnNext, data.LevelName));
 
         internal static IDisposable Initialize() =>
             Disposable.Create(Harmony.CreateAndPatchAll(typeof(Hooks), $"Hooks.{Plugin.Name}").UnpatchSelf);
