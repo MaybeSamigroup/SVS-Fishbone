@@ -631,8 +631,7 @@ namespace CoastalSmell
                 LayoutH(padding: Offset(20, 0)) + "Label".AsChild(Font() + action));
 
         static TMP_FontAsset FontAsset;
-        static void Initialize(TMP_FontAsset font) =>
-            (FontAsset = font).With(() => Plugin.Instance.Log.LogInfo("font initialize")); 
+        static void Initialize(TMP_FontAsset font) => FontAsset = font;
         internal static IDisposable Initialize() =>
             Hooks.OnFontInitialize.Subscribe(Initialize);
     }

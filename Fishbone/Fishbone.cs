@@ -63,15 +63,20 @@ namespace Fishbone
         sealed T Merge(CoordLimit limit, T mods) => Get();
     }
 
+    public class PathAttribute : Attribute
+    {
+        internal readonly string Path;
+        public PathAttribute(params string[] paths) =>
+            Path = System.IO.Path.Combine(paths);
+    }
+
     // Attribute for complex extensions
     [AttributeUsage(AttributeTargets.Class)]
-    public class ExtensionAttribute<T, U> : Attribute
+    public class ExtensionAttribute<T, U> : PathAttribute
         where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
         where U : CoordinateExtension<U>, new()
     {
-        internal string Path;
-        public ExtensionAttribute(params string[] paths) =>
-            Path = System.IO.Path.Combine(paths);
+        public ExtensionAttribute(params string[] paths) : base(paths) {}
     }
 
     public interface Storage<T, U, Index>
@@ -132,20 +137,18 @@ namespace Fishbone
             Json<U>.Load.Apply(Plugin.Instance.Log.LogError);
         public static IDisposable Translate<V>(string path, Func<V, T> map) where V : new() =>
             Extension.OnPreprocessChara
-                .Subscribe(tuple => TryGetEntry(tuple.Archive, path, out var entry).Maybe(F.Apply(Translate, map, tuple.Archive, entry)));
+                .Subscribe(tuple => tuple.Archive.TryGetEntry(path, out var entry).Maybe(F.Apply(Translate, map, tuple.Archive, entry)));
         public static IDisposable Translate<V>(string path, Func<V, U> map) where V : new() =>
             Extension.OnPreprocessCoord
-                .Subscribe(tuple => TryGetEntry(tuple.Archive, path, out var entry).Maybe(F.Apply(Translate, map, tuple.Archive, entry)));
+                .Subscribe(tuple => tuple.Archive.TryGetEntry(path, out var entry).Maybe(F.Apply(Translate, map, tuple.Archive, entry)));
     }
 
     // Attribute for simple extensions
     [AttributeUsage(AttributeTargets.Class)]
-    public class ExtensionAttribute<T> : Attribute
+    public class ExtensionAttribute<T> : PathAttribute
         where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
-        internal string Path;
-        public ExtensionAttribute(params string[] paths) =>
-            Path = System.IO.Path.Combine(paths);
+        public ExtensionAttribute(params string[] paths) : base(paths) {}
     }
 
     public interface Storage<T, Index>
@@ -176,7 +179,7 @@ namespace Fishbone
             Json<T>.Load.Apply(Plugin.Instance.Log.LogError);
         public static IDisposable Translate<V>(string path, Func<V, T> map) where V : new() =>
             Extension.OnPreprocessChara.Subscribe(tuple => 
-                TryGetEntry(tuple.Archive, path, out var entry)
+                tuple.Archive.TryGetEntry(path, out var entry)
                     .Maybe(F.Apply(Translate, map, tuple.Archive, entry)));
     }
     public static partial class Hooks

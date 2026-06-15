@@ -46,6 +46,8 @@ namespace Fishbone
 
         static void Save(this Action<ZipArchive> action, MemoryStream stream) =>
             action.ApplyDisposable(new ZipArchive(stream, ZipArchiveMode.Create)).Try(Plugin.Instance.Log.LogError);
+
+        internal static bool TryGetEntry(this ZipArchive archive, string path, out ZipArchiveEntry entry) => null != (entry = archive.GetEntry(path));
     }
     public static partial class Extension<T, U>
     {
@@ -53,8 +55,6 @@ namespace Fishbone
             typeof(T).GetCustomAttribute(typeof(ExtensionAttribute<T, U>))
                 is ExtensionAttribute<T, U> extension ? extension.Path :
                 throw new InvalidDataException($"{typeof(T)} does not have valid extension attribute.");
-
-        static bool TryGetEntry(ZipArchive archive, string path, out ZipArchiveEntry entry) => null != (entry = archive.GetEntry(path));
 
         static void Translate<V>(Func<V, T> map, ZipArchive archive, ZipArchiveEntry entry) where V : new() =>
             SaveChara(archive, map(Json<V>.Load(Plugin.Instance.Log.LogError, entry.Open())));
@@ -69,10 +69,10 @@ namespace Fishbone
             SerializeCoord(archive.CreateEntry(Path).Open(), value);
 
         internal static T LoadChara(ZipArchive archive) =>
-            TryGetEntry(archive, Path, out var entry) ? DeserializeChara(entry.Open()) : new();
+            archive.TryGetEntry(Path, out var entry) ? DeserializeChara(entry.Open()) : new();
 
         internal static U LoadCoord(ZipArchive archive) =>
-            TryGetEntry(archive, Path, out var entry) ? DeserializeCoord(entry.Open()) : new();
+            archive.TryGetEntry(Path, out var entry) ? DeserializeCoord(entry.Open()) : new();
     }
 
     public static partial class Extension<T>
@@ -82,20 +82,17 @@ namespace Fishbone
                 is ExtensionAttribute<T> extension ? extension.Path :
                 throw new InvalidDataException($"{typeof(T)} does not have valid extension attribute.");
 
-        static bool TryGetEntry(ZipArchive archive, string path, out ZipArchiveEntry entry) =>
-            null != (entry = archive.GetEntry(path));
-
         static void Translate<V>(Func<V, T> map, ZipArchive archive, ZipArchiveEntry entry) where V : new() =>
             SaveChara(archive, map(Json<V>.Load(Plugin.Instance.Log.LogError, entry.Open())));
 
         static void Cleanup(ZipArchive archive) =>
-            TryGetEntry(archive, Path, out var entry).Maybe(entry.Delete);
+            archive.TryGetEntry(Path, out var entry).Maybe(entry.Delete);
 
         internal static void SaveChara(ZipArchive archive, T value) =>
             SerializeChara(archive.With(Cleanup).CreateEntry(Path).Open(), value);
 
         internal static T LoadChara(ZipArchive archive) =>
-            TryGetEntry(archive, Path, out var entry) ? DeserializeChara(entry.Open()) : new();
+            archive.TryGetEntry(Path, out var entry) ? DeserializeChara(entry.Open()) : new();
     }
     #endregion
 

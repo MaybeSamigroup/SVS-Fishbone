@@ -22,7 +22,6 @@ using ActorIndex = (int, int);
 #else
 using ILLGames.Rigging;
 using ILLGames.Extensions;
-using ILLGames.Unity.Animations;
 using Actor = SaveData.Actor;
 using ActorIndex = int;
 #endif
