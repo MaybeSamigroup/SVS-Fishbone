@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Reactive.Disposables;
@@ -14,7 +15,6 @@ using CoastalSmell;
 using Il2CppReader = Il2CppSystem.IO.BinaryReader;
 using Il2CppWriter = Il2CppSystem.IO.BinaryWriter;
 using Il2CppBytes = Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<byte>;
-using Cysharp.Threading.Tasks;
 
 namespace Fishbone
 {
@@ -27,6 +27,7 @@ namespace Fishbone
         public U GetNowCoordinate(Human human) => Get(human).Get(human.data.Status.coordinateType);
         public void SetNowCoordinate(Human human, U value) => Humans[human] = Get(human).Merge(human.data.Status.coordinateType, value);
         internal void Remove(Human human) => Humans.Remove(human);
+        internal void Clear() => Humans.Clear();
     }
     class HumansStorage<T> : Storage<T, Human>
         where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
@@ -35,6 +36,7 @@ namespace Fishbone
         public T Get(Human human) => Humans.GetValueOrDefault(human, new());
         public void Set(Human human, T value) => Humans[human] = value; 
         internal void Remove(Human human) => Humans.Remove(human);
+        internal void Clear() => Humans.Clear();
     }
 
     static partial class Hooks
@@ -139,6 +141,7 @@ namespace Fishbone
         internal static IObservable<(Human Human, T Value)> OnLoadChara =>
             OnTrackChara.SelectMany(tuple => tuple.Track.OnResolve.Select(human => (human, tuple.Value)));
         internal static void Remove(Human human) => Storage.Remove(human);
+        internal static void Clear() => Storage.Clear();
     }
     public static partial class Extension<T>
     {
@@ -147,6 +150,7 @@ namespace Fishbone
         internal static IObservable<(Human Human, T Value)> OnLoadChara =>
             OnTrackChara.SelectMany(tuple => tuple.Track.OnResolve.Select(human => (human, tuple.Value)));
         internal static void Remove(Human human) => Storage.Remove(human);
+        internal static void Clear() => Storage.Clear();
     }
     static partial class Hooks
     {
@@ -163,35 +167,41 @@ namespace Fishbone
     #region Object
     static partial class Hooks
     {
-        internal static Subject<string> LoadScene = new();
-        internal static Subject<(string Path, int Offset)> ImportScene = new();
-        internal static Subject<(int Index, ObjectInfo Info)> PreprocessObject = new();
+        internal static Subject<Unit> SceneInit = new();
+        internal static Subject<(ZipArchive Archive, int Offset)> LoadScene = new();
+        internal static Subject<(ZipArchive Archive, int Offset)> ImportScene = new();
+        internal static Subject<IEnumerable<(int[] Indices, ObjectInfo Info)>> Preprocess = new();
+
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(SceneInfo), nameof(SceneInfo.Init), [])]
+        static void SceneInfoInitPrefix() => SceneInit.OnNext(Unit.Default);
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(SceneInfo), nameof(SceneInfo.Load),
             [typeof(string), typeof(Il2CppSystem.Version), typeof(bool), typeof(bool)],
             [ArgumentType.Normal, ArgumentType.Out, ArgumentType.Normal, ArgumentType.Normal])]
         static void SceneInfoLoadPrefix(string _path) =>
-            LoadScene.OnNext(_path);
+            LoadScene.With(F.Apply(SceneInit.OnNext, Unit.Default)).OnNext((Extension.Extract(_path), 0));
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(SceneInfo), nameof(SceneInfo.Import), typeof(string))]
         static void SceneInfoImportPrefix(SceneInfo __instance, string _path) =>
-            ImportScene.OnNext((_path, __instance.ObjectInfos.Count));
+            ImportScene.OnNext((Extension.Extract(_path), __instance.ObjectInfos.Count));
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(SceneInfo), nameof(SceneInfo.Load),
             [typeof(string), typeof(Il2CppSystem.Version), typeof(bool), typeof(bool)],
             [ArgumentType.Normal, ArgumentType.Out, ArgumentType.Normal, ArgumentType.Normal])]
+
         static void SceneInfoLoadPostfix(SceneInfo __instance) =>
-            Enumerable.Range(0, __instance.ObjectInfos.Count)
-                .ForEach(index => PreprocessObject.OnNext((index, __instance?.ObjectInfos[index])));
+            Preprocess.OnNext(Enumerable.Range(0, __instance.ObjectInfos.Count)
+                .SelectMany(index => Extension.Deconstruct([index], __instance.ObjectInfos[index])));
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(SceneInfo), nameof(SceneInfo.Import), typeof(string))]
         static void SceneInfoImportPostfix(SceneInfo __instance) =>
-            __instance?.DicImport?.Yield()?.Select(entry => entry.Value)
-                .ForEach(value => PreprocessObject.OnNext((__instance.ObjectInfos.IndexOf(value), value)));
+            Preprocess.OnNext(__instance.DicImport.Yield()
+                .SelectMany(entry => Extension.Deconstruct([__instance.ObjectInfos.IndexOf(entry.Value)], entry.Value)));
 
         internal static Subject<OIItemInfo> TrackItem = new();
         internal static Subject<OILightInfo> TrackLight = new();
@@ -224,85 +234,126 @@ namespace Fishbone
             typeof(Il2CppReader), typeof(Il2CppSystem.Version), typeof(bool), typeof(bool))]
         static void OIFolderInfoLoad(OIFolderInfo __instance) => TrackFolder.OnNext(__instance);
 
-        static void TryResolve<T>(int index, T value, Action<(int, T)> action) =>
-            (index >= 0).Maybe(F.Apply(action, (index, value)));
-
-        internal static Subject<(int Index, ObjectCtrlInfo Value)> ObjectCtrlResolve = new();
-        internal static Subject<(int Index, ObjectCtrlInfo Value)> ObjectCtrlAttach = new();
-
-        [HarmonyPrefix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(TreeNodeCtrl), nameof(TreeNodeCtrl.AddNode), typeof(ObjectCtrlInfo), typeof(string), typeof(TreeNodeObject))]
-        static void TreeNodeCtrlAddNodePrefix(ObjectCtrlInfo _objectCtrl) =>
-            TryResolve(_objectCtrl.ToIndex(), _objectCtrl, ObjectCtrlResolve.OnNext);
+        internal static Subject<ObjectCtrlInfo> AddObjectCtrl = new();
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(TreeNodeCtrl), nameof(TreeNodeCtrl.AddNode), typeof(ObjectCtrlInfo), typeof(string), typeof(TreeNodeObject))]
-        static void TreeNodeCtrlAddNodePostfix(ObjectCtrlInfo _objectCtrl) =>
-            TryResolve(_objectCtrl.ToIndex(), _objectCtrl, ObjectCtrlAttach.OnNext);
+        static void TreeNodeCtrlAddNodePostfix(ObjectCtrlInfo _objectCtrl) => AddObjectCtrl.OnNext(_objectCtrl);
 
-        internal static Subject<(int, OCIItem)> DeleteItem = new();
-        internal static Subject<(int, OCILight)> DeleteLight = new();
-        internal static Subject<(int, OCIRoute)> DeleteRoute = new();
-        internal static Subject<(int, OCICamera)> DeleteCamera = new();
-        internal static Subject<(int, OCIFolder)> DeleteFolder = new();
+        internal static Subject<OCIItem> DeleteItem = new();
+        internal static Subject<OCILight> DeleteLight = new();
+        internal static Subject<OCIRoute> DeleteRoute = new();
+        internal static Subject<OCICamera> DeleteCamera = new();
+        internal static Subject<OCIFolder> DeleteFolder = new();
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(OCIItem), nameof(OCIItem.OnDelete))]
-        static void OCIItemOnDelete(OCIItem __instance) =>
-            TryResolve(__instance.ToIndex(), __instance, DeleteItem.OnNext);
+        static void OCIItemOnDelete(OCIItem __instance) => DeleteItem.OnNext(__instance);
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(OCILight), nameof(OCILight.OnDelete))]
-        static void OCILightOnDelete(OCILight __instance) =>
-            TryResolve(__instance.ToIndex(), __instance, DeleteLight.OnNext);
-
-        [HarmonyPrefix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(OCIRoute), nameof(OCIRoute.OnDelete))]
-        static void OCIRouteOnDelete(OCIRoute __instance) =>
-            TryResolve(__instance.ToIndex(), __instance, DeleteRoute.OnNext);
-
-        [HarmonyPrefix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(OCICamera), nameof(OCICamera.OnDelete))]
-        static void OCICameraOnDelete(OCICamera __instance) =>
-            TryResolve(__instance.ToIndex(), __instance, DeleteCamera.OnNext);
+        static void OCILightOnDelete(OCILight __instance) => DeleteLight.OnNext(__instance);
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(OCIFolder), nameof(OCIFolder.OnDelete))]
-        static void OCIFolderOnDelete(OCIFolder __instance) =>
-            TryResolve(__instance.ToIndex(), __instance, DeleteFolder.OnNext);
+        static void OCIFolderOnDelete(OCIFolder __instance) => DeleteFolder.OnNext(__instance);
 
-        internal static Subject<(int, OCIItem)> PrepareSaveItem = new();
-        internal static Subject<(int, OCILight)> PrepareSaveLight = new();
-        internal static Subject<(int, OCIRoute)> PrepareSaveRoute = new();
-        internal static Subject<(int, OCICamera)> PrepareSaveCamera = new();
-        internal static Subject<(int, OCIFolder)> PrepareSaveFolder = new();
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(OCIRoute), nameof(OCIRoute.OnDelete))]
+        static void OCIRouteOnDelete(OCIRoute __instance) => DeleteRoute.OnNext(__instance);
+
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(OCICamera), nameof(OCICamera.OnDelete))]
+        static void OCICameraOnDelete(OCICamera __instance) => DeleteCamera.OnNext(__instance);
+
+        internal static Subject<OCIItem> PrepareSaveItem = new();
+        internal static Subject<OCILight> PrepareSaveLight = new();
+        internal static Subject<OCIFolder> PrepareSaveFolder = new();
+        internal static Subject<OCIRoute> PrepareSaveRoute = new();
+        internal static Subject<OCICamera> PrepareSaveCamera = new();
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(ObjectCtrlInfo), nameof(ObjectCtrlInfo.OnSavePreprocessing))]
         static void ObjectCtrlInfoOnSavePreprocessingPostfix(ObjectCtrlInfo __instance) =>
             (__instance.objectInfo.Kind switch {
-                1 => F.Apply(TryResolve, __instance.ToIndex(), new OCIItem(__instance.Pointer), PrepareSaveItem.OnNext),
-                2 => F.Apply(TryResolve, __instance.ToIndex(), new OCILight(__instance.Pointer), PrepareSaveLight.OnNext),
-                4 => F.Apply(TryResolve, __instance.ToIndex(), new OCIRoute(__instance.Pointer), PrepareSaveRoute.OnNext),
-                5 => F.Apply(TryResolve, __instance.ToIndex(), new OCICamera(__instance.Pointer), PrepareSaveCamera.OnNext),
-                3 => F.Apply(TryResolve, __instance.ToIndex(), new OCIFolder(__instance.Pointer), PrepareSaveFolder.OnNext),
+                1 => F.Apply(PrepareSaveItem.OnNext, new OCIItem(__instance.Pointer)),
+                2 => F.Apply(PrepareSaveLight.OnNext, new OCILight(__instance.Pointer)),
+                3 => F.Apply(PrepareSaveFolder.OnNext, new OCIFolder(__instance.Pointer)),
+                4 => F.Apply(PrepareSaveRoute.OnNext, new OCIRoute(__instance.Pointer)),
+                5 => F.Apply(PrepareSaveCamera.OnNext, new OCICamera(__instance.Pointer)),
                 _ => F.DoNothing
             }).Invoke();
+
+        internal static Subject<IEnumerable<(int[] Indices, ObjectInfo Info)>> SaveObjects = new();
+
+        [HarmonyPrefix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(SceneInfo), nameof(SceneInfo.Save), typeof(string), typeof(Il2CppBytes))]
+        static void ScenInfoSavePrefix(SceneInfo __instance) =>
+            SaveObjects.OnNext(Enumerable.Range(0, __instance.ObjectInfos.Count)
+                .SelectMany(index => Extension.Deconstruct([index], __instance.ObjectInfos[index])));
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(SceneInfo), nameof(SceneInfo.Save), typeof(string), typeof(Il2CppBytes))]
         static void ScenInfoSavePostfix(string _path) =>
-            UniTask.NextFrame().ContinueWith(F.Apply(Extension.SaveObjects, _path));
+            F.Apply(Extension.SaveObjects, _path).DelayFrames(1);
     }
     public static partial class Extension
     {
         internal static ZipArchive Extract(string path) =>
             new ZipArchive(Extract(File.ReadAllBytes(path)), ZipArchiveMode.Update);
 
+        static int[] ApplyOffset(int[] indices, int offset) => offset == 0 ? indices : [indices[0] - offset, ..indices[1..]];
+
+        static IEnumerable<(ZipArchive Archive, int[] Indices, T Info)>
+            Transform<T>(IEnumerable<(int[] Indices, ObjectInfo Info)> values,
+                ZipArchive archive, int offset, Func<ObjectInfo, bool> filter, Func<ObjectInfo, T> map) =>
+            values.Where(value => filter(value.Info))
+                .Select(value => (archive, ApplyOffset(value.Indices, offset), map(value.Info)));
+
+        static IEnumerable<(ZipArchive Archive, int[] indices, OIItemInfo)> ToItems(
+            IEnumerable<(int[] Indices, ObjectInfo Info)> values, ZipArchive archive, int offset) =>
+            Transform(values, archive, offset, info => info.Kind == 1, info => new OIItemInfo(info.Pointer));
+
+        static IEnumerable<(ZipArchive Archive, int[] indices, OILightInfo)> ToLights(
+            IEnumerable<(int[] Indices, ObjectInfo Info)> values, ZipArchive archive, int offset) =>
+            Transform(values, archive, offset, info => info.Kind == 2, info => new OILightInfo(info.Pointer));
+
+        static IEnumerable<(ZipArchive Archive, int[] indices, OIFolderInfo)> ToFolders(
+            IEnumerable<(int[] Indices, ObjectInfo Info)> values, ZipArchive archive, int offset) =>
+            Transform(values, archive, offset, info => info.Kind == 3, info => new OIFolderInfo(info.Pointer));
+
+        static IEnumerable<(ZipArchive Archive, int[] indices, OIRouteInfo)> ToRoutes(
+            IEnumerable<(int[] Indices, ObjectInfo Info)> values, ZipArchive archive, int offset) =>
+            Transform(values, archive, offset, info => info.Kind == 4, info => new OIRouteInfo(info.Pointer));
+
+        static IEnumerable<(ZipArchive Archive, int[] indices, OICameraInfo)> ToCameras(
+            IEnumerable<(int[] Indices, ObjectInfo Info)> values, ZipArchive archive, int offset) =>
+            Transform(values, archive, offset, info => info.Kind == 5, info => new OICameraInfo(info.Pointer));
+
+        internal static IEnumerable<(int[] Indices, ObjectInfo)> Deconstruct(int[] indices, ObjectInfo info) =>
+            info.Kind switch
+            {
+                0 => Deconstruct(indices, new OICharInfo(info.Pointer)),
+                1 => Deconstruct(indices, new OIItemInfo(info.Pointer)),
+                2 => [(indices, info)],
+                3 => Deconstruct(indices, new OIFolderInfo(info.Pointer)),
+                4 => Deconstruct(indices, new OIRouteInfo(info.Pointer)),
+                5 => [(indices, info)],
+                _ => []
+            };
+        static IEnumerable<(int[] indices, ObjectInfo)> Deconstruct(int[] indices, ObjectInfo[] infos) =>
+            infos.Index().SelectMany(entry => Deconstruct([.. indices, entry.Index], entry.Value));
+        static IEnumerable<(int[] indices, ObjectInfo)> Deconstruct(int[] indices, OICharInfo info) =>
+            info.Child.Yield().SelectMany(entry => Deconstruct([..indices, entry.Key], entry.Value.ToArray()));
+        static IEnumerable<(int[] indices, ObjectInfo)> Deconstruct(int[] indices, OIItemInfo info) =>
+            Deconstruct(indices, info.Child.ToArray()).Prepend((indices, info)); 
+        static IEnumerable<(int[] indices, ObjectInfo)> Deconstruct(int[] indices, OIFolderInfo info) =>
+            Deconstruct(indices, info.Child.ToArray()).Prepend((indices, info)); 
+        static IEnumerable<(int[] indices, ObjectInfo)> Deconstruct(int[] indices, OIRouteInfo info) =>
+            Deconstruct(indices, info.Child.ToArray()).Prepend((indices, info)); 
+        static Subject<ZipArchive> SaveScene = new();
         internal static void SaveObjects(string path) =>
             File.WriteAllBytes(path, Encode.Implant(File.ReadAllBytes(path), ToBinary(SaveScene.OnNext)));
-
-        static Subject<ZipArchive> SaveScene = new();
     }
     #endregion
 
@@ -313,28 +364,20 @@ namespace Fishbone
             typeof(T).GetCustomAttribute(typeof(ItemExtensionAttribute<T>))
                 is ItemExtensionAttribute<T> extension ? extension.Path :
                 throw new InvalidDataException($"{typeof(T)} does not have valid extension attribute.");
-
-        static void Translate<V>(Func<V, T> map, ZipArchive archive, ZipArchiveEntry entry) where V : new() =>
-            SaveValues(archive, Json<Dictionary<int, V>>.Load(Plugin.Instance.Log.LogError, entry.Open())
-                .ToDictionary(entry => entry.Key, entry => map(entry.Value)));
-
-        static void Cleanup(ZipArchive archive) =>
-            archive.TryGetEntry(Path, out var entry).Maybe(entry.Delete);
-
-        static void SaveValues(ZipArchive archive, Dictionary<int, T> value) =>
-            SerializeItems(archive.With(Cleanup).CreateEntry(Path).Open(), value);
-
-        static Dictionary<int, T> LoadValues(ZipArchive archive) =>
-            archive.TryGetEntry(Path, out var entry) ? DeserializeItems(entry.Open()) : new();
-
-        static Dictionary<int, T> LoadValues((ZipArchive Archive, int Offset) values) =>
-            LoadValues(values.Archive).ToDictionary(entry => entry.Key + values.Offset, entry => entry.Value);
-
-        static IObservable<(int Index, T Value)> OnLoadValue =>
-            Extension.OnLoadScene.Select(LoadValues).Merge(Extension.OnImportScene.Select(LoadValues))
-                .SelectMany(entries => entries.Select(entry => (entry.Key, entry.Value)));
-
-        internal static void SaveScene(ZipArchive archive) => SaveValues(archive, Storage);
+        static void Translate<V>(Func<V, T> map, ZipArchive archive, ZipArchiveEntry entry, int[] indices) where V : new() =>
+            SaveValue(archive, ToPath(indices), map(Json<V>.Load(Plugin.Instance.Log.LogError, entry.Open())));
+        static string ToPath(int[] indices) =>
+            indices.Aggregate(Path, (path, index) => System.IO.Path.Combine(path, index.ToString()));
+        static Action<ZipArchive> Cleanup(string path) =>
+            archive => archive.TryGetEntry(path, out var entry).Maybe(entry.Delete);
+        static void SaveValue(ZipArchive archive, string path, T value) =>
+            Serialize(archive.With(Cleanup(path)).CreateEntry(path).Open(), value);
+        static T LoadValue(ZipArchive archive, int[] indices) =>
+            archive.TryGetEntry(ToPath(indices), out var entry) ? Deserialize(entry.Open()) : new();
+        static IEnumerable<T> ToValue(OIItemInfo info) =>
+            Items.Where(entry => entry.Key.objectInfo.Pointer == info.Pointer).Select(entry => entry.Value);
+        internal static void SaveValue((ZipArchive Archive, int[] Indices, OIItemInfo Info) entry) =>
+            ToValue(entry.Info).ForEach(Value => SaveValue(entry.Archive, ToPath(entry.Indices), Value));
     }
     #endregion
 
@@ -345,92 +388,20 @@ namespace Fishbone
             typeof(T).GetCustomAttribute(typeof(LightExtensionAttribute<T>))
                 is LightExtensionAttribute<T> extension ? extension.Path :
                 throw new InvalidDataException($"{typeof(T)} does not have valid extension attribute.");
-
-        static void Translate<V>(Func<V, T> map, ZipArchive archive, ZipArchiveEntry entry) where V : new() =>
-            SaveValues(archive, Json<Dictionary<int, V>>.Load(Plugin.Instance.Log.LogError, entry.Open())
-                .ToDictionary(entry => entry.Key, entry => map(entry.Value)));
-
-        static void Cleanup(ZipArchive archive) =>
-            archive.TryGetEntry(Path, out var entry).Maybe(entry.Delete);
-
-        static void SaveValues(ZipArchive archive, Dictionary<int, T> value) =>
-            SerializeLights(archive.With(Cleanup).CreateEntry(Path).Open(), value);
-
-        static Dictionary<int, T> LoadValues(ZipArchive archive) =>
-            archive.TryGetEntry(Path, out var entry) ? DeserializeLights(entry.Open()) : new();
-
-        static Dictionary<int, T> LoadValues((ZipArchive Archive, int Offset) values) =>
-            LoadValues(values.Archive).ToDictionary(entry => entry.Key + values.Offset, entry => entry.Value);
-
-        static IObservable<(int Index, T Value)> OnLoadValue =>
-            Extension.OnLoadScene.Select(LoadValues).Merge(Extension.OnImportScene.Select(LoadValues))
-                .SelectMany(entries => entries.Select(entry => (entry.Key, entry.Value)));
-
-        internal static void SaveScene(ZipArchive archive) => SaveValues(archive, Storage);
-    }
-    #endregion
-
-    #region Route
-    public static partial class RouteExtension<T>
-    {
-        static readonly string Path =
-            typeof(T).GetCustomAttribute(typeof(RouteExtensionAttribute<T>))
-                is RouteExtensionAttribute<T> extension ? extension.Path :
-                throw new InvalidDataException($"{typeof(T)} does not have valid extension attribute.");
-
-        static void Translate<V>(Func<V, T> map, ZipArchive archive, ZipArchiveEntry entry) where V : new() =>
-            SaveValues(archive, Json<Dictionary<int, V>>.Load(Plugin.Instance.Log.LogError, entry.Open())
-                .ToDictionary(entry => entry.Key, entry => map(entry.Value)));
-
-        static void Cleanup(ZipArchive archive) =>
-            archive.TryGetEntry(Path, out var entry).Maybe(entry.Delete);
-
-        static void SaveValues(ZipArchive archive, Dictionary<int, T> value) =>
-            SerializeRoutes(archive.With(Cleanup).CreateEntry(Path).Open(), value);
-
-        static Dictionary<int, T> LoadValues(ZipArchive archive) =>
-            archive.TryGetEntry(Path, out var entry) ? DeserializeRoutes(entry.Open()) : new();
-
-        static Dictionary<int, T> LoadValues((ZipArchive Archive, int Offset) values) =>
-            LoadValues(values.Archive).ToDictionary(entry => entry.Key + values.Offset, entry => entry.Value);
-
-        static IObservable<(int Index, T Value)> OnLoadValue =>
-            Extension.OnLoadScene.Select(LoadValues).Merge(Extension.OnImportScene.Select(LoadValues))
-                .SelectMany(entries => entries.Select(entry => (entry.Key, entry.Value)));
-
-        internal static void SaveScene(ZipArchive archive) => SaveValues(archive, Storage);
-    }
-    #endregion
-
-    #region Camera
-    public static partial class CameraExtension<T>
-    {
-        static readonly string Path =
-            typeof(T).GetCustomAttribute(typeof(CameraExtensionAttribute<T>))
-                is CameraExtensionAttribute<T> extension ? extension.Path :
-                throw new InvalidDataException($"{typeof(T)} does not have valid extension attribute.");
-
-        static void Translate<V>(Func<V, T> map, ZipArchive archive, ZipArchiveEntry entry) where V : new() =>
-            SaveValues(archive, Json<Dictionary<int, V>>.Load(Plugin.Instance.Log.LogError, entry.Open())
-                .ToDictionary(entry => entry.Key, entry => map(entry.Value)));
-
-        static void Cleanup(ZipArchive archive) =>
-            archive.TryGetEntry(Path, out var entry).Maybe(entry.Delete);
-
-        static void SaveValues(ZipArchive archive, Dictionary<int, T> value) =>
-            SerializeCameras(archive.With(Cleanup).CreateEntry(Path).Open(), value);
-
-        static Dictionary<int, T> LoadValues(ZipArchive archive) =>
-            archive.TryGetEntry(Path, out var entry) ? DeserializeCameras(entry.Open()) : new();
-
-        static Dictionary<int, T> LoadValues((ZipArchive Archive, int Offset) values) =>
-            LoadValues(values.Archive).ToDictionary(entry => entry.Key + values.Offset, entry => entry.Value);
-
-        static IObservable<(int Index, T Value)> OnLoadValue =>
-            Extension.OnLoadScene.Select(LoadValues).Merge(Extension.OnImportScene.Select(LoadValues))
-                .SelectMany(entries => entries.Select(entry => (entry.Key, entry.Value)));
-
-        internal static void SaveScene(ZipArchive archive) => SaveValues(archive, Storage);
+        static void Translate<V>(Func<V, T> map, ZipArchive archive, ZipArchiveEntry entry, int[] indices) where V : new() =>
+            SaveValue(archive, ToPath(indices), map(Json<V>.Load(Plugin.Instance.Log.LogError, entry.Open())));
+        static string ToPath(int[] indices) =>
+            indices.Aggregate(Path, (path, index) => System.IO.Path.Combine(path, index.ToString()));
+        static Action<ZipArchive> Cleanup(string path) =>
+            archive => archive.TryGetEntry(path, out var entry).Maybe(entry.Delete);
+        static void SaveValue(ZipArchive archive, string path, T value) =>
+            Serialize(archive.With(Cleanup(path)).CreateEntry(path).Open(), value);
+        static T LoadValue(ZipArchive archive, int[] indices) =>
+            archive.TryGetEntry(ToPath(indices), out var entry) ? Deserialize(entry.Open()) : new();
+        static IEnumerable<T> ToValue(OILightInfo info) =>
+            Lights.Where(entry => entry.Key.objectInfo.Pointer == info.Pointer).Select(entry => entry.Value);
+        internal static void SaveValue((ZipArchive Archive, int[] Indices, OILightInfo Info) entry) =>
+            ToValue(entry.Info).ForEach(Value => SaveValue(entry.Archive, ToPath(entry.Indices), Value));
     }
     #endregion
 
@@ -441,28 +412,69 @@ namespace Fishbone
             typeof(T).GetCustomAttribute(typeof(FolderExtensionAttribute<T>))
                 is FolderExtensionAttribute<T> extension ? extension.Path :
                 throw new InvalidDataException($"{typeof(T)} does not have valid extension attribute.");
+        static void Translate<V>(Func<V, T> map, ZipArchive archive, ZipArchiveEntry entry, int[] indices) where V : new() =>
+            SaveValue(archive, ToPath(indices), map(Json<V>.Load(Plugin.Instance.Log.LogError, entry.Open())));
+        static string ToPath(int[] indices) =>
+            indices.Aggregate(Path, (path, index) => System.IO.Path.Combine(path, index.ToString()));
+        static Action<ZipArchive> Cleanup(string path) =>
+            archive => archive.TryGetEntry(path, out var entry).Maybe(entry.Delete);
+        static void SaveValue(ZipArchive archive, string path, T value) =>
+            Serialize(archive.With(Cleanup(path)).CreateEntry(path).Open(), value);
+        static T LoadValue(ZipArchive archive, int[] indices) =>
+            archive.TryGetEntry(ToPath(indices), out var entry) ? Deserialize(entry.Open()) : new();
+        static IEnumerable<T> ToValue(OIFolderInfo info) =>
+            Folders.Where(entry => entry.Key.objectInfo.Pointer == info.Pointer).Select(entry => entry.Value);
+        internal static void SaveValue((ZipArchive Archive, int[] Indices, OIFolderInfo Info) entry) =>
+            ToValue(entry.Info).ForEach(Value => SaveValue(entry.Archive, ToPath(entry.Indices), Value));
+    }
 
-        static void Translate<V>(Func<V, T> map, ZipArchive archive, ZipArchiveEntry entry) where V : new() =>
-            SaveValues(archive, Json<Dictionary<int, V>>.Load(Plugin.Instance.Log.LogError, entry.Open())
-                .ToDictionary(entry => entry.Key, entry => map(entry.Value)));
+    #endregion
 
-        static void Cleanup(ZipArchive archive) =>
-            archive.TryGetEntry(Path, out var entry).Maybe(entry.Delete);
+    #region Route
+    public static partial class RouteExtension<T>
+    {
+        static readonly string Path =
+            typeof(T).GetCustomAttribute(typeof(RouteExtensionAttribute<T>))
+                is RouteExtensionAttribute<T> extension ? extension.Path :
+                throw new InvalidDataException($"{typeof(T)} does not have valid extension attribute.");
+        static void Translate<V>(Func<V, T> map, ZipArchive archive, ZipArchiveEntry entry, int[] indices) where V : new() =>
+            SaveValue(archive, ToPath(indices), map(Json<V>.Load(Plugin.Instance.Log.LogError, entry.Open())));
+        static string ToPath(int[] indices) =>
+            indices.Aggregate(Path, (path, index) => System.IO.Path.Combine(path, index.ToString()));
+        static Action<ZipArchive> Cleanup(string path) =>
+            archive => archive.TryGetEntry(path, out var entry).Maybe(entry.Delete);
+        static void SaveValue(ZipArchive archive, string path, T value) =>
+            Serialize(archive.With(Cleanup(path)).CreateEntry(path).Open(), value);
+        static T LoadValue(ZipArchive archive, int[] indices) =>
+            archive.TryGetEntry(ToPath(indices), out var entry) ? Deserialize(entry.Open()) : new();
+        static IEnumerable<T> ToValue(OIRouteInfo info) =>
+            Routes.Where(entry => entry.Key.objectInfo.Pointer == info.Pointer).Select(entry => entry.Value);
+        internal static void SaveValue((ZipArchive Archive, int[] Indices, OIRouteInfo Info) entry) =>
+            ToValue(entry.Info).ForEach(Value => SaveValue(entry.Archive, ToPath(entry.Indices), Value));
+    }
+    #endregion
 
-        static void SaveValues(ZipArchive archive, Dictionary<int, T> value) =>
-            SerializeFolders(archive.With(Cleanup).CreateEntry(Path).Open(), value);
-
-        static Dictionary<int, T> LoadValues(ZipArchive archive) =>
-            archive.TryGetEntry(Path, out var entry) ? DeserializeFolders(entry.Open()) : new();
-
-        static Dictionary<int, T> LoadValues((ZipArchive Archive, int Offset) values) =>
-            LoadValues(values.Archive).ToDictionary(entry => entry.Key + values.Offset, entry => entry.Value);
-
-        static IObservable<(int Index, T Value)> OnLoadValue =>
-            Extension.OnLoadScene.Select(LoadValues).Merge(Extension.OnImportScene.Select(LoadValues))
-                .SelectMany(entries => entries.Select(entry => (entry.Key, entry.Value)));
-
-        internal static void SaveScene(ZipArchive archive) => SaveValues(archive, Storage);
+    #region Camera
+    public static partial class CameraExtension<T>
+    {
+        static readonly string Path =
+            typeof(T).GetCustomAttribute(typeof(CameraExtensionAttribute<T>))
+                is CameraExtensionAttribute<T> extension ? extension.Path :
+                throw new InvalidDataException($"{typeof(T)} does not have valid extension attribute.");
+        static void Translate<V>(Func<V, T> map, ZipArchive archive, ZipArchiveEntry entry, int[] indices) where V : new() =>
+            SaveValue(archive, ToPath(indices), map(Json<V>.Load(Plugin.Instance.Log.LogError, entry.Open())));
+        static string ToPath(int[] indices) =>
+            indices.Aggregate(Path, (path, index) => System.IO.Path.Combine(path, index.ToString()));
+        static Action<ZipArchive> Cleanup(string path) =>
+            archive => archive.TryGetEntry(path, out var entry).Maybe(entry.Delete);
+        static void SaveValue(ZipArchive archive, string path, T value) =>
+            Serialize(archive.With(Cleanup(path)).CreateEntry(path).Open(), value);
+        static T LoadValue(ZipArchive archive, int[] indices) =>
+            archive.TryGetEntry(ToPath(indices), out var entry) ? Deserialize(entry.Open()) : new();
+        static IEnumerable<T> ToValue(OICameraInfo info) =>
+            Cameras.Where(entry => entry.Key.objectInfo.Pointer == info.Pointer).Select(entry => entry.Value);
+        internal static void SaveValue((ZipArchive Archive, int[] Indices, OICameraInfo Info) entry) =>
+            ToValue(entry.Info).ForEach(Value => SaveValue(entry.Archive, ToPath(entry.Indices), Value));
     }
     #endregion
 
@@ -470,6 +482,8 @@ namespace Fishbone
     {
         internal static IDisposable[] Initialize() => [
 #if DEBUG
+            OnSceneInit.Subscribe(_ => Plugin.Instance.Log.LogInfo("scene initialized")),
+
             OnPrepareSaveChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("prepare save chara")),
             OnPreprocessChara.Subscribe(_ => Plugin.Instance.Log.LogDebug($"preprocess chara")),
             OnPreprocessCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("preprocess coord")),
@@ -477,35 +491,11 @@ namespace Fishbone
             OnLoadCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("coord load")),
             OnChangeCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("coordinate change")),
 
+            OnPreprocessItem.Subscribe(entry => Plugin.Instance.Log.LogDebug($"preprocess item: {string.Join(",", entry.Indices)}")),
+            OnAddItem.Subscribe(entry => Plugin.Instance.Log.LogDebug("add item")),
+            OnDeleteItem.Subscribe(entry => Plugin.Instance.Log.LogDebug("delete item")),
             OnPrepareSaveItem.Subscribe(entry => Plugin.Instance.Log.LogDebug("prepare save item")),
-            OnPrepareSaveLight.Subscribe(entry => Plugin.Instance.Log.LogDebug("prepare save light")),
-            OnPrepareSaveRoute.Subscribe(entry => Plugin.Instance.Log.LogDebug("prepare save route")),
-            OnPrepareSaveCamera.Subscribe(entry => Plugin.Instance.Log.LogDebug("prepare save camera")),
-            OnPrepareSaveFolder.Subscribe(entry => Plugin.Instance.Log.LogDebug("prepare save folder")),
-
-            OnPreprocessItem.Subscribe(entry => Plugin.Instance.Log.LogDebug($"preprocess item: {entry.Index}")),
-            OnPreprocessLight.Subscribe(entry => Plugin.Instance.Log.LogDebug($"preprocess light: {entry.Index}")),
-            OnPreprocessRoute.Subscribe(entry => Plugin.Instance.Log.LogDebug($"preprocess route: {entry.Index}")),
-            OnPreprocessCamera.Subscribe(entry => Plugin.Instance.Log.LogDebug($"preprocess camera: {entry.Index}")),
-            OnPreprocessFolder.Subscribe(entry => Plugin.Instance.Log.LogDebug($"preprocess folder: {entry.Index}")),
-
-            OnLoadItem.Subscribe(entry => Plugin.Instance.Log.LogDebug($"item load: {entry.Index}")),
-            OnLoadLight.Subscribe(entry => Plugin.Instance.Log.LogDebug($"light load: {entry.Index}")),
-            OnLoadRoute.Subscribe(entry => Plugin.Instance.Log.LogDebug($"route load: {entry.Index}")),
-            OnLoadCamera.Subscribe(entry => Plugin.Instance.Log.LogDebug($"camera load: {entry.Index}")),
-            OnLoadFolder.Subscribe(entry => Plugin.Instance.Log.LogDebug($"folder load: {entry.Index}")),
-
-            OnAttachItem.Subscribe(entry => Plugin.Instance.Log.LogDebug($"attach item: {entry.Index}")),
-            OnAttachLight.Subscribe(entry => Plugin.Instance.Log.LogDebug($"attach light: {entry.Index}")),
-            OnAttachRoute.Subscribe(entry => Plugin.Instance.Log.LogDebug($"attach route: {entry.Index}")),
-            OnAttachCamera.Subscribe(entry => Plugin.Instance.Log.LogDebug($"attach camera: {entry.Index}")),
-            OnAttachFolder.Subscribe(entry => Plugin.Instance.Log.LogDebug($"attach folder: {entry.Index}")),
-
-            OnDeleteItem.Subscribe(entry => Plugin.Instance.Log.LogDebug($"delete item: {entry.Index}")),
-            OnDeleteLight.Subscribe(entry => Plugin.Instance.Log.LogDebug($"delete light: {entry.Index}")),
-            OnDeleteRoute.Subscribe(entry => Plugin.Instance.Log.LogDebug($"delete route: {entry.Index}")),
-            OnDeleteCamera.Subscribe(entry => Plugin.Instance.Log.LogDebug($"delete camera: {entry.Index}")),
-            OnDeleteFolder.Subscribe(entry => Plugin.Instance.Log.LogDebug($"delete folder: {entry.Index}")),
+            OnSaveItem.Subscribe(entry => Plugin.Instance.Log.LogDebug($"save item: {string.Join(",", entry.Indices)}")),
 #endif
         ];
     }

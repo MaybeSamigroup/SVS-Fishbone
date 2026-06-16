@@ -196,7 +196,7 @@ namespace Fishbone
     {
         public const string Guid = $"{Process}.{Name}";
         public const string Name = "Fishbone";
-        public const string Version = "4.0.0";
+        public const string Version = "4.1.0";
         internal static Plugin Instance;
         CompositeDisposable Subscriptions;
         public Plugin() : base() => Instance = this;
