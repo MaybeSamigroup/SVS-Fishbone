@@ -78,13 +78,21 @@ namespace Fishbone
     {
         public ExtensionAttribute(params string[] paths) : base(paths) {}
     }
-
-    public interface Storage<T, U, Index>
-        where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
-        where U : CoordinateExtension<U>, new()
+    public interface ValueStorage<T, Index> where T : new()
     {
         T Get(Index index);
         void Set(Index index, T value);
+
+        sealed T this[Index index]
+        {
+            get => Get(index);
+            set => Set(index, value);
+        }
+    }
+    public interface Storage<T, U, Index> : ValueStorage<T, Index>
+        where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
+        where U : CoordinateExtension<U>, new() 
+    {
         U GetNowCoordinate(Index index);
         void SetNowCoordinate(Index index, U value);
         sealed U Get(Index index, int coordinateType) =>
@@ -103,11 +111,6 @@ namespace Fishbone
                 get => new U().Merge(limit, Storage.GetNowCoordinate(index));
                 set => Storage.SetNowCoordinate(index, Storage.GetNowCoordinate(index).Merge(limit, value));
             }
-        }
-        sealed T this[Index index]
-        {
-            get => Get(index);
-            set => Set(index, value);
         }
         sealed T this[Index index, CharaLimit limit]
         {
@@ -151,17 +154,9 @@ namespace Fishbone
         public ExtensionAttribute(params string[] paths) : base(paths) {}
     }
 
-    public interface Storage<T, Index>
+    public interface Storage<T, Index> : ValueStorage<T, Index>
         where T : SimpleExtension<T>, ComplexExtension<T,T>, CharacterExtension<T>, CoordinateExtension<T>, new()
     {
-        T Get(Index index);
-        void Set(Index index, T value);
-
-        sealed T this[Index index]
-        {
-            get => Get(index);
-            set => Set(index, value);
-        }
         sealed T this[Index index, CharaLimit limit]
         {
             get => new T().Merge(limit, Get(index));

@@ -1,18 +1,24 @@
 using System;
-using System.IO;
 using System.Linq;
+using System.Collections.Generic;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.IO;
 using System.IO.Compression;
 using Character;
 using DigitalCraft;
 using BepInEx.Unity.IL2CPP;
 using CoastalSmell;
-using System.Collections.Generic;
+using Scene = (
+    System.Collections.Generic.IEnumerable<(int[] Indices, DigitalCraft.OICharInfo Info)> Charas,
+    System.Collections.Generic.IEnumerable<(int[] Indices, DigitalCraft.OIItemInfo Info)> Items,
+    System.Collections.Generic.IEnumerable<(int[] Indices, DigitalCraft.OILightInfo Info)> Lights,
+    System.Collections.Generic.IEnumerable<(int[] Indices, DigitalCraft.OIFolderInfo Info)> Folders,
+    System.Collections.Generic.IEnumerable<(int[] Indices, DigitalCraft.OIRouteInfo Info)> Routes,
+    System.Collections.Generic.IEnumerable<(int[] Indices, DigitalCraft.OICameraInfo Info)> Cameras);
 
 namespace Fishbone
 {
-
     public static partial class Extension<T, U>
     {
         static readonly HumansStorage<T, U> Storage = new HumansStorage<T, U>();
@@ -60,7 +66,6 @@ namespace Fishbone
             Extension<T, U>.OnLoadChara.Subscribe(tuple => Extension<T, U>.Humans[tuple.Human] = tuple.Value),
             Extension<T, U>.OnLoadCoordInternal.Subscribe(tuple => Extension<T, U>.Humans.NowCoordinate[tuple.Human, tuple.Limit] = tuple.Value)
         ];
-
         public static IDisposable[] Register<T>()
             where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new() => [
             OnSceneInit.Subscribe(_ => Extension<T>.Clear()),
@@ -69,46 +74,55 @@ namespace Fishbone
             Extension<T>.OnLoadChara.Subscribe(tuple => Extension<T>.Humans[tuple.Human] = tuple.Value)
         ];
     }
-
     #region Object
+    public class ExtensionAttribute<S,T,U,V> : PathAttribute, TargetObject<T,U>
+        where S: TargetObject<T, U>
+        where T: ObjectInfo
+        where U: ObjectCtrlInfo
+        where V: new()
+    {
+        S Delegate { init; get; }
+        public ExtensionAttribute(S target, params string[] paths) : base(paths) => Delegate = target;
+        public T ToInfo(U value) => Delegate.ToInfo(value);
+        public bool ToCtrl(ObjectCtrlInfo ojb, out U value) => Delegate.ToCtrl(ojb, out value);
+        public IEnumerable<(int[] Indices, T Info)> Entries(Scene scene) => Delegate.Entries(scene);
+        public virtual IEnumerable<U> ToCtrl(ObjectCtrlInfo info) => ToCtrl(info, out var value) ? [value] : [];
+    }
+    [AttributeUsage(AttributeTargets.Class)]
+    public class ItemExtensionAttribute<T>: ExtensionAttribute<Item, OIItemInfo, OCIItem, T> where T: new()
+    {
+        public ItemExtensionAttribute(params string[] paths) : base(Item.Instance, paths) { }
+    }
+    [AttributeUsage(AttributeTargets.Class)]
+    public class LightExtensionAttribute<T>: ExtensionAttribute<Light, OILightInfo, OCILight, T> where T: new()
+    {
+        public LightExtensionAttribute(params string[] paths) : base(Light.Instance, paths) { }
+    }
+    [AttributeUsage(AttributeTargets.Class)]
+    public class FolderExtensionAttribute<T>: ExtensionAttribute<Folder, OIFolderInfo, OCIFolder, T> where T: new()
+    {
+        public FolderExtensionAttribute(params string[] paths) : base(Folder.Instance, paths) { }
+    }
+    [AttributeUsage(AttributeTargets.Class)]
+    public class RouteExtensionAttribute<T>: ExtensionAttribute<Route, OIRouteInfo, OCIRoute, T> where T: new()
+    {
+        public RouteExtensionAttribute(params string[] paths) : base(Route.Instance, paths) { }
+    }
+    [AttributeUsage(AttributeTargets.Class)]
+    public class CameraExtensionAttribute<T>: ExtensionAttribute<Camera, OICameraInfo, OCICamera, T> where T: new()
+    {
+        public CameraExtensionAttribute(params string[] paths) : base(Camera.Instance, paths) { }
+    }
     public static partial class Extension
     {
         public static IObservable<Unit> OnSceneInit =>
             Hooks.SceneInit.AsObservable();
-        public static IObservable<(ZipArchive Archive, int Offset)> OnLoadScene =>
+        public static IObservable<ZipArchive> OnLoadScene =>
             Hooks.LoadScene.AsObservable();
-        public static IObservable<(ZipArchive Archive, int Offset)> OnImportScene =>
+        public static IObservable<ZipArchive> OnImportScene =>
             Hooks.ImportScene.AsObservable();
-        public static IObservable<(ZipArchive Archive, int[] Indices, OIItemInfo Info)> OnPreprocessItem =>
-            OnLoadScene.Merge(OnImportScene).SelectMany(entry =>
-                Hooks.Preprocess.AsObservable().FirstAsync()
-                    .SelectMany(values => ToItems(values, entry.Archive, entry.Offset)));
-        public static IObservable<(ZipArchive Archive, int[] Indices, OILightInfo Info)> OnPreprocessLight =>
-            OnLoadScene.Merge(OnImportScene).SelectMany(entry =>
-                Hooks.Preprocess.AsObservable().FirstAsync()
-                    .SelectMany(values => ToLights(values, entry.Archive, entry.Offset)));
-        public static IObservable<(ZipArchive Archive, int[] Indices, OIFolderInfo Info)> OnPreprocessFolder =>
-            OnLoadScene.Merge(OnImportScene).SelectMany(entry =>
-                Hooks.Preprocess.AsObservable().FirstAsync()
-                    .SelectMany(values => ToFolders(values, entry.Archive, entry.Offset)));
-        public static IObservable<(ZipArchive Archive, int[] Indices, OIRouteInfo Info)> OnPreprocessRoute =>
-            OnLoadScene.Merge(OnImportScene).SelectMany(entry =>
-                Hooks.Preprocess.AsObservable().FirstAsync()
-                    .SelectMany(values => ToRoutes(values, entry.Archive, entry.Offset)));
-        public static IObservable<(ZipArchive Archive, int[] Indices, OICameraInfo Info)> OnPreprocessCamera =>
-            OnLoadScene.Merge(OnImportScene).SelectMany(entry =>
-                Hooks.Preprocess.AsObservable().FirstAsync()
-                    .SelectMany(values => ToCameras(values, entry.Archive, entry.Offset)));
-        public static IObservable<OCIItem> OnAddItem =>
-            Hooks.AddObjectCtrl.Where(obj => 1 == (obj?.objectInfo?.Kind ?? -1)).Select(obj => new OCIItem(obj.Pointer));
-        public static IObservable<OCILight> OnAddLight =>
-            Hooks.AddObjectCtrl.Where(obj => 2 == (obj?.objectInfo?.Kind ?? -1)).Select(obj => new OCILight(obj.Pointer));
-        public static IObservable<OCIFolder> OnAddFolder =>
-            Hooks.AddObjectCtrl.Where(obj => 3 == (obj?.objectInfo?.Kind ?? -1)).Select(obj => new OCIFolder(obj.Pointer));
-        public static IObservable<OCIRoute> OnAddRoute =>
-            Hooks.AddObjectCtrl.Where(obj => 4 == (obj?.objectInfo?.Kind ?? -1)).Select(obj => new OCIRoute(obj.Pointer));
-        public static IObservable<OCICamera> OnAddCamera =>
-            Hooks.AddObjectCtrl.Where(obj => 5 == (obj?.objectInfo?.Kind ?? -1)).Select(obj => new OCICamera(obj.Pointer));
+        public static IObservable<Scene> OnPreprocess =>
+            Hooks.Preprocess.AsObservable();
         public static IObservable<OCIItem> OnDeleteItem =>
             Hooks.DeleteItem.AsObservable();
         public static IObservable<OCILight> OnDeleteLight =>
@@ -131,231 +145,59 @@ namespace Fishbone
             Hooks.PrepareSaveCamera.AsObservable();
         public static IObservable<ZipArchive> OnSaveScene =>
             SaveScene.AsObservable();
-        public static IObservable<(ZipArchive Archive, int[] Indices, OIItemInfo Info)> OnSaveItem =>
-            Hooks.SaveObjects.AsObservable().SelectMany(values =>
-                OnSaveScene.FirstAsync().SelectMany(archive => ToItems(values, archive, 0)));
-        public static IObservable<(ZipArchive Archive, int[] Indices, OILightInfo Info)> OnSaveLight =>
-            Hooks.SaveObjects.AsObservable().SelectMany(values =>
-                OnSaveScene.FirstAsync().SelectMany(archive => ToLights(values, archive, 0)));
-        public static IObservable<(ZipArchive Archive, int[] Indices, OIFolderInfo Info)> OnSaveFolder =>
-            Hooks.SaveObjects.AsObservable().SelectMany(values =>
-                OnSaveScene.FirstAsync().SelectMany(archive => ToFolders(values, archive, 0)));
-        public static IObservable<(ZipArchive Archive, int[] Indices, OIRouteInfo Info)> OnSaveRoute =>
-            Hooks.SaveObjects.AsObservable().SelectMany(values =>
-                OnSaveScene.FirstAsync().SelectMany(archive => ToRoutes(values, archive, 0)));
-        public static IObservable<(ZipArchive Archive, int[] Indices, OICameraInfo Info)> OnSaveCamera =>
-            Hooks.SaveObjects.AsObservable().SelectMany(values =>
-                OnSaveScene.FirstAsync().SelectMany(archive => ToCameras(values, archive, 0)));
     }
-    #endregion
-    
-    #region Item
-    [AttributeUsage(AttributeTargets.Class)]
-    public class ItemExtensionAttribute<T> : PathAttribute where T : new()
+    public static partial class Extension<S, T, U, V>
+        where S: TargetObject<T,U>
+        where T: ObjectInfo
+        where U: ObjectCtrlInfo
+        where V: new()
     {
-        public ItemExtensionAttribute(params string[] paths) : base(paths) { }
+        static readonly ObjectStorage<T, U, V> Storage = new ObjectStorage<T, U, V>(Attribute);
+
+        public static ValueStorage<V, U> Values => Storage;
+
+        public static Action<Stream, V> Serialize =
+            Json<V>.Save.Apply(Plugin.Instance.Log.LogError);
+
+        public static Func<Stream, V> Deserialize =
+            Json<V>.Load.Apply(Plugin.Instance.Log.LogError);
+
+        public static IDisposable Translate<W>(string path, Func<W, V> map) where W : new() =>
+            Extension.OnLoadScene.Merge(Extension.OnImportScene).SelectMany(archive =>
+                Hooks.Preprocess.AsObservable().FirstAsync()
+                    .SelectMany(Attribute.Entries)
+                    .Select(entry => (archive, entry.Indices)))
+                    .Subscribe(tuple => tuple.Item1.TryGetEntry(path, out var entry)
+                        .Maybe(F.Apply(Translate, map, tuple.Item1, entry, Attribute.Path.Compose(tuple.Item2))));
+
+        public static IObservable<(T Info, V Value)> OnPreprocess =>
+            Extension.OnLoadScene.Merge(Extension.OnImportScene).SelectMany(archive =>
+                Hooks.Preprocess.AsObservable().FirstAsync()
+                    .SelectMany(Attribute.Entries)
+                        .Select(entry => (entry.Info, LoadValue(archive, entry.Indices))));
+        public static IObservable<(U Index, V Value)> OnLoad =>
+            OnPreprocess.SelectMany(entry => OnAdd
+                .Where(ctrl => entry.Info.Pointer == Attribute.ToInfo(ctrl).Pointer)
+                .FirstAsync().Select(ctrl => (ctrl, entry.Value)));
     }
-    public static partial class ItemExtension<T> where T: new()
-    {
-        public static Dictionary<OCIItem,T> Items { get; } = new(); 
-
-        public static Action<Stream, T> Serialize =
-            Json<T>.Save.Apply(Plugin.Instance.Log.LogError);
-
-        public static Func<Stream, T> Deserialize =
-            Json<T>.Load.Apply(Plugin.Instance.Log.LogError);
-
-        public static IDisposable Translate<V>(string path, Func<V, T> map) where V : new() =>
-            Extension.OnPreprocessItem.Subscribe(tuple => 
-                tuple.Archive.TryGetEntry(path, out var entry)
-                    .Maybe(F.Apply(Translate, map, tuple.Archive, entry, tuple.Indices)));
-
-        public static IObservable<(OIItemInfo Info, T Value)> OnPreprocess =>
-            Extension.OnPreprocessItem.Select(entry => (entry.Info, LoadValue(entry.Archive, entry.Indices)));
-
-        public static IObservable<(OCIItem Index, T Value)> OnLoad =>
-            OnPreprocess.SelectMany(entry =>
-                Extension.OnAddItem.AsObservable()
-                    .Where(obj => entry.Info.Pointer == obj.objectInfo.Pointer)
-                    .FirstAsync().Select(obj => (new OCIItem(obj.Pointer), entry.Value)));
-    }
+ 
     public static partial class Extension
     {
-        public static IDisposable[] RegisterItem<T>() where T : new() => [
-            OnSceneInit.Subscribe(_ => ItemExtension<T>.Items.Clear()),
-            OnSaveItem.Subscribe(ItemExtension<T>.SaveValue),
-            ItemExtension<T>.OnLoad.Subscribe(tuple => ItemExtension<T>.Items[tuple.Index] = tuple.Value),
-            OnAddItem.Subscribe(index => ItemExtension<T>.Items[index] = new()),
-            OnDeleteItem.Subscribe(index => ItemExtension<T>.Items.Remove(index))
-        ];
-    }
-    #endregion 
-
-    #region Light
-    [AttributeUsage(AttributeTargets.Class)]
-    public class LightExtensionAttribute<T> : PathAttribute where T : new()
-    {
-        public LightExtensionAttribute(params string[] paths) : base(paths) { }
-    }
-    public static partial class LightExtension<T> where T: new()
-    {
-        public static Dictionary<OCILight,T> Lights { get; } = new(); 
-
-        public static Action<Stream, T> Serialize =
-            Json<T>.Save.Apply(Plugin.Instance.Log.LogError);
-
-        public static Func<Stream, T> Deserialize =
-            Json<T>.Load.Apply(Plugin.Instance.Log.LogError);
-
-        public static IDisposable Translate<V>(string path, Func<V, T> map) where V : new() =>
-            Extension.OnPreprocessLight.Subscribe(tuple => 
-                tuple.Archive.TryGetEntry(path, out var entry)
-                    .Maybe(F.Apply(Translate, map, tuple.Archive, entry, tuple.Indices)));
-
-        public static IObservable<(OILightInfo Info, T Value)> OnPreprocess =>
-            Extension.OnPreprocessLight.Select(entry => (entry.Info, LoadValue(entry.Archive, entry.Indices)));
-
-        public static IObservable<(OCILight Index, T Value)> OnLoad =>
-            OnPreprocess.SelectMany(entry =>
-                Extension.OnAddLight.AsObservable()
-                    .Where(obj => entry.Info.Pointer == obj.objectInfo.Pointer)
-                    .FirstAsync().Select(obj => (new OCILight(obj.Pointer), entry.Value)));
-    }
-    public static partial class Extension
-    {
-        public static IDisposable[] RegisterLight<T>() where T : new() => [
-            OnSceneInit.Subscribe(_ => LightExtension<T>.Lights.Clear()),
-            OnSaveLight.Subscribe(LightExtension<T>.SaveValue),
-            LightExtension<T>.OnLoad.Subscribe(tuple => LightExtension<T>.Lights[tuple.Index] = tuple.Value),
-            OnAddLight.Subscribe(index => LightExtension<T>.Lights[index] = new()),
-            OnDeleteLight.Subscribe(index => LightExtension<T>.Lights.Remove(index))
-        ];
-    }
-    #endregion
-
-    #region Folder
-    [AttributeUsage(AttributeTargets.Class)]
-    public class FolderExtensionAttribute<T> : PathAttribute where T : new()
-    {
-        public FolderExtensionAttribute(params string[] paths) : base(paths) { }
-    }
-    public static partial class FolderExtension<T> where T: new()
-    {
-        public static Dictionary<OCIFolder,T> Folders { get; } = new(); 
-
-        public static Action<Stream, T> Serialize =
-            Json<T>.Save.Apply(Plugin.Instance.Log.LogError);
-
-        public static Func<Stream, T> Deserialize =
-            Json<T>.Load.Apply(Plugin.Instance.Log.LogError);
-
-        public static IDisposable Translate<V>(string path, Func<V, T> map) where V : new() =>
-            Extension.OnPreprocessFolder.Subscribe(tuple => 
-                tuple.Archive.TryGetEntry(path, out var entry)
-                    .Maybe(F.Apply(Translate, map, tuple.Archive, entry, tuple.Indices)));
-
-        public static IObservable<(OIFolderInfo Info, T Value)> OnPreprocess =>
-            Extension.OnPreprocessFolder.Select(entry => (entry.Info, LoadValue(entry.Archive, entry.Indices)));
-
-        public static IObservable<(OCIFolder Index, T Value)> OnLoad =>
-            OnPreprocess.SelectMany(entry =>
-                Extension.OnAddFolder.AsObservable()
-                    .Where(obj => entry.Info.Pointer == obj.objectInfo.Pointer)
-                    .FirstAsync().Select(obj => (new OCIFolder(obj.Pointer), entry.Value)));
-    }
-    public static partial class Extension
-    {
-        public static IDisposable[] RegisterFolder<T>() where T : new() => [
-            OnSceneInit.Subscribe(_ => FolderExtension<T>.Folders.Clear()),
-            OnSaveFolder.Subscribe(FolderExtension<T>.SaveValue),
-            FolderExtension<T>.OnLoad.Subscribe(tuple => FolderExtension<T>.Folders[tuple.Index] = tuple.Value),
-            OnAddFolder.Subscribe(index => FolderExtension<T>.Folders[index] = new()),
-            OnDeleteFolder.Subscribe(index => FolderExtension<T>.Folders.Remove(index))
-        ];
-    }
-    #endregion
-
-    #region Route
-    [AttributeUsage(AttributeTargets.Class)]
-    public class RouteExtensionAttribute<T> : PathAttribute where T : new()
-    {
-        public RouteExtensionAttribute(params string[] paths) : base(paths) { }
-    }
-    public static partial class RouteExtension<T> where T: new()
-    {
-        public static Dictionary<OCIRoute,T> Routes { get; } = new(); 
-
-        public static Action<Stream, T> Serialize =
-            Json<T>.Save.Apply(Plugin.Instance.Log.LogError);
-
-        public static Func<Stream, T> Deserialize =
-            Json<T>.Load.Apply(Plugin.Instance.Log.LogError);
-
-        public static IDisposable Translate<V>(string path, Func<V, T> map) where V : new() =>
-            Extension.OnPreprocessRoute.Subscribe(tuple => 
-                tuple.Archive.TryGetEntry(path, out var entry)
-                    .Maybe(F.Apply(Translate, map, tuple.Archive, entry, tuple.Indices)));
-
-        public static IObservable<(OIRouteInfo Info, T Value)> OnPreprocess =>
-            Extension.OnPreprocessRoute.Select(entry => (entry.Info, LoadValue(entry.Archive, entry.Indices)));
-
-        public static IObservable<(OCIRoute Index, T Value)> OnLoad =>
-            OnPreprocess.SelectMany(entry =>
-                Extension.OnAddRoute.AsObservable()
-                    .Where(obj => entry.Info.Pointer == obj.objectInfo.Pointer)
-                    .FirstAsync().Select(obj => (new OCIRoute(obj.Pointer), entry.Value)));
-    }
-    public static partial class Extension
-    {
-        public static IDisposable[] RegisterRoute<T>() where T : new() => [
-            OnSceneInit.Subscribe(_ => RouteExtension<T>.Routes.Clear()),
-            OnSaveRoute.Subscribe(RouteExtension<T>.SaveValue),
-            RouteExtension<T>.OnLoad.Subscribe(tuple => RouteExtension<T>.Routes[tuple.Index] = tuple.Value),
-            OnAddRoute.Subscribe(index => RouteExtension<T>.Routes[index] = new()),
-            OnDeleteRoute.Subscribe(index => RouteExtension<T>.Routes.Remove(index))
-        ];
-    }
-    #endregion
-
-    #region Camera
-    [AttributeUsage(AttributeTargets.Class)]
-    public class CameraExtensionAttribute<T> : PathAttribute where T : new()
-    {
-        public CameraExtensionAttribute(params string[] paths) : base(paths) { }
-    }
-    public static partial class CameraExtension<T> where T: new()
-    {
-        public static Dictionary<OCICamera,T> Cameras { get; } = new(); 
-
-        public static Action<Stream, T> Serialize =
-            Json<T>.Save.Apply(Plugin.Instance.Log.LogError);
-
-        public static Func<Stream, T> Deserialize =
-            Json<T>.Load.Apply(Plugin.Instance.Log.LogError);
-
-        public static IDisposable Translate<V>(string path, Func<V, T> map) where V : new() =>
-            Extension.OnPreprocessCamera.Subscribe(tuple => 
-                tuple.Archive.TryGetEntry(path, out var entry)
-                    .Maybe(F.Apply(Translate, map, tuple.Archive, entry, tuple.Indices)));
-
-        public static IObservable<(OICameraInfo Info, T Value)> OnPreprocess =>
-            Extension.OnPreprocessCamera.Select(entry => (entry.Info, LoadValue(entry.Archive, entry.Indices)));
-
-        public static IObservable<(OCICamera Index, T Value)> OnLoad =>
-            OnPreprocess.SelectMany(entry =>
-                Extension.OnAddCamera.AsObservable()
-                    .Where(obj => entry.Info.Pointer == obj.objectInfo.Pointer)
-                    .FirstAsync().Select(obj => (new OCICamera(obj.Pointer), entry.Value)));
-    }
-    public static partial class Extension
-    {
-        public static IDisposable[] RegisterCamera<T>() where T : new() => [
-            OnSceneInit.Subscribe(_ => CameraExtension<T>.Cameras.Clear()),
-            OnSaveCamera.Subscribe(CameraExtension<T>.SaveValue),
-            CameraExtension<T>.OnLoad.Subscribe(tuple => CameraExtension<T>.Cameras[tuple.Index] = tuple.Value),
-            OnAddCamera.Subscribe(index => CameraExtension<T>.Cameras[index] = new()),
-            OnDeleteCamera.Subscribe(index => CameraExtension<T>.Cameras.Remove(index))
-        ];
+        static IDisposable[] Register<S, T, U, V>(IObservable<U> onDelete)
+            where S : TargetObject<T, U>
+            where T : ObjectInfo
+            where U : ObjectCtrlInfo
+            where V : new() => Extension<S, T, U, V>.Initialize(onDelete);
+        public static IDisposable[] RegisterItem<T>() where T : new() =>
+            Register<Item, OIItemInfo, OCIItem, T>(OnDeleteItem);
+        public static IDisposable[] RegisterLight<T>() where T : new() =>
+            Register<Light, OILightInfo, OCILight, T>(OnDeleteLight);
+        public static IDisposable[] RegisterFolder<T>() where T : new() =>
+            Register<Folder, OIFolderInfo, OCIFolder, T>(OnDeleteFolder);
+        public static IDisposable[] RegisterRouter<T>() where T : new() =>
+            Register<Route, OIRouteInfo, OCIRoute, T>(OnDeleteRoute);
+        public static IDisposable[] RegisterCamerar<T>() where T : new() =>
+            Register<Camera, OICameraInfo, OCICamera, T>(OnDeleteCamera);
     }
     #endregion
 

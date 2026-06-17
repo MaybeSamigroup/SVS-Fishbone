@@ -33,7 +33,7 @@ Extension data will be extracted as zip file with the same name in the same fold
 
 ### Aicomi
 
-Confirmed working under Aicomi 1.0.7.
+Confirmed working under Aicomi(with Night Tour) 2.0.3.
 
 #### Prerequisites (Aicomi)
 
@@ -57,7 +57,7 @@ Extract the [latest release](https://github.com/MaybeSamigroup/SVS-Fishbone/rele
 
 ### DigitalCraft Standalone/DigitalCraft with HoneyCome
 
-Confirmed working under DigitalCraft Standalone 3.0.0.
+Confirmed working under DigitalCraft Standalone 3.1.1.
 
 #### Prerequisites (DigitalCraft)
 

@@ -85,11 +85,8 @@ namespace Fishbone
         static void Translate<V>(Func<V, T> map, ZipArchive archive, ZipArchiveEntry entry) where V : new() =>
             SaveChara(archive, map(Json<V>.Load(Plugin.Instance.Log.LogError, entry.Open())));
 
-        static void Cleanup(ZipArchive archive) =>
-            archive.TryGetEntry(Path, out var entry).Maybe(entry.Delete);
-
         internal static void SaveChara(ZipArchive archive, T value) =>
-            SerializeChara(archive.With(Cleanup).CreateEntry(Path).Open(), value);
+            SerializeChara(archive.CreateEntry(Path).Open(), value);
 
         internal static T LoadChara(ZipArchive archive) =>
             archive.TryGetEntry(Path, out var entry) ? DeserializeChara(entry.Open()) : new();
