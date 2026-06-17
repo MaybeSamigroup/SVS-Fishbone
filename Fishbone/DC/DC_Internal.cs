@@ -323,7 +323,7 @@ namespace Fishbone
         where U: ObjectCtrlInfo
         where V: new()
     {
-        internal ObjectStorage(TargetObject<T,U> target) => Target = target;
+        internal ObjectStorage(TargetObject<T, U> target) => Target = target;
         TargetObject<T,U> Target { init; get; }
         Dictionary<T, V> Values = new(Il2CppEquals.Instance);
         public V Get(T index) => Values.GetValueOrDefault(index, new());
@@ -339,10 +339,16 @@ namespace Fishbone
         where U: ObjectCtrlInfo
         where V: new()
     {
-        static readonly ExtensionAttribute<S,T,U,V> Attribute =
-            typeof(V).GetCustomAttribute(typeof(ExtensionAttribute<S,T,U,V>))
+        static readonly ExtensionAttribute<S, T, U, V> Attribute;
+        static readonly ObjectStorage<T, U, V> Storage; 
+        
+        static Extension() {
+            Attribute = typeof(V).GetCustomAttribute(typeof(ExtensionAttribute<S,T,U,V>))
                 is ExtensionAttribute<S,T,U,V> extension ? extension :
                 throw new InvalidDataException($"{typeof(V)} does not have valid extension attribute.");
+            Storage = new ObjectStorage<T, U, V>(Attribute);
+        }
+
         static void Translate<W>(Func<W, V> map, ZipArchive archive, ZipArchiveEntry entry, string path) where W : new() =>
             SaveValue(archive, path, map(Json<W>.Load(Plugin.Instance.Log.LogError, entry.Open())));
 

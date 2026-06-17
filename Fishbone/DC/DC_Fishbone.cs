@@ -152,8 +152,6 @@ namespace Fishbone
         where U: ObjectCtrlInfo
         where V: new()
     {
-        static readonly ObjectStorage<T, U, V> Storage = new ObjectStorage<T, U, V>(Attribute);
-
         public static ValueStorage<V, U> Values => Storage;
 
         public static Action<Stream, V> Serialize =
