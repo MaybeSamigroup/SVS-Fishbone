@@ -89,6 +89,15 @@ namespace Fishbone
             set => Set(index, value);
         }
     }
+    public interface MapStorage<T,U,Index> : ValueStorage<T, Index> where T: new ()
+    {
+        Index Map(U index);
+        sealed T this[U index]
+        {
+            get => Get(Map(index));
+            set => Set(Map(index), value);
+        }
+    }
     public interface Storage<T, U, Index> : ValueStorage<T, Index>
         where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
         where U : CoordinateExtension<U>, new() 

@@ -385,6 +385,8 @@ namespace CoastalSmell
                     CanvasScaler(referenceResolution: new(1920, 1080)) +
                     Component<GraphicRaycaster>()));
 
+        public static UIAction AsRoot =>
+            go => go.With(Root.AsParent());
         public static UIAction ClearPanel =
             Image(color: new(0.0f, 0.0f, 0.0f, 0.0f), alphaHit: 1.0f);
 
@@ -621,14 +623,25 @@ namespace CoastalSmell
                 Component<RectTransform, TMP_Dropdown>((rect, dropdown) => dropdown.template = rect)) +
             action;
 
-        public static UIAction Window(float width, float height, UIAction action) =>
+        public static UIAction Window(float x, float y, float width, float height) =>
+            AsRoot +
+            Rt(
+                pivot: new (0, 1),
+                anchorMin: new (0, 1),
+                anchorMax: new (0, 1),
+                offsetMin: new (0, 0),
+                offsetMax: new (0, 0),
+                sizeDelta: new(width + 10, height + 45),
+                anchoredPosition: new(x, y)) +
             ClearPanel +
             LayoutV(spacing: 5, padding: Offset(5, 5)) +
             Component<UI_DragWindow>() +
             "Title".AsChild(
+                (go => go.transform.SetAsFirstSibling()) +
                 Size(width: width, height: 30) +
                 Image(color: new(1, 1, 1, 1), sprite: BorderSprites.ColorBg.Get()) +
-                LayoutH(padding: Offset(20, 0)) + "Label".AsChild(Font() + action));
+                LayoutH(padding: Offset(20, 0)) + "Label".AsChild(Font())) +
+            "Content".AsChild(Size(width, height));
 
         static TMP_FontAsset FontAsset;
         static void Initialize(TMP_FontAsset font) => FontAsset = font;
@@ -656,45 +669,35 @@ namespace CoastalSmell
                 .Select(_ => State.Value = !State.Value);
 
         public Window Create(float width, float height, string name) =>
-            new Window(this, width, height, name);
+            new Window(this, name,
+                UGUI.Window(AnchorX.Value, AnchorY.Value, width, height) + UGUI.GameObject(active: State.Value));
     }
     public class Window : IDisposable {
         public GameObject Background { init; get; }
         public GameObject Content { init; get; }
         public IObservable<Unit> OnUpdate { init; get; }
         public CompositeDisposable Subscriptions { init; get; }
-        public string Title { get => TitleUI.text; set => TitleUI.SetText(value);  }
+        public string Title { get => TitleUI.text; set => TitleUI.SetText(value); }
         TextMeshProUGUI TitleUI;
         public void Dispose() => Subscriptions.Dispose();
-        Window(GameObject go, IObservable<Unit> observable) =>
-            (Background, OnUpdate) = (go, observable);
-        Window(GameObject go) : this(go, go.OnUpdateAsObservable()) =>
-            go.OnDestroyAsObservable().Subscribe(_ => Dispose());
+        Window(GameObject go, GameObject content) =>
+            (Background, Content) = (go, content);
+        Window(GameObject go) : this(go, new GameObject("Content").With(go.AsParent())) =>
+            OnUpdate = Background.OnUpdateAsObservable();
         Window(WindowConfig config, string name) : this(new GameObject(name)) =>
-            Subscriptions = [
-                config.OnToggle.Subscribe(Background.SetActive),
+             Subscriptions = [
+                UGUI.Root.OnUpdateAsObservable()
+                    .Select(_ => config.State.Value = config.Shortcut.Value.IsDown() ^ config.State.Value)
+                    .Select(state => state && Content.activeSelf)
+                    .DistinctUntilChanged().Subscribe(Background.SetActive),
                 OnUpdate
-                    .Select(_ =>  Background.GetComponent<RectTransform>())
+                    .Select(_ => Background.GetComponent<RectTransform>())
                     .Select(rt => rt.anchoredPosition)
                     .DistinctUntilChanged()
                     .Subscribe(config.Update),
+                Background.OnDestroyAsObservable().Subscribe(_ => Dispose())
             ];
-        internal Window(WindowConfig config, float width, float height, string name) : this(config, name) =>
-            Content = new GameObject("Content").With(
-                Background.With(
-                    UGUI.Root.AsParent() +
-                    UGUI.GameObject(active: config.State.Value) +
-                    UGUI.Rt(
-                        pivot: new (0, 1),
-                        anchorMin: new (0, 1),
-                        anchorMax: new (0, 1),
-                        offsetMin: new (0, 0),
-                        offsetMax: new (0, 0),
-                        sizeDelta: new(width + 10, height + 45),
-                        anchoredPosition: new(config.AnchorX.Value, config.AnchorY.Value)) +
-                    UGUI.Window(width, height,
-                        UGUI.Text(text: name) +
-                        UGUI.Component<TextMeshProUGUI>(text => TitleUI = text))
-            ).AsParent() + UGUI.Size(width, height));
+        internal Window(WindowConfig config, string name, UIAction template) : this(config, name) =>
+            Background.With(template + UGUI.Component<TextMeshProUGUI>(text => (TitleUI = text).SetText(name)).At("Title", "Label"));
     }
 }

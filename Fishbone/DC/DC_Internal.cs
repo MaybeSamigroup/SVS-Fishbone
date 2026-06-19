@@ -15,14 +15,8 @@ using CoastalSmell;
 using Il2CppReader = Il2CppSystem.IO.BinaryReader;
 using Il2CppWriter = Il2CppSystem.IO.BinaryWriter;
 using Il2CppBytes = Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<byte>;
-using Entry = (int[] Indices, DigitalCraft.ObjectInfo Info);
-using Scene = (
-    System.Collections.Generic.IEnumerable<(int[] Indices, DigitalCraft.OICharInfo Info)> Charas,
-    System.Collections.Generic.IEnumerable<(int[] Indices, DigitalCraft.OIItemInfo Info)> Items,
-    System.Collections.Generic.IEnumerable<(int[] Indices, DigitalCraft.OILightInfo Info)> Lights,
-    System.Collections.Generic.IEnumerable<(int[] Indices, DigitalCraft.OIFolderInfo Info)> Folders,
-    System.Collections.Generic.IEnumerable<(int[] Indices, DigitalCraft.OIRouteInfo Info)> Routes,
-    System.Collections.Generic.IEnumerable<(int[] Indices, DigitalCraft.OICameraInfo Info)> Cameras);
+using Entry = (int[] Path, DigitalCraft.ObjectInfo Info);
+using Scene = System.Collections.Generic.IEnumerable<(CoastalSmell.TargetType Kind, (int[] Path, DigitalCraft.ObjectInfo Info) Value)>;
 
 namespace Fishbone
 {
@@ -209,55 +203,49 @@ namespace Fishbone
         static void SceneInfoImportPostfix(SceneInfo __instance) =>
             Preprocess.OnNext(Extension.Deconstruct(__instance, ImportOffset));
 
-        internal static Subject<ObjectCtrlInfo> AddObjectCtrl = new();
-
-        [HarmonyPostfix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(TreeNodeCtrl), nameof(TreeNodeCtrl.AddNode), typeof(ObjectCtrlInfo), typeof(string), typeof(TreeNodeObject))]
-        static void TreeNodeCtrlAddNodePostfix(ObjectCtrlInfo _objectCtrl) => AddObjectCtrl.OnNext(_objectCtrl);
-
-        internal static Subject<OCIItem> DeleteItem = new();
-        internal static Subject<OCILight> DeleteLight = new();
-        internal static Subject<OCIRoute> DeleteRoute = new();
-        internal static Subject<OCICamera> DeleteCamera = new();
-        internal static Subject<OCIFolder> DeleteFolder = new();
+        internal static Subject<(TargetType, ObjectCtrlInfo)> DeleteObject = new();
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(OCIItem), nameof(OCIItem.OnDelete))]
-        static void OCIItemOnDelete(OCIItem __instance) => DeleteItem.OnNext(__instance);
+        static void OCIItemOnDelete(OCIItem __instance) =>
+            DeleteObject.OnNext((TargetType.Item, __instance));
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(OCILight), nameof(OCILight.OnDelete))]
-        static void OCILightOnDelete(OCILight __instance) => DeleteLight.OnNext(__instance);
+        static void OCILightOnDelete(OCILight __instance) =>
+            DeleteObject.OnNext((TargetType.Light, __instance));
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(OCIFolder), nameof(OCIFolder.OnDelete))]
-        static void OCIFolderOnDelete(OCIFolder __instance) => DeleteFolder.OnNext(__instance);
+        static void OCIFolderOnDelete(OCIFolder __instance) =>
+            DeleteObject.OnNext((TargetType.Folder, __instance));
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(OCIRoute), nameof(OCIRoute.OnDelete))]
-        static void OCIRouteOnDelete(OCIRoute __instance) => DeleteRoute.OnNext(__instance);
+        static void OCIRouteOnDelete(OCIRoute __instance) => 
+            DeleteObject.OnNext((TargetType.Route, __instance));
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(OCICamera), nameof(OCICamera.OnDelete))]
-        static void OCICameraOnDelete(OCICamera __instance) => DeleteCamera.OnNext(__instance);
+        static void OCICameraOnDelete(OCICamera __instance) =>
+            DeleteObject.OnNext((TargetType.Camera, __instance));
 
-        internal static Subject<OCIItem> PrepareSaveItem = new();
-        internal static Subject<OCILight> PrepareSaveLight = new();
-        internal static Subject<OCIFolder> PrepareSaveFolder = new();
-        internal static Subject<OCIRoute> PrepareSaveRoute = new();
-        internal static Subject<OCICamera> PrepareSaveCamera = new();
+        static void Resolve(TargetType kind, ObjectCtrlInfo info, Action<(TargetType, ObjectCtrlInfo)> action) =>
+            (kind is not TargetType.Undefined).Maybe(action.Apply((kind, info)));
+
+        internal static Subject<(TargetType, ObjectCtrlInfo)> AddObjectCtrl = new();
+
+        [HarmonyPostfix, HarmonyWrapSafe]
+        [HarmonyPatch(typeof(TreeNodeCtrl), nameof(TreeNodeCtrl.AddNode), typeof(ObjectCtrlInfo), typeof(string), typeof(TreeNodeObject))]
+        static void TreeNodeCtrlAddNodePostfix(ObjectCtrlInfo _objectCtrl) =>
+            Resolve(_objectCtrl.Classify(), _objectCtrl, AddObjectCtrl.OnNext);
+
+        internal static Subject<(TargetType, ObjectCtrlInfo)> PrepareSaveObject = new();
 
         [HarmonyPostfix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(ObjectCtrlInfo), nameof(ObjectCtrlInfo.OnSavePreprocessing))]
         static void ObjectCtrlInfoOnSavePreprocessingPostfix(ObjectCtrlInfo __instance) =>
-            (__instance.objectInfo.Kind switch {
-                1 => F.Apply(PrepareSaveItem.OnNext, new OCIItem(__instance.Pointer)),
-                2 => F.Apply(PrepareSaveLight.OnNext, new OCILight(__instance.Pointer)),
-                3 => F.Apply(PrepareSaveFolder.OnNext, new OCIFolder(__instance.Pointer)),
-                4 => F.Apply(PrepareSaveRoute.OnNext, new OCIRoute(__instance.Pointer)),
-                5 => F.Apply(PrepareSaveCamera.OnNext, new OCICamera(__instance.Pointer)),
-                _ => F.DoNothing
-            }).Invoke();
+            Resolve(__instance.Classify(), __instance, PrepareSaveObject.OnNext);
 
         internal static Subject<Scene> SaveObjects = new();
 
@@ -277,101 +265,72 @@ namespace Fishbone
         internal static ZipArchive Extract(string path) =>
             new ZipArchive(Extract(File.ReadAllBytes(path)), ZipArchiveMode.Update);
         internal static Scene Deconstruct(SceneInfo info) =>
-            Deconstruct(Deconstruct(info.ObjectInfos.ToArray(), []), ([], [], [], [], [], []));
+            Deconstruct([], info.ObjectInfos.ToArray());
+
         internal static Scene Deconstruct(SceneInfo info, int offset) =>
-            Deconstruct(info.DicImport.Yield().Select(entry => entry.Value)
-                .Select<ObjectInfo, Entry>(value => ([info.ObjectInfos.IndexOf(value) - offset], value)), ([], [], [], [], [], []));
-        static Scene Deconstruct(IEnumerable<Entry> infos, Scene scene) =>
-            infos.Aggregate(scene, Deconstruct);
-        static Scene Deconstruct(Scene scene, int[] indices, OICharInfo value) =>
-            Deconstruct(value.Child.Yield().SelectMany(entry => Deconstruct(entry.Value.ToArray(), [.. indices, entry.Key])),
-                ([.. scene.Charas, (indices, value)], scene.Items, scene.Lights, scene.Folders, scene.Routes, scene.Cameras));
-        static Scene Deconstruct(Scene scene, int[] indices, OIItemInfo value) =>
-            Deconstruct(Deconstruct(value.Child.ToArray(), indices),
-                (scene.Charas, [.. scene.Items, (indices, value)], scene.Lights, scene.Folders, scene.Routes, scene.Cameras));
-        static Scene Deconstruct(Scene scene, int[] indices, OILightInfo value) =>
-            (scene.Charas, scene.Items, [..scene.Lights, (indices, value)], scene.Folders, scene.Routes, scene.Cameras);
-        static Scene Deconstruct(Scene scene, int[] indices, OIFolderInfo value) =>
-            Deconstruct(Deconstruct(value.Child.ToArray(), indices),
-                (scene.Charas, scene.Items, scene.Lights, [..scene.Folders, (indices, value)], scene.Routes, scene.Cameras));
-        static Scene Deconstruct(Scene scene, int[] indices, OIRouteInfo value) =>
-            Deconstruct(Deconstruct(value.Child.ToArray(), indices),
-                (scene.Charas, scene.Items, scene.Lights, scene.Folders, [..scene.Routes, (indices, value)], scene.Cameras));
-        static Scene Deconstruct(Scene scene, int[] indices, OICameraInfo value) =>
-            (scene.Charas, scene.Items, scene.Lights, scene.Folders, scene.Routes, [..scene.Cameras, (indices, value)]);
-        static Scene Deconstruct(Scene scene, Entry entry) =>
-            entry.Info.Kind switch
+            info.DicImport.Yield().Select(entry => entry.Value)
+                .Select<ObjectInfo, Entry>(value => ([info.ObjectInfos.IndexOf(value) - offset], value))
+                .SelectMany(Deconstruct);
+
+        static Scene Deconstruct(int[] path, IEnumerable<ObjectInfo> infos) =>
+            infos.Select<ObjectInfo, Entry>((info, index) => ([.. path, index], info)).SelectMany(Deconstruct);
+
+        static Scene Deconstruct(Entry entry) =>
+            entry.Info.Classify() switch
             {
-                0 => Deconstruct(scene, entry.Indices, new OICharInfo(entry.Info.Pointer)),
-                1 => Deconstruct(scene, entry.Indices, new OIItemInfo(entry.Info.Pointer)),
-                2 => Deconstruct(scene, entry.Indices, new OILightInfo(entry.Info.Pointer)),
-                3 => Deconstruct(scene, entry.Indices, new OIFolderInfo(entry.Info.Pointer)),
-                4 => Deconstruct(scene, entry.Indices, new OIRouteInfo(entry.Info.Pointer)),
-                5 => Deconstruct(scene, entry.Indices, new OICameraInfo(entry.Info.Pointer)),
-                _ => scene
+                TargetType.Chara =>
+                    Deconstruct(entry.Path, new OICharInfo(entry.Info.Pointer)
+                        .Child.Yield().SelectMany(entry => entry.Value.ToArray())).Prepend((TargetType.Chara, entry)),
+                TargetType.Item =>
+                    Deconstruct(entry.Path, new OIItemInfo(entry.Info.Pointer).Child.ToArray()).Prepend((TargetType.Item, entry)),
+                TargetType.Light =>
+                    [(TargetType.Item, entry)],
+                TargetType.Folder =>
+                    Deconstruct(entry.Path, new OIFolderInfo(entry.Info.Pointer).Child.ToArray()).Prepend((TargetType.Item, entry)),
+                TargetType.Route =>
+                    Deconstruct(entry.Path, new OIRouteInfo(entry.Info.Pointer).Child.ToArray()).Prepend((TargetType.Item, entry)),
+                TargetType.Camera =>
+                    [(TargetType.Item, entry)],
+                _ => []
             };
-        static IEnumerable<Entry> Deconstruct(IEnumerable<ObjectInfo> infos, int[] indices) =>
-            infos.Select<ObjectInfo, (int[], ObjectInfo)>((info, index) => ([.. indices, index], info));
+        
         static Subject<ZipArchive> SaveScene = new();
         internal static void SaveObjects(string path) =>
             File.WriteAllBytes(path, Encode.Implant(File.ReadAllBytes(path), ToBinary(SaveScene.OnNext)));
-        internal static string Compose(this string path, int[] indices) =>
-            Path.Combine(path, string.Join("-", indices));
     }
-    class ObjectStorage<T,U,V> : ValueStorage<V, U>
-        where T: ObjectInfo
-        where U: ObjectCtrlInfo
-        where V: new()
-    {
-        internal ObjectStorage(TargetObject<T, U> target) => Target = target;
-        TargetObject<T,U> Target { init; get; }
-        Dictionary<T, V> Values = new(Il2CppEquals.Instance);
-        public V Get(T index) => Values.GetValueOrDefault(index, new());
-        public void Set(T index, V value) => Values[index] = value;
-        public V Get(U index) => Get(Target.ToInfo(index));
-        public void Set(U index, V value) => Set(Target.ToInfo(index), value); 
-        internal void Remove(U index) => Values.Remove(Target.ToInfo(index));
+    class ObjectStorage<T> : MapStorage<T, ObjectCtrlInfo, ObjectInfo> where T: new() {
+        Dictionary<ObjectInfo, T> Values = new(Il2CppEquals.Instance);
+        public ObjectInfo Map(ObjectCtrlInfo index) => index.objectInfo;
+        public T Get(ObjectInfo index) => Values.GetValueOrDefault(index, new());
+        public void Set(ObjectInfo index, T value) => Values[index] = value;
+        internal void Remove(ObjectCtrlInfo index) => Values.Remove(Map(index));
         internal void Clear() => Values.Clear();
     }
-    public static partial class Extension<S, T, U, V>
-        where S: TargetObject<T,U>
-        where T: ObjectInfo
-        where U: ObjectCtrlInfo
-        where V: new()
-    {
-        static readonly ExtensionAttribute<S, T, U, V> Attribute;
-        static readonly ObjectStorage<T, U, V> Storage; 
-        
-        static Extension() {
-            Attribute = typeof(V).GetCustomAttribute(typeof(ExtensionAttribute<S,T,U,V>))
-                is ExtensionAttribute<S,T,U,V> extension ? extension :
-                throw new InvalidDataException($"{typeof(V)} does not have valid extension attribute.");
-            Storage = new ObjectStorage<T, U, V>(Attribute);
-        }
+    public static partial class ObjectExtension<T> where T: new() {
+        static readonly ObjectExtensionAttribute<T> Attribute =
+            typeof(T).GetCustomAttribute(typeof(ObjectExtensionAttribute<T>))
+                is ObjectExtensionAttribute<T> extension ? extension :
+                throw new InvalidDataException($"{typeof(T)} does not have valid extension attribute.");
+        static readonly ObjectStorage<T> Storage = new(); 
 
-        static void Translate<W>(Func<W, V> map, ZipArchive archive, ZipArchiveEntry entry, string path) where W : new() =>
-            SaveValue(archive, path, map(Json<W>.Load(Plugin.Instance.Log.LogError, entry.Open())));
+        static void SaveValue((ZipArchive Archive, string Path, ObjectInfo Info) tuple) =>
+            SaveValue(tuple.Archive, tuple.Path, Values[tuple.Info]);
 
-        static void SaveValue(ZipArchive archive, string path, V value) =>
+        static void SaveValue(ZipArchive archive, string path, T value) =>
             Serialize(archive.CreateEntry(path).Open(), value);
 
-        static V LoadValue(ZipArchive archive, int[] indices) =>
-            archive.TryGetEntry(Attribute.Path.Compose(indices), out var entry) ? Deserialize(entry.Open()) : new();
+        static T LoadValue<V>(ZipArchive archive, string path, Func<V, T> map) where V: new() =>
+            archive.TryGetEntry(path, out var entry) ? map(Json<V>.Load(Plugin.Instance.Log.LogError, entry.Open())) : new();
 
-        static IObservable<U> OnAdd =>
-            Hooks.AddObjectCtrl.SelectMany(Attribute.ToCtrl);
+        static T LoadValue(ZipArchive archive, string path) =>
+            archive.TryGetEntry(path, out var entry) ? Deserialize(entry.Open()) : new();
 
-        static IObservable<(ZipArchive Archive, string Path, V Value)> OnSave =>
-            Hooks.SaveObjects.AsObservable().SelectMany(Attribute.Entries)
-                .SelectMany(entry => Extension.OnSaveScene.FirstAsync()
-                .Select(archive => (archive, Attribute.Path.Compose(entry.Indices), Storage.Get(entry.Info))));
-
-        internal static IDisposable[] Initialize(IObservable<U> onDelete) => [
+        internal static IDisposable[] Initialize() => [
             Extension.OnSceneInit.Subscribe(_ => Storage.Clear()),
-            onDelete.Subscribe(Storage.Remove),
-            OnAdd.Subscribe(index => Storage.Set(index, new())),
-            OnLoad.Subscribe(entry => Storage.Set(entry.Index, entry.Value)),
-            OnSave.Subscribe(entry => SaveValue(entry.Archive, entry.Path, entry.Value))
+            Attribute.OnDelete.Subscribe(Storage.Remove),
+            Attribute.OnAdd.Subscribe(index => Values[index] = new()),
+            Attribute.OnSave.Subscribe(SaveValue),
+            OnLoad.Subscribe(entry => Values[entry.Info] = entry.Value)
         ];
     }
     
@@ -387,8 +346,8 @@ namespace Fishbone
             OnLoadChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("chara load")),
             OnLoadCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("coord load")),
             OnChangeCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("coordinate change")),
-            OnPreprocess.Subscribe(_ => Plugin.Instance.Log.LogDebug("scene preprocess")),
-            OnPrepareSaveItem.Subscribe(entry => Plugin.Instance.Log.LogDebug("prepare save item")),
+            OnPreprocessObject.Subscribe(_ => Plugin.Instance.Log.LogDebug("scene preprocess")),
+            OnPrepareSaveObject.Subscribe(entry => Plugin.Instance.Log.LogDebug("prepare save item")),
 #endif
         ];
     }
