@@ -10,7 +10,8 @@
             <Private>False</Private>
             <ExcludeAssets>all</ExcludeAssets>
         </ProjectReference>
-        <Compile Include="../Custom.cs"/>
+        <Compile Include="../Custom.Public.cs"/>
+        <Compile Include="../Custom.Internal.cs"/>
     </ItemGroup>
     <Import Project="../Tasks.xml"/>
 </Project>

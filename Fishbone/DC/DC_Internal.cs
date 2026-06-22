@@ -31,8 +31,7 @@ namespace Fishbone
         internal void Remove(Human human) => Humans.Remove(human);
         internal void Clear() => Humans.Clear();
     }
-    class HumansStorage<T> : Storage<T, Human>
-        where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
+    class HumansStorage<T> : Storage<T, Human> where T : CharacterExtension<T>, new()
     {
         Dictionary<Human, T> Humans = new(Il2CppEquals.Instance);
         public T Get(Human human) => Humans.GetValueOrDefault(human, new());

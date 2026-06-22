@@ -9,10 +9,22 @@ using HarmonyLib;
 
 namespace CoastalSmell
 {
+    /// <summary>
+    /// Convenience observables and notifiers for human customization UI events.
+    /// Provides hooks to observe UI prefab loads and body/face/accessory changes.
+    /// </summary>
     public static class HumanCustomExtension
     {
+        /// <summary>
+        /// Observable that yields UI prefab <see cref="GameObject"/> instances when the specified
+        /// bundle and asset are loaded by the game.
+        /// </summary>
         public static IObservable<GameObject> OnUIPrefab(string bundle, string asset) =>
             Hooks.UIPrefab.AsObservable().Where(tuple => (tuple.Bundle, tuple.Asset) == (bundle, asset)).Select(tuple => tuple.Prefab);
+        /// <summary>
+        /// Observable that yields a pair of the <see cref="HumanCustom"/> scene and the first
+        /// initialized <see cref="Human"/> for that scene.
+        /// </summary>
         public static IObservable<(HumanCustom Scene, Human Human)> OnHumanInitialize =>
             SingletonInitializerExtension<HumanCustom>.OnStartup.SelectMany(scene =>
 #if Aicomi
@@ -22,15 +34,25 @@ namespace CoastalSmell
                 OnBodyChange.Select(part => (scene, part.human))
                     .Merge(OnFaceChange.Select(part => (scene, part.human))).FirstAsync());
 #endif
+        /// <summary>Observable that signals when a human body prefab or data changes.</summary>
         public static IObservable<HumanBody> OnBodyChange => Hooks.BodyChange.AsObservable();
+        /// <summary>Observable that signals when a human face changes.</summary>
         public static IObservable<HumanFace> OnFaceChange => Hooks.FaceChange.AsObservable();
+        /// <summary>Observable that signals when hair changes, including the hair index.</summary>
         public static IObservable<(HumanHair Hair, int Index)> OnHairChange => Hooks.HairChange.AsObservable();
+        /// <summary>Observable that signals when clothing changes, including the clothes index.</summary>
         public static IObservable<(HumanCloth Clothes, int Index)> OnClothesChange => Hooks.ClothesChange.AsObservable();
+        /// <summary>Observable that signals when an accessory changes, including the accessory slot index.</summary>
         public static IObservable<(HumanAccessory Accessory, int Index)> OnAccessoryChange => Hooks.AccessoryChange.AsObservable();
+        /// <summary>Notify subscribers that the given <paramref name="body"/> has changed.</summary>
         public static void NotifyBodyChange(HumanBody body) => Hooks.BodyChange.OnNext(body);
+        /// <summary>Notify subscribers that the given <paramref name="face"/> has changed.</summary>
         public static void NotifyFaceChange(HumanFace face) => Hooks.FaceChange.OnNext(face);
+        /// <summary>Notify subscribers that the given <paramref name="hair"/> has changed.</summary>
         public static void NotifyHairChange(HumanHair hair, int index) => Hooks.HairChange.OnNext((hair, index));
+        /// <summary>Notify subscribers that the given <paramref name="clothes"/> has changed.</summary>
         public static void NotifyClothesChange(HumanCloth clothes, int index) => Hooks.ClothesChange.OnNext((clothes, index));
+        /// <summary>Notify subscribers that the given <paramref name="accessory"/> has changed.</summary>
         public static void NotifyAccessoryChange(HumanAccessory accessory, int index) => Hooks.AccessoryChange.OnNext((accessory, index));
     }
 

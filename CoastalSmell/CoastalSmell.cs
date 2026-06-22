@@ -30,6 +30,10 @@ namespace CoastalSmell
             new CancellationTokenSource().DelayFrames(action, frames);
     }
 
+    /// <summary>
+    /// Helper that exposes lifecycle observables for <see cref="SingletonInitializer{T}"/> instances.
+    /// Use <c>OnStartup</c> to observe when the singleton is available and <c>OnDestroy</c> to observe its disposal.
+    /// </summary>
     public static class SingletonInitializerExtension<T> where T : SingletonInitializer<T>
     {
         public static IObservable<T> OnStartup =>
@@ -213,6 +217,10 @@ namespace CoastalSmell
         #endregion
     }
 
+    /// <summary>
+    /// Equality comparer for Il2Cpp object wrappers that compares by pointer and object class.
+    /// Used to support Il2Cpp collection lookups and value comparisons.
+    /// </summary>
     public class Il2CppEquals : IEqualityComparer<Il2CppObjectBase>
     {
         Il2CppEquals() { }
@@ -254,6 +262,9 @@ namespace CoastalSmell
 
     #region Plugin
 
+    /// <summary>
+    /// CoastalSmell plugin bootstrap (handles UI and reactive utilities initialization).
+    /// </summary>
     [BepInProcess(Process)]
     [BepInPlugin(Guid, Name, Version)]
     public partial class Plugin : BasePlugin

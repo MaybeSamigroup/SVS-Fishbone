@@ -13,6 +13,10 @@ using ILLGames.IO;
 
 namespace CoastalSmell
 {
+    /// <summary>
+    /// Lightweight serializable 2-component float vector used for JSON-friendly storage.
+    /// Implicit conversions to/from Unity's <see cref="Vector2"/> are provided.
+    /// </summary>
     public struct Float2 : IEquatable<Float2>
     {
         public float x { get; set; }
@@ -24,6 +28,9 @@ namespace CoastalSmell
         public bool Equals(Float2 s) =>
           (x, y) == (s.x, s.y);
     }
+    /// <summary>
+    /// Lightweight serializable 3-component float vector with conversions to/from <see cref="Vector3"/> and <see cref="Color"/>.
+    /// </summary>
     public struct Float3 : IEquatable<Float3>
     {
         public float x { get; set; }
@@ -38,6 +45,9 @@ namespace CoastalSmell
         public bool Equals(Float3 s) =>
           (x, y, z) == (s.x, s.y, s.z);
     }
+    /// <summary>
+    /// Lightweight serializable 4-component float vector with conversions to/from <see cref="Vector4"/> and <see cref="Color"/>.
+    /// </summary>
     public struct Float4 : IEquatable<Float4>
     {
         public float x { get; set; }
@@ -53,6 +63,10 @@ namespace CoastalSmell
         public bool Equals(Float4 s) =>
           (x, y, z, w) == (s.x, s.y, s.z, s.w);
     }
+    /// <summary>
+    /// Simple JSON serializer/deserializer helpers for type <typeparamref name="T"/> using <see cref="System.Text.Json"/> options from <see cref="Util"/>.
+    /// Provides `Save` and `Load` delegates that accept a logger action.
+    /// </summary>
     public static class Json<T> where T : new()
     {
         static Action<Stream, T> Serialize =
@@ -70,9 +84,20 @@ namespace CoastalSmell
     }
     public static partial class Util
     {
+        /// <summary>
+        /// General-purpose utility helpers used across the plugin.
+        /// Contains JSON serializer options and common convenience methods.
+        /// </summary>
+        
         public static string UserDataPath => UserData.Path;
+        /// <summary>
+        /// Returns the plugin user data path used for storing plugin files.
+        /// </summary>
         public static string ToJson<T>(T value) =>
             JsonSerializer.Serialize(value, JsonOpts);
+        /// <summary>
+        /// Serializes <paramref name="value"/> to a JSON string using plugin-wide options.
+        /// </summary>
         internal static readonly JsonSerializerOptions JsonOpts = new()
         {
             Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),

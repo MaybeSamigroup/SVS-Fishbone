@@ -8,6 +8,9 @@
         <GamePrefix>$([System.IO.Path]::GetFileName($(MSBuildProjectDirectory)))</GamePrefix>
         <AssemblyName>$(GamePrefix)_$(PluginName)</AssemblyName>
         <DefineConstants>$(GameName)</DefineConstants>
+        <!-- Generate XML documentation for API reference consumers -->
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <DocumentationFile>$(OutputPath)$(AssemblyName).xml</DocumentationFile>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="System.Reactive" Version="6.1.0"/>

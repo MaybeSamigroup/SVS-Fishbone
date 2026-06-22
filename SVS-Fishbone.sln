@@ -1,4 +1,4 @@
-Microsoft Visual Studio Solution File, Format Version 12.00
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
@@ -31,6 +31,10 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SVS", "SVS", "{3EDC1F7F-3225-3ED6-1FC9-2C675C515DFF}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SVS_Fishbone", "Fishbone\SVS\SVS_Fishbone.csproj", "{F0828863-5062-B01F-EF9B-1B433514853C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{FF2ABCCF-202B-4CAE-91B8-4EA9E1382A08}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PngTests", "Tests\PngTests\PngTests.csproj", "{40307935-6892-4321-B9C1-116E32489ED9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -66,6 +70,10 @@ Global
 		{F0828863-5062-B01F-EF9B-1B433514853C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F0828863-5062-B01F-EF9B-1B433514853C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F0828863-5062-B01F-EF9B-1B433514853C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{40307935-6892-4321-B9C1-116E32489ED9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{40307935-6892-4321-B9C1-116E32489ED9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{40307935-6892-4321-B9C1-116E32489ED9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{40307935-6892-4321-B9C1-116E32489ED9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -83,6 +91,7 @@ Global
 		{97383A83-1B6F-0827-5AC6-4887F715FF72} = {4A023DCC-9E7D-0D40-014A-417C26F9BF57}
 		{3EDC1F7F-3225-3ED6-1FC9-2C675C515DFF} = {3DD79502-F954-D61B-69C7-33AFB849EC2C}
 		{F0828863-5062-B01F-EF9B-1B433514853C} = {3EDC1F7F-3225-3ED6-1FC9-2C675C515DFF}
+		{40307935-6892-4321-B9C1-116E32489ED9} = {FF2ABCCF-202B-4CAE-91B8-4EA9E1382A08}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {5AF4097A-8AF8-43F3-B711-37F7622B1755}

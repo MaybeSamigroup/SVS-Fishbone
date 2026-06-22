@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <!-- Emit compiler-generated files so we can inspect source generator outputs -->
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
+    <!-- Temporarily suppress JsonSourceGenerator failure warning while we investigate -->
+    <NoWarn>$(NoWarn);CS8785</NoWarn>
+  </PropertyGroup>
+</Project>

@@ -14,7 +14,6 @@ using CharacterCreation;
 #if Aicomi
 using ILLGAMES.Rigging;
 using ILLGAMES.Extensions;
-using ILLGAMES.Unity.Animations;
 using AC.User;
 using AC.Scene.FreeH;
 using Actor = AC.User.ActorData;
@@ -170,7 +169,7 @@ namespace Fishbone
         Storage<T, Human>,
         Storage<T, Actor>,
         Storage<T, ActorIndex>
-        where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
+        where T : CharacterExtension<T>, new()
     {
         T Custom { get; set; } = new();
         public T Get(Human _) => Custom;
@@ -185,7 +184,7 @@ namespace Fishbone
         Storage<T, Human>,
         Storage<T, Actor>,
         Storage<T, ActorIndex>
-        where T : SimpleExtension<T>, ComplexExtension<T, T>, CharacterExtension<T>, CoordinateExtension<T>, new()
+        where T : CharacterExtension<T>, new()
     {
         Dictionary<ActorIndex, T> Actors = new();
         public T Get(Human human) => Get(human.ToIndex());
@@ -255,6 +254,10 @@ namespace Fishbone
         internal static void SaveCustomCoord((ZipArchive Value, Human Human) tuple) =>
             SaveCoord(tuple.Value, Humans.NowCoordinate[tuple.Human]);
     }
+    /// <summary>
+    /// Helper that invokes <c>ConvertChara</c>/<c>ConvertCoord</c> pipelines for complex extensions.
+    /// This is used by the save/convert hooks to translate game data into extension payloads.
+    /// </summary>
     public static class Conversion<T, U>
         where T : ComplexExtension<T, U>, CharacterExtension<T>, CharacterConversion<T>, new()
         where U : CoordinateExtension<U>, CoordinateConversion<U>, new()
@@ -271,8 +274,11 @@ namespace Fishbone
         internal static void SaveActorChara((ZipArchive Value, ActorIndex Index) tuple) =>
             SaveChara(tuple.Value, Indices[tuple.Index]);
     }
+    /// <summary>
+    /// Helper that invokes <c>ConvertChara</c> pipeline for simple character extensions.
+    /// </summary>
     public static class Conversion<T>
-        where T : ComplexExtension<T, T>, SimpleExtension<T>, CharacterExtension<T>, CoordinateExtension<T>, CharacterConversion<T>, new()
+        where T : CharacterExtension<T>, CharacterConversion<T>, new()
     {
         internal static void ConvertChara((ZipArchive Output, ZipArchive Input, HumanData Data) tuple) =>
            Extension<T>.SaveChara(tuple.Output, Extension<T>.LoadChara(tuple.Input).Convert(tuple.Data));

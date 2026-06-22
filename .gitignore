@@ -1,4 +1,9 @@
 Release/
 obj/
+Generated/
 bin/
+*/AC/*.xml
+*/DC/*.xml
+*/SVS/*.xml
+docfx/
 *.zip
