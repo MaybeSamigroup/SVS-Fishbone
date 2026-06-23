@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface ComplexExtension&lt;T, U&gt; | Fishbone </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface ComplexExtension&lt;T, U&gt; | Fishbone ">
+      
+      <meta name="description" content="Represents an extension that has both character and coordinate components.
+Implementations provide access to coordinate-specific data and merging logic.">
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ApiPage">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="Fishbone">
+            Fishbone
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 class='section api' data-uid='Fishbone.ComplexExtension`2' data-commentid='T:Fishbone.ComplexExtension`2' id='Fishbone_ComplexExtension_2'>Interface ComplexExtension&lt;T, U&gt;   </h1>
+ <div class="facts text-secondary">
+<dl><dt>Namespace</dt><dd><a href='Fishbone.html'>Fishbone</a></dd></dl><dl><dt>Assembly</dt><dd>DC_Fishbone.dll</dd></dl>
+</div><p>Represents an extension that has both character and coordinate components.
+Implementations provide access to coordinate-specific data and merging logic.</p>
+<pre><code class='lang-csharp'>public interface ComplexExtension&lt;T, U&gt; where T : ComplexExtension&lt;T, U&gt;, CharacterExtension&lt;T&gt;, new() where U : CoordinateExtension&lt;U&gt;, new()</code></pre><h4 class='section'>Type Parameters</h4><dl class='parameters'><dt><code>T</code>   </dt>
+<dd>
+
+
+
+</dd><dt><code>U</code>   </dt>
+<dd>
+
+
+
+</dd></dl><h2 class='section'>Methods</h2><h3 class='section api' data-uid='Fishbone.ComplexExtension`2.Get(System.Int32)' data-commentid='M:Fishbone.ComplexExtension`2.Get(System.Int32)' id='Fishbone_ComplexExtension_2_Get_System_Int32_'>Get(int)   </h3>
+ <p>Return the coordinate extension instance for the given coordinate type.</p>
+<pre><code class='lang-csharp'>U Get(int coordinateType)</code></pre><h4 class='section'>Parameters</h4><dl class='parameters'><dt><code>coordinateType</code> <a href='https://learn.microsoft.com/dotnet/api/system.int32'>int</a>  </dt>
+<dd>
+
+
+
+</dd></dl><h4 class='section'>Returns</h4><dl class='parameters'><dt> U  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.ComplexExtension`2.Merge(System.Int32,`1)' data-commentid='M:Fishbone.ComplexExtension`2.Merge(System.Int32,`1)' id='Fishbone_ComplexExtension_2_Merge_System_Int32__1_'>Merge(int, U)   </h3>
+ <p>Merge the provided coordinate modifications into a copy of this extension for the given type.</p>
+<pre><code class='lang-csharp'>T Merge(int coordinateType, U mods)</code></pre><h4 class='section'>Parameters</h4><dl class='parameters'><dt><code>coordinateType</code> <a href='https://learn.microsoft.com/dotnet/api/system.int32'>int</a>  </dt>
+<dd>
+
+
+
+</dd><dt><code>mods</code> U  </dt>
+<dd>
+
+
+
+</dd></dl><h4 class='section'>Returns</h4><dl class='parameters'><dt> T  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.ComplexExtension`2.Merge(System.Int32,Character.HumanDataCoordinate.LoadLimited.Flags,`1)' data-commentid='M:Fishbone.ComplexExtension`2.Merge(System.Int32,Character.HumanDataCoordinate.LoadLimited.Flags,`1)' id='Fishbone_ComplexExtension_2_Merge_System_Int32_Character_HumanDataCoordinate_LoadLimited_Flags__1_'>Merge(int, Flags, U)   </h3>
+ <p>Merge the provided coordinate modifications into a copy of this extension for the given type according to the limit.</p>
+<pre><code class='lang-csharp'>T Merge(int coordinateType, HumanDataCoordinate.LoadLimited.Flags limit, U coord)</code></pre><h4 class='section'>Parameters</h4><dl class='parameters'><dt><code>coordinateType</code> <a href='https://learn.microsoft.com/dotnet/api/system.int32'>int</a>  </dt>
+<dd>
+
+
+
+</dd><dt><code>limit</code> HumanDataCoordinate.LoadLimited.Flags  </dt>
+<dd>
+
+
+
+</dd><dt><code>coord</code> U  </dt>
+<dd>
+
+
+
+</dd></dl><h4 class='section'>Returns</h4><dl class='parameters'><dt> T  </dt>
+<dd>
+
+
+
+</dd></dl>
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

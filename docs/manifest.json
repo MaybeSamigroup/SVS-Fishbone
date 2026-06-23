@@ -1,0 +1,738 @@
+{
+  "source_base_path": "F:/Repositories/SVS-Fishbone/docfx",
+  "xrefmap": "xrefmap.yml",
+  "files": [
+    {
+      "type": "Resource",
+      "output": {
+        "resource": {
+          "relative_path": "index.json"
+        }
+      }
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.CharacterConversion-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.CharacterConversion-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.CharacterExtension-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.CharacterExtension-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.ComplexExtension-2.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.ComplexExtension-2.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.Conversion-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.Conversion-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.Conversion-2.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.Conversion-2.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.CoordinateConversion-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.CoordinateConversion-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.CoordinateExtension-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.CoordinateExtension-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.Decode.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.Decode.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.Encode.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.Encode.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.Extension-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.Extension-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.Extension-2.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.Extension-2.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.Extension.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.Extension.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.ExtensionAttribute-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.ExtensionAttribute-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.ExtensionAttribute-2.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.ExtensionAttribute-2.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.MapStorage-3.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.MapStorage-3.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.NetworkOrderBytes.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.NetworkOrderBytes.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.PathAttribute.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.PathAttribute.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.Plugin.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.Plugin.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.Storage-2.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.Storage-2.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.Storage-3.Now.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.Storage-3.Now.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.Storage-3.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.Storage-3.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.ValueStorage-2.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.ValueStorage-2.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/ac/Fishbone.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/Fishbone.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "Toc",
+      "source_relative_path": "api/ac/toc.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/ac/toc.html"
+        },
+        ".json": {
+          "relative_path": "api/ac/toc.json"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.CharacterExtension-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.CharacterExtension-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.ComplexExtension-2.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.ComplexExtension-2.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.CoordinateExtension-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.CoordinateExtension-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.Decode.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.Decode.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.Encode.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.Encode.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.Extension-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.Extension-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.Extension-2.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.Extension-2.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.Extension.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.Extension.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.ExtensionAttribute-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.ExtensionAttribute-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.ExtensionAttribute-2.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.ExtensionAttribute-2.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.MapStorage-3.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.MapStorage-3.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.NetworkOrderBytes.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.NetworkOrderBytes.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.ObjectExtension-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.ObjectExtension-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.ObjectExtensionAttribute-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.ObjectExtensionAttribute-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.PathAttribute.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.PathAttribute.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.Plugin.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.Plugin.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.Storage-2.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.Storage-2.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.Storage-3.Now.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.Storage-3.Now.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.Storage-3.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.Storage-3.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.ValueStorage-2.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.ValueStorage-2.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "Toc",
+      "source_relative_path": "api/dc/toc.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/toc.html"
+        },
+        ".json": {
+          "relative_path": "api/dc/toc.json"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.CharacterConversion-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.CharacterConversion-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.CharacterExtension-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.CharacterExtension-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.ComplexExtension-2.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.ComplexExtension-2.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.Conversion-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.Conversion-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.Conversion-2.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.Conversion-2.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.CoordinateConversion-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.CoordinateConversion-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.CoordinateExtension-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.CoordinateExtension-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.Decode.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.Decode.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.Encode.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.Encode.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.Extension-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.Extension-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.Extension-2.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.Extension-2.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.Extension.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.Extension.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.ExtensionAttribute-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.ExtensionAttribute-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.ExtensionAttribute-2.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.ExtensionAttribute-2.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.MapStorage-3.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.MapStorage-3.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.NetworkOrderBytes.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.NetworkOrderBytes.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.PathAttribute.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.PathAttribute.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.Plugin.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.Plugin.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.Storage-2.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.Storage-2.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.Storage-3.Now.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.Storage-3.Now.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.Storage-3.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.Storage-3.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.ValueStorage-2.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.ValueStorage-2.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/svs/Fishbone.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/Fishbone.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "Toc",
+      "source_relative_path": "api/svs/toc.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/svs/toc.html"
+        },
+        ".json": {
+          "relative_path": "api/svs/toc.json"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "index.md",
+      "output": {
+        ".html": {
+          "relative_path": "index.html"
+        }
+      },
+      "version": ""
+    }
+  ],
+  "groups": [
+    {
+      "xrefmap": "xrefmap.yml"
+    }
+  ]
+}

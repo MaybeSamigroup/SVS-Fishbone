@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface Storage&lt;T, U, Index&gt; | Fishbone </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface Storage&lt;T, U, Index&gt; | Fishbone ">
+      
+      <meta name="description" content="Rich storage abstraction for complex extensions that also exposes coordinate-aware accessors.">
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ApiPage">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="Fishbone">
+            Fishbone
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 class='section api' data-uid='Fishbone.Storage`3' data-commentid='T:Fishbone.Storage`3' id='Fishbone_Storage_3'>Interface Storage&lt;T, U, Index&gt;   </h1>
+ <div class="facts text-secondary">
+<dl><dt>Namespace</dt><dd><a href='Fishbone.html'>Fishbone</a></dd></dl><dl><dt>Assembly</dt><dd>DC_Fishbone.dll</dd></dl>
+</div><p>Rich storage abstraction for complex extensions that also exposes coordinate-aware accessors.</p>
+<pre><code class='lang-csharp'>public interface Storage&lt;T, U, Index&gt; : ValueStorage&lt;T, Index&gt; where T : ComplexExtension&lt;T, U&gt;, CharacterExtension&lt;T&gt;, new() where U : CoordinateExtension&lt;U&gt;, new()</code></pre><h4 class='section'>Type Parameters</h4><dl class='parameters'><dt><code>T</code>   </dt>
+<dd>
+
+
+
+</dd><dt><code>U</code>   </dt>
+<dd>
+
+
+
+</dd><dt><code>Index</code>   </dt>
+<dd>
+
+
+
+</dd></dl><h4 class='section'>Implements</h4><dl class="typelist"><dd>
+<div>
+<a href='Fishbone.ValueStorage-2.html'>ValueStorage&lt;T, Index&gt;</a>
+</div>
+
+</dd></dl><h2 class='section'>Properties</h2><h3 class='section api' data-uid='Fishbone.Storage`3.NowCoordinate' data-commentid='P:Fishbone.Storage`3.NowCoordinate' id='Fishbone_Storage_3_NowCoordinate'>NowCoordinate   </h3>
+ <p>Provide access for each character's now coordinate</p>
+<pre><code class='lang-csharp'>Storage&lt;T, U, Index&gt;.Now NowCoordinate { get; }</code></pre><h4 class='section'>Property Value</h4><dl class='parameters'><dt> <a href='Fishbone.Storage-3.html'>Storage</a>&lt;T, U, Index&gt;.<a href='Fishbone.Storage-3.Now.html'>Now</a>  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Storage`3.Item(`2,Character.HumanData.LoadLimited.Flags)' data-commentid='P:Fishbone.Storage`3.Item(`2,Character.HumanData.LoadLimited.Flags)' id='Fishbone_Storage_3_Item__2_Character_HumanData_LoadLimited_Flags_'>this[Index, Flags]   </h3>
+ <p>Provide access for the specified character's extension value, according to the limit</p>
+<pre><code class='lang-csharp'>T this[Index index, HumanData.LoadLimited.Flags limit] { get; set; }</code></pre><h4 class='section'>Property Value</h4><dl class='parameters'><dt> T  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Storage`3.Item(`2,System.Int32)' data-commentid='P:Fishbone.Storage`3.Item(`2,System.Int32)' id='Fishbone_Storage_3_Item__2_System_Int32_'>this[Index, int]   </h3>
+ <p>Provide access for the specified character's coordinate extension value</p>
+<pre><code class='lang-csharp'>U this[Index index, int coordinateType] { get; set; }</code></pre><h4 class='section'>Property Value</h4><dl class='parameters'><dt> U  </dt>
+<dd>
+
+
+
+</dd></dl><h2 class='section'>Methods</h2><h3 class='section api' data-uid='Fishbone.Storage`3.Get(`2,System.Int32)' data-commentid='M:Fishbone.Storage`3.Get(`2,System.Int32)' id='Fishbone_Storage_3_Get__2_System_Int32_'>Get(Index, int)   </h3>
+ <p>Get coordinate value for the specified character and type</p>
+<pre><code class='lang-csharp'>U Get(Index index, int coordinateType)</code></pre><h4 class='section'>Parameters</h4><dl class='parameters'><dt><code>index</code> Index  </dt>
+<dd>
+
+
+
+</dd><dt><code>coordinateType</code> <a href='https://learn.microsoft.com/dotnet/api/system.int32'>int</a>  </dt>
+<dd>
+
+
+
+</dd></dl><h4 class='section'>Returns</h4><dl class='parameters'><dt> U  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Storage`3.GetNowCoordinate(`2)' data-commentid='M:Fishbone.Storage`3.GetNowCoordinate(`2)' id='Fishbone_Storage_3_GetNowCoordinate__2_'>GetNowCoordinate(Index)   </h3>
+ <p>Get the current coordinate extension value for the specified character.</p>
+<pre><code class='lang-csharp'>U GetNowCoordinate(Index index)</code></pre><h4 class='section'>Parameters</h4><dl class='parameters'><dt><code>index</code> Index  </dt>
+<dd>
+
+
+
+</dd></dl><h4 class='section'>Returns</h4><dl class='parameters'><dt> U  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Storage`3.Set(`2,System.Int32,`1)' data-commentid='M:Fishbone.Storage`3.Set(`2,System.Int32,`1)' id='Fishbone_Storage_3_Set__2_System_Int32__1_'>Set(Index, int, U)   </h3>
+ <p>Set coordinate value for the specified character and type</p>
+<pre><code class='lang-csharp'>void Set(Index index, int coordinateType, U value)</code></pre><h4 class='section'>Parameters</h4><dl class='parameters'><dt><code>index</code> Index  </dt>
+<dd>
+
+
+
+</dd><dt><code>coordinateType</code> <a href='https://learn.microsoft.com/dotnet/api/system.int32'>int</a>  </dt>
+<dd>
+
+
+
+</dd><dt><code>value</code> U  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Storage`3.SetNowCoordinate(`2,`1)' data-commentid='M:Fishbone.Storage`3.SetNowCoordinate(`2,`1)' id='Fishbone_Storage_3_SetNowCoordinate__2__1_'>SetNowCoordinate(Index, U)   </h3>
+ <p>Set the current coordinate extension value for the specified character.</p>
+<pre><code class='lang-csharp'>void SetNowCoordinate(Index index, U value)</code></pre><h4 class='section'>Parameters</h4><dl class='parameters'><dt><code>index</code> Index  </dt>
+<dd>
+
+
+
+</dd><dt><code>value</code> U  </dt>
+<dd>
+
+
+
+</dd></dl>
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

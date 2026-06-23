@@ -62,6 +62,20 @@ namespace Fishbone
             OnTrackCustom.Select(tuple => (tuple.Data, tuple.Value))
                 .Merge(OnTrackActor.Select(tuple => (tuple.Data, tuple.Value)));
     }
+    /// <summary>Inter game conversion interface for character extension. </summary>
+    /// <typeparam name="T">Concrete extension type.</typeparam>
+    public interface CharacterConversion<T> where T : CharacterExtension<T>, CharacterConversion<T>, new ()
+    {
+        /// <summary>Convert <b>this</b> extension originated in another game to applicatable form to provided <see cref="HumanData"/>.</summary>
+        T Convert(HumanData data);
+    }
+    /// <summary>Inter game conversion interface for coordinate extension. </summary>
+    /// <typeparam name="T">Concrete extension type.</typeparam>
+    public interface CoordinateConversion<T> where T : CoordinateExtension<T>, CoordinateConversion<T>, new ()
+    {
+        /// <summary>Convert <b>this</b> extension originated in another game to applicatable form to provided <see cref="HumanDataCoordinate"/>.</summary>
+        T Convert(HumanDataCoordinate data);
+    }
 
     /// <summary>
     /// Platform-level extension event entrypoints (save/load/convert hooks) used by plugin registration.

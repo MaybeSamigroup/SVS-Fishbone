@@ -1,0 +1,137 @@
+{
+  "$schema": "https://raw.githubusercontent.com/dotnet/docfx/main/schemas/docfx.schema.json",
+  "metadata": [
+    {
+      "globalNamespaceId": "DC",
+      "src": [
+        {
+          "src": "../Fishbone/DC",
+          "files": [
+            "bin/Release/**.dll"
+          ]
+        }
+      ],
+      "references": [
+        {
+          "src": "~/.nuget/packages",
+          "files": [
+            "system.*/**.dll",
+            "bepinex.*/**.dll",
+            "harmonyx/**.dll",
+            "illusionlibs.*/**.dll",
+            "il2cppinterop.*/**.dll"
+          ]
+        },
+        {
+          "src": "../CoastalSmell/DC",
+          "files": [
+            "bin/Release/**.dll"
+          ]
+        }
+      ],
+      "properties": {
+        "TargetFramework": "net6"
+      },
+      "outputFormat": "apiPage",
+      "output": "api/dc"
+    },
+    {
+      "globalNamespaceId": "AC",
+      "src": [
+        {
+          "src": "../Fishbone/AC",
+          "files": [
+            "bin/Release/**.dll"
+          ]
+        }
+      ],
+      "references": [
+        {
+          "src": "~/.nuget/packages",
+          "files": [
+            "system.*/**.dll",
+            "bepinex.*/**.dll",
+            "harmonyx/**.dll",
+            "illusionlibs.*/**.dll",
+            "il2cppinterop.*/**.dll"
+          ]
+        },
+        {
+          "src": "../CoastalSmell/AC",
+          "files": [
+            "bin/Release/**.dll"
+          ]
+        }
+      ],
+      "properties": {
+        "TargetFramework": "net6"
+      },
+      "outputFormat": "apiPage",
+      "output": "api/ac"
+    },
+    {
+      "globalNamespaceId": "SVS",
+      "src":[
+        {
+          "src": "../Fishbone/SVS",
+          "files": [
+            "bin/Release/**.dll"
+          ]
+        }
+      ],
+      "references": [
+        {
+          "src": "~/.nuget/packages",
+          "files": [
+            "system.*/**.dll",
+            "bepinex.*/**.dll",
+            "harmonyx/**.dll",
+            "illusionlibs.*/**.dll",
+            "il2cppinterop.*/**.dll"
+          ]
+        },
+        {
+          "src": "../CoastalSmell/SVS",
+          "files": [
+            "bin/Release/**.dll"
+          ]
+        }
+      ],
+      "properties": {
+        "TargetFramework": "net6"
+      },
+      "outputFormat": "apiPage",
+      "output": "api/svs"
+    }
+  ],
+  "build": {
+    "content": [
+      {
+        "files": [
+          "**/*.{md,yml}"
+        ],
+        "exclude": [
+          "Home.md"
+        ]
+      }
+    ],
+    "resource": [
+      {
+        "files": [
+          "images/**"
+        ]
+      }
+    ],
+    "output": "../docs",
+    "template": [
+      "default",
+      "modern"
+    ],
+    "globalMetadata": {
+      "_appName": "Fishbone",
+      "_appTitle": "Fishbone",
+      "_enableSearch": true,
+      "pdf": false
+    }
+  }
+}

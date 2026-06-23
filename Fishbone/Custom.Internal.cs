@@ -256,7 +256,7 @@ namespace Fishbone
     }
     /// <summary>
     /// Helper that invokes <c>ConvertChara</c>/<c>ConvertCoord</c> pipelines for complex extensions.
-    /// This is used by the save/convert hooks to translate game data into extension payloads.
+    /// This is used by the save/convert hooks to translate inter game extensions.
     /// </summary>
     public static class Conversion<T, U>
         where T : ComplexExtension<T, U>, CharacterExtension<T>, CharacterConversion<T>, new()

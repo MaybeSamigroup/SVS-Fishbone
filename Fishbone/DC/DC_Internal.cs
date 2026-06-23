@@ -168,7 +168,7 @@ namespace Fishbone
     #region Object
     static partial class Hooks
     {
-        internal static Subject<Unit> SceneInit = new();
+        internal static Subject<Unit> InitScene = new();
         internal static Subject<ZipArchive> LoadScene = new();
         internal static Subject<ZipArchive> ImportScene = new();
         internal static Subject<Scene> Preprocess = new();
@@ -176,14 +176,14 @@ namespace Fishbone
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(SceneInfo), nameof(SceneInfo.Init), [])]
-        static void SceneInfoInitPrefix() => SceneInit.OnNext(Unit.Default);
+        static void SceneInfoInitPrefix() => InitScene.OnNext(Unit.Default);
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(SceneInfo), nameof(SceneInfo.Load),
             [typeof(string), typeof(Il2CppSystem.Version), typeof(bool), typeof(bool)],
             [ArgumentType.Normal, ArgumentType.Out, ArgumentType.Normal, ArgumentType.Normal])]
         static void SceneInfoLoadPrefix(string _path) =>
-            LoadScene.With(F.Apply(SceneInit.OnNext, Unit.Default)).OnNext(Extension.Extract(_path));
+            LoadScene.With(F.Apply(InitScene.OnNext, Unit.Default)).OnNext(Extension.Extract(_path));
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(SceneInfo), nameof(SceneInfo.Import), typeof(string))]
@@ -325,7 +325,7 @@ namespace Fishbone
             archive.TryGetEntry(path, out var entry) ? Deserialize(entry.Open()) : new();
 
         internal static IDisposable[] Initialize() => [
-            Extension.OnSceneInit.Subscribe(_ => Storage.Clear()),
+            Extension.OnInitScene.Subscribe(_ => Storage.Clear()),
             Attribute.OnDelete.Subscribe(Storage.Remove),
             Attribute.OnAdd.Subscribe(index => Values[index] = new()),
             Attribute.OnSave.Subscribe(SaveValue),
@@ -338,7 +338,7 @@ namespace Fishbone
     {
         internal static IDisposable[] Initialize() => [
 #if DEBUG
-            OnSceneInit.Subscribe(_ => Plugin.Instance.Log.LogDebug("scene initialized")),
+            OnInitScene.Subscribe(_ => Plugin.Instance.Log.LogDebug("scene initialized")),
             OnPrepareSaveChara.Subscribe(_ => Plugin.Instance.Log.LogDebug("prepare save chara")),
             OnPreprocessChara.Subscribe(_ => Plugin.Instance.Log.LogDebug($"preprocess chara")),
             OnPreprocessCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("preprocess coord")),

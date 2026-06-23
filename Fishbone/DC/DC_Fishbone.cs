@@ -74,7 +74,7 @@ namespace Fishbone
         public static IDisposable[] Register<T, U>()
             where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
             where U : CoordinateExtension<U>, new() => [
-            OnSceneInit.Subscribe(_ => Extension<T, U>.Clear()),
+            OnInitScene.Subscribe(_ => Extension<T, U>.Clear()),
             OnSaveChara.Subscribe(Extension<T, U>.SaveChara),
             OnDeleteChara.Subscribe(Extension<T,U>.Remove),
             Extension<T, U>.OnLoadChara.Subscribe(tuple => Extension<T, U>.Humans[tuple.Human] = tuple.Value),
@@ -84,7 +84,7 @@ namespace Fishbone
         /// <summary>Register simple character extension</summary>
         public static IDisposable[] Register<T>()
             where T : CharacterExtension<T>, new() => [
-            OnSceneInit.Subscribe(_ => Extension<T>.Clear()),
+            OnInitScene.Subscribe(_ => Extension<T>.Clear()),
             OnSaveChara.Subscribe(Extension<T>.SaveChara),
             OnDeleteChara.Subscribe(Extension<T>.Remove),
             Extension<T>.OnLoadChara.Subscribe(tuple => Extension<T>.Humans[tuple.Human] = tuple.Value)
@@ -94,8 +94,8 @@ namespace Fishbone
     public static partial class Extension
     {
         /// <summary>Raised when scene data has initialized.</summary>
-        public static IObservable<Unit> OnSceneInit =>
-            Hooks.SceneInit.AsObservable();
+        public static IObservable<Unit> OnInitScene =>
+            Hooks.InitScene.AsObservable();
 
         /// <summary>Raised when scene data is about to load.</summary>
         public static IObservable<ZipArchive> OnLoadScene =>
@@ -128,7 +128,7 @@ namespace Fishbone
                     .SelectMany(scene => scene.Select(entry => (entry.Kind, (archive, entry.Value)))));
         
         /// <summary>Raised when object's data is saved to extension archive</summary>
-        public static IObservable<(TargetType Kind, (ZipArchive Archive, Entry Entry) Value)> OnSaveObject =>
+        internal static IObservable<(TargetType Kind, (ZipArchive Archive, Entry Entry) Value)> OnSaveObject =>
             Hooks.SaveObjects.AsObservable().SelectMany(scene => OnSaveScene.FirstAsync()
                 .SelectMany(archive => scene.Select(entry => (entry.Kind, (archive, entry.Value)))));
         internal static string Compose(this string path, int[] indices) =>

@@ -15,7 +15,6 @@ using CoordLimit = Character.HumanDataCoordinate.LoadLimited.Flags;
 
 namespace Fishbone
 {
-    // Extension events and helpers
     /// <summary>
     /// Top-level extension utilities and events.
     /// Consumers can subscribe to preprocess events to translate or inject extension data.
@@ -41,7 +40,6 @@ namespace Fishbone
                     .Select(entry => new Tuple<K, V>(entry.Key, entry.Value))
                     .Append(new Tuple<K, V>(index, mod)).ToDictionary();
     }
-    // Extension interfaces
     /// <summary>
     /// Implemented by character-bound extension types to support merge semantics.
     /// </summary>
@@ -57,20 +55,6 @@ namespace Fishbone
     {
         /// <summary>Merge coordinate-limited modifications into this instance.</summary>
         T Merge(CoordLimit limit, T mods);
-    }
-    /// <summary>Conversion helper to produce a character extension from raw <see cref="HumanData"/>.</summary>
-    /// <typeparam name="T">Concrete extension type.</typeparam>
-    public interface CharacterConversion<T> where T : CharacterExtension<T>, CharacterConversion<T>, new ()
-    {
-        /// <summary>Convert the provided <see cref="HumanData"/> into an extension instance.</summary>
-        T Convert(HumanData data);
-    }
-    /// <summary>Conversion helper to produce a coordinate extension from raw <see cref="HumanDataCoordinate"/>.</summary>
-    /// <typeparam name="T">Concrete extension type.</typeparam>
-    public interface CoordinateConversion<T> where T : CoordinateExtension<T>, CoordinateConversion<T>, new ()
-    {
-        /// <summary>Convert the provided <see cref="HumanDataCoordinate"/> into an extension instance.</summary>
-        T Convert(HumanDataCoordinate data);
     }
     /// <summary>
     /// Represents an extension that has both character and coordinate components.
@@ -189,7 +173,6 @@ namespace Fishbone
         /// <summary>Provide access for each character's now coordinate</summary>
         sealed Now NowCoordinate => new Now(this);
     }
-    // Static extension class for complex extensions
     /// <summary>Utilities for complex (character+coordinate) extensions.</summary>
     public static partial class Extension<T, U>
         where T : ComplexExtension<T, U>, CharacterExtension<T>, new()
@@ -243,7 +226,7 @@ namespace Fishbone
         }
     }
 
-    // Static extension class for simple extensions
+    /// <summary>Utilities for simple character extensions.</summary>
     public static partial class Extension<T> where T : CharacterExtension<T>, new()
     {
         /// <summary>Serializer for character extension instances.</summary>
@@ -267,7 +250,6 @@ namespace Fishbone
             Disposable.Create(Harmony.CreateAndPatchAll(typeof(Hooks), $"{Plugin.Name}.Hooks").UnpatchSelf);
     }
 
-    // Main plugin class
     [BepInProcess(Process)]
     [BepInPlugin(Guid, Name, Version)]
     [BepInDependency(CoastalSmell.Plugin.Guid)]

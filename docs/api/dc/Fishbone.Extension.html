@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class Extension | Fishbone </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class Extension | Fishbone ">
+      
+      <meta name="description" content="Platform-level extension entrypoints for scene/object save and load hooks.">
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ApiPage">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="Fishbone">
+            Fishbone
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 class='section api' data-uid='Fishbone.Extension' data-commentid='T:Fishbone.Extension' id='Fishbone_Extension'>Class Extension   </h1>
+ <div class="facts text-secondary">
+<dl><dt>Namespace</dt><dd><a href='Fishbone.html'>Fishbone</a></dd></dl><dl><dt>Assembly</dt><dd>DC_Fishbone.dll</dd></dl>
+</div><p>Platform-level extension entrypoints for scene/object save and load hooks.</p>
+<pre><code class='lang-csharp'>public static class Extension</code></pre><h4 class='section'>Inheritance</h4><dl class="typelist inheritance"><dd>
+<div>
+<a href='https://learn.microsoft.com/dotnet/api/system.object'>object</a>
+</div>
+<div>
+<a href='Fishbone.Extension.html'>Extension</a>
+</div>
+
+</dd></dl><h4 class='section'>Inherited Members</h4><dl class="typelist"><dd>
+<div>
+<a href='https://learn.microsoft.com/dotnet/api/system.object.gettype'>object.GetType()</a>
+</div>
+<div>
+<a href='https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone'>object.MemberwiseClone()</a>
+</div>
+<div>
+<a href='https://learn.microsoft.com/dotnet/api/system.object.tostring'>object.ToString()</a>
+</div>
+<div>
+<a href='https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)'>object.Equals(object?)</a>
+</div>
+<div>
+<a href='https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)'>object.Equals(object?, object?)</a>
+</div>
+<div>
+<a href='https://learn.microsoft.com/dotnet/api/system.object.referenceequals'>object.ReferenceEquals(object?, object?)</a>
+</div>
+<div>
+<a href='https://learn.microsoft.com/dotnet/api/system.object.gethashcode'>object.GetHashCode()</a>
+</div>
+
+</dd></dl><h2 class='section'>Fields</h2><h3 class='section api' data-uid='Fishbone.Extension.OnChangeCoord' data-commentid='F:Fishbone.Extension.OnChangeCoord' id='Fishbone_Extension_OnChangeCoord'>OnChangeCoord   </h3>
+ <p>Raised when a character's coordinate has changed.</p>
+<pre><code class='lang-csharp'>public static IObservable&lt;(Human Human, int Index)&gt; OnChangeCoord</code></pre><h4 class='section'>Field Value</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.iobservable-1'>IObservable</a>&lt;(Human <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-character.human,system.int32-.human'>Human</a>, <a href='https://learn.microsoft.com/dotnet/api/system.int32'>int</a> <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-character.human,system.int32-.index'>Index</a>)&gt;  </dt>
+<dd>
+
+
+
+</dd></dl><h2 class='section'>Properties</h2><h3 class='section api' data-uid='Fishbone.Extension.OnAddObject' data-commentid='P:Fishbone.Extension.OnAddObject' id='Fishbone_Extension_OnAddObject'>OnAddObject   </h3>
+ <p>Raised when object added to scene.</p>
+<pre><code class='lang-csharp'>public static IObservable&lt;(TargetType Kind, ObjectCtrlInfo Value)&gt; OnAddObject { get; }</code></pre><h4 class='section'>Property Value</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.iobservable-1'>IObservable</a>&lt;(<a href='https://github.com/MaybeSamigroup/SVS-Fishbone/blob/cce16a2e2ee57776a6efab67954640ebd3f560fc/CoastalSmell/DC/DC_CoastalSmell.cs'>TargetType</a> <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-coastalsmell.targettype,digitalcraft.objectctrlinfo-.kind'>Kind</a>, ObjectCtrlInfo <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-coastalsmell.targettype,digitalcraft.objectctrlinfo-.value'>Value</a>)&gt;  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Extension.OnDeleteChara' data-commentid='P:Fishbone.Extension.OnDeleteChara' id='Fishbone_Extension_OnDeleteChara'>OnDeleteChara   </h3>
+ <p>Raised when a character is deleted from scene.</p>
+<pre><code class='lang-csharp'>public static IObservable&lt;Human&gt; OnDeleteChara { get; }</code></pre><h4 class='section'>Property Value</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.iobservable-1'>IObservable</a>&lt;Human&gt;  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Extension.OnDeleteObject' data-commentid='P:Fishbone.Extension.OnDeleteObject' id='Fishbone_Extension_OnDeleteObject'>OnDeleteObject   </h3>
+ <p>Raised when object deleted from scene.</p>
+<pre><code class='lang-csharp'>public static IObservable&lt;(TargetType Kind, ObjectCtrlInfo Value)&gt; OnDeleteObject { get; }</code></pre><h4 class='section'>Property Value</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.iobservable-1'>IObservable</a>&lt;(<a href='https://github.com/MaybeSamigroup/SVS-Fishbone/blob/cce16a2e2ee57776a6efab67954640ebd3f560fc/CoastalSmell/DC/DC_CoastalSmell.cs'>TargetType</a> <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-coastalsmell.targettype,digitalcraft.objectctrlinfo-.kind'>Kind</a>, ObjectCtrlInfo <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-coastalsmell.targettype,digitalcraft.objectctrlinfo-.value'>Value</a>)&gt;  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Extension.OnImportScene' data-commentid='P:Fishbone.Extension.OnImportScene' id='Fishbone_Extension_OnImportScene'>OnImportScene   </h3>
+ <p>Raised when scene data is about to import.</p>
+<pre><code class='lang-csharp'>public static IObservable&lt;ZipArchive&gt; OnImportScene { get; }</code></pre><h4 class='section'>Property Value</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.iobservable-1'>IObservable</a>&lt;<a href='https://learn.microsoft.com/dotnet/api/system.io.compression.ziparchive'>ZipArchive</a>&gt;  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Extension.OnInitScene' data-commentid='P:Fishbone.Extension.OnInitScene' id='Fishbone_Extension_OnInitScene'>OnInitScene   </h3>
+ <p>Raised when scene data has initialized.</p>
+<pre><code class='lang-csharp'>public static IObservable&lt;Unit&gt; OnInitScene { get; }</code></pre><h4 class='section'>Property Value</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.iobservable-1'>IObservable</a>&lt;Unit&gt;  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Extension.OnLoadChara' data-commentid='P:Fishbone.Extension.OnLoadChara' id='Fishbone_Extension_OnLoadChara'>OnLoadChara   </h3>
+ <p>Raised when a character is loaded.</p>
+<pre><code class='lang-csharp'>public static IObservable&lt;Human&gt; OnLoadChara { get; }</code></pre><h4 class='section'>Property Value</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.iobservable-1'>IObservable</a>&lt;Human&gt;  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Extension.OnLoadCoord' data-commentid='P:Fishbone.Extension.OnLoadCoord' id='Fishbone_Extension_OnLoadCoord'>OnLoadCoord   </h3>
+ <p>Raised when a coordinate is loaded.</p>
+<pre><code class='lang-csharp'>public static IObservable&lt;Human&gt; OnLoadCoord { get; }</code></pre><h4 class='section'>Property Value</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.iobservable-1'>IObservable</a>&lt;Human&gt;  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Extension.OnLoadScene' data-commentid='P:Fishbone.Extension.OnLoadScene' id='Fishbone_Extension_OnLoadScene'>OnLoadScene   </h3>
+ <p>Raised when scene data is about to load.</p>
+<pre><code class='lang-csharp'>public static IObservable&lt;ZipArchive&gt; OnLoadScene { get; }</code></pre><h4 class='section'>Property Value</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.iobservable-1'>IObservable</a>&lt;<a href='https://learn.microsoft.com/dotnet/api/system.io.compression.ziparchive'>ZipArchive</a>&gt;  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Extension.OnPrepareSaveChara' data-commentid='P:Fishbone.Extension.OnPrepareSaveChara' id='Fishbone_Extension_OnPrepareSaveChara'>OnPrepareSaveChara   </h3>
+ <p>Raised when a character data is about to be saved.</p>
+<pre><code class='lang-csharp'>public static IObservable&lt;Human&gt; OnPrepareSaveChara { get; }</code></pre><h4 class='section'>Property Value</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.iobservable-1'>IObservable</a>&lt;Human&gt;  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Extension.OnPrepareSaveObject' data-commentid='P:Fishbone.Extension.OnPrepareSaveObject' id='Fishbone_Extension_OnPrepareSaveObject'>OnPrepareSaveObject   </h3>
+ <p>Raised when object is about to save.</p>
+<pre><code class='lang-csharp'>public static IObservable&lt;(TargetType Kind, ObjectCtrlInfo Value)&gt; OnPrepareSaveObject { get; }</code></pre><h4 class='section'>Property Value</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.iobservable-1'>IObservable</a>&lt;(<a href='https://github.com/MaybeSamigroup/SVS-Fishbone/blob/cce16a2e2ee57776a6efab67954640ebd3f560fc/CoastalSmell/DC/DC_CoastalSmell.cs'>TargetType</a> <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-coastalsmell.targettype,digitalcraft.objectctrlinfo-.kind'>Kind</a>, ObjectCtrlInfo <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-coastalsmell.targettype,digitalcraft.objectctrlinfo-.value'>Value</a>)&gt;  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Extension.OnPreprocessChara' data-commentid='P:Fishbone.Extension.OnPreprocessChara' id='Fishbone_Extension_OnPreprocessChara'>OnPreprocessChara   </h3>
+ <p>Raised when a character's data has been loaded and an extension archive is available.</p>
+<pre><code class='lang-csharp'>public static IObservable&lt;(HumanData Data, ZipArchive Archive)&gt; OnPreprocessChara { get; }</code></pre><h4 class='section'>Property Value</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.iobservable-1'>IObservable</a>&lt;(HumanData <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-character.humandata,system.io.compression.ziparchive-.data'>Data</a>, <a href='https://learn.microsoft.com/dotnet/api/system.io.compression.ziparchive'>ZipArchive</a> <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-character.humandata,system.io.compression.ziparchive-.archive'>Archive</a>)&gt;  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Extension.OnPreprocessCoord' data-commentid='P:Fishbone.Extension.OnPreprocessCoord' id='Fishbone_Extension_OnPreprocessCoord'>OnPreprocessCoord   </h3>
+ <p>Raised when coordinate data has been loaded and an extension archive is available.</p>
+<pre><code class='lang-csharp'>public static IObservable&lt;(HumanDataCoordinate Data, ZipArchive Archive)&gt; OnPreprocessCoord { get; }</code></pre><h4 class='section'>Property Value</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.iobservable-1'>IObservable</a>&lt;(HumanDataCoordinate <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-character.humandatacoordinate,system.io.compression.ziparchive-.data'>Data</a>, <a href='https://learn.microsoft.com/dotnet/api/system.io.compression.ziparchive'>ZipArchive</a> <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-character.humandatacoordinate,system.io.compression.ziparchive-.archive'>Archive</a>)&gt;  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Extension.OnPreprocessObject' data-commentid='P:Fishbone.Extension.OnPreprocessObject' id='Fishbone_Extension_OnPreprocessObject'>OnPreprocessObject   </h3>
+ <p>Raised when a object's data has been loaded and an extension archive is available.</p>
+<pre><code class='lang-csharp'>public static IObservable&lt;(TargetType Kind, (ZipArchive Archive, (int[] Path, ObjectInfo Info) Entry) Value)&gt; OnPreprocessObject { get; }</code></pre><h4 class='section'>Property Value</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.iobservable-1'>IObservable</a>&lt;(<a href='https://github.com/MaybeSamigroup/SVS-Fishbone/blob/cce16a2e2ee57776a6efab67954640ebd3f560fc/CoastalSmell/DC/DC_CoastalSmell.cs'>TargetType</a> <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-coastalsmell.targettype,system.valuetuple-system.io.compression.ziparchive,system.valuetuple-system.int32[],digitalcraft.objectinfo---.kind'>Kind</a>, (<a href='https://learn.microsoft.com/dotnet/api/system.io.compression.ziparchive'>ZipArchive</a> <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-system.io.compression.ziparchive,system.valuetuple-system.int32[],digitalcraft.objectinfo--.archive'>Archive</a>, (<a href='https://learn.microsoft.com/dotnet/api/system.int32'>int</a>[] <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int32[],digitalcraft.objectinfo-.path'>Path</a>, ObjectInfo <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int32[],digitalcraft.objectinfo-.info'>Info</a>) <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-system.io.compression.ziparchive,system.valuetuple-system.int32[],digitalcraft.objectinfo--.entry'>Entry</a>) <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-coastalsmell.targettype,system.valuetuple-system.io.compression.ziparchive,system.valuetuple-system.int32[],digitalcraft.objectinfo---.value'>Value</a>)&gt;  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Extension.OnSaveChara' data-commentid='P:Fishbone.Extension.OnSaveChara' id='Fishbone_Extension_OnSaveChara'>OnSaveChara   </h3>
+ <p>Raised when a character is saved.</p>
+<pre><code class='lang-csharp'>public static IObservable&lt;(ZipArchive Archive, Human Human)&gt; OnSaveChara { get; }</code></pre><h4 class='section'>Property Value</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.iobservable-1'>IObservable</a>&lt;(<a href='https://learn.microsoft.com/dotnet/api/system.io.compression.ziparchive'>ZipArchive</a> <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-system.io.compression.ziparchive,character.human-.archive'>Archive</a>, Human <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-system.io.compression.ziparchive,character.human-.human'>Human</a>)&gt;  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Extension.OnSaveObject' data-commentid='P:Fishbone.Extension.OnSaveObject' id='Fishbone_Extension_OnSaveObject'>OnSaveObject   </h3>
+ <p>Raised when object's data is saved to extension archive</p>
+<pre><code class='lang-csharp'>public static IObservable&lt;(TargetType Kind, (ZipArchive Archive, (int[] Path, ObjectInfo Info) Entry) Value)&gt; OnSaveObject { get; }</code></pre><h4 class='section'>Property Value</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.iobservable-1'>IObservable</a>&lt;(<a href='https://github.com/MaybeSamigroup/SVS-Fishbone/blob/cce16a2e2ee57776a6efab67954640ebd3f560fc/CoastalSmell/DC/DC_CoastalSmell.cs'>TargetType</a> <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-coastalsmell.targettype,system.valuetuple-system.io.compression.ziparchive,system.valuetuple-system.int32[],digitalcraft.objectinfo---.kind'>Kind</a>, (<a href='https://learn.microsoft.com/dotnet/api/system.io.compression.ziparchive'>ZipArchive</a> <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-system.io.compression.ziparchive,system.valuetuple-system.int32[],digitalcraft.objectinfo--.archive'>Archive</a>, (<a href='https://learn.microsoft.com/dotnet/api/system.int32'>int</a>[] <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int32[],digitalcraft.objectinfo-.path'>Path</a>, ObjectInfo <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int32[],digitalcraft.objectinfo-.info'>Info</a>) <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-system.io.compression.ziparchive,system.valuetuple-system.int32[],digitalcraft.objectinfo--.entry'>Entry</a>) <a href='https://learn.microsoft.com/dotnet/api/system.valuetuple-coastalsmell.targettype,system.valuetuple-system.io.compression.ziparchive,system.valuetuple-system.int32[],digitalcraft.objectinfo---.value'>Value</a>)&gt;  </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Extension.OnSaveScene' data-commentid='P:Fishbone.Extension.OnSaveScene' id='Fishbone_Extension_OnSaveScene'>OnSaveScene   </h3>
+ <p>Raised when scene extension saved.</p>
+<pre><code class='lang-csharp'>public static IObservable&lt;ZipArchive&gt; OnSaveScene { get; }</code></pre><h4 class='section'>Property Value</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.iobservable-1'>IObservable</a>&lt;<a href='https://learn.microsoft.com/dotnet/api/system.io.compression.ziparchive'>ZipArchive</a>&gt;  </dt>
+<dd>
+
+
+
+</dd></dl><h2 class='section'>Methods</h2><h3 class='section api' data-uid='Fishbone.Extension.Merge``2(System.Collections.Generic.Dictionary{``0,``1},``0,``1)' data-commentid='M:Fishbone.Extension.Merge``2(System.Collections.Generic.Dictionary{``0,``1},``0,``1)' id='Fishbone_Extension_Merge__2_System_Collections_Generic_Dictionary___0___1____0___1_'>Merge&lt;K, V&gt;(Dictionary&lt;K, V&gt;, K, V)   </h3>
+ <p>Return a new dictionary which merges an entry into <code class="paramref">mods</code>.</p>
+<pre><code class='lang-csharp'>public static Dictionary&lt;K, V&gt; Merge&lt;K, V&gt;(this Dictionary&lt;K, V&gt; mods, K index, V mod)</code></pre><h4 class='section'>Parameters</h4><dl class='parameters'><dt><code>mods</code> <a href='https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2'>Dictionary</a>&lt;K, V&gt;  </dt>
+<dd>
+
+
+<p>Original dictionary (may be null).</p>
+
+</dd><dt><code>index</code> K  </dt>
+<dd>
+
+
+<p>Key to insert or replace.</p>
+
+</dd><dt><code>mod</code> V  </dt>
+<dd>
+
+
+<p>Value to insert.</p>
+
+</dd></dl><h4 class='section'>Returns</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2'>Dictionary</a>&lt;K, V&gt;  </dt>
+<dd>
+
+
+<p>New dictionary containing the merged entries.</p>
+
+</dd></dl><h4 class='section'>Type Parameters</h4><dl class='parameters'><dt><code>K</code>   </dt>
+<dd>
+
+
+<p>Dictionary key type.</p>
+
+</dd><dt><code>V</code>   </dt>
+<dd>
+
+
+<p>Dictionary value type.</p>
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Extension.Register``2' data-commentid='M:Fishbone.Extension.Register``2' id='Fishbone_Extension_Register__2'>Register&lt;T, U&gt;()   </h3>
+ <p>Register complex character and coordinate extension</p>
+<pre><code class='lang-csharp'>public static IDisposable[] Register&lt;T, U&gt;() where T : ComplexExtension&lt;T, U&gt;, CharacterExtension&lt;T&gt;, new() where U : CoordinateExtension&lt;U&gt;, new()</code></pre><h4 class='section'>Returns</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.idisposable'>IDisposable</a>[]  </dt>
+<dd>
+
+
+
+</dd></dl><h4 class='section'>Type Parameters</h4><dl class='parameters'><dt><code>T</code>   </dt>
+<dd>
+
+
+
+</dd><dt><code>U</code>   </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Extension.Register``1' data-commentid='M:Fishbone.Extension.Register``1' id='Fishbone_Extension_Register__1'>Register&lt;T&gt;()   </h3>
+ <p>Register simple character extension</p>
+<pre><code class='lang-csharp'>public static IDisposable[] Register&lt;T&gt;() where T : CharacterExtension&lt;T&gt;, new()</code></pre><h4 class='section'>Returns</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.idisposable'>IDisposable</a>[]  </dt>
+<dd>
+
+
+
+</dd></dl><h4 class='section'>Type Parameters</h4><dl class='parameters'><dt><code>T</code>   </dt>
+<dd>
+
+
+
+</dd></dl><h3 class='section api' data-uid='Fishbone.Extension.RegisterObject``1' data-commentid='M:Fishbone.Extension.RegisterObject``1' id='Fishbone_Extension_RegisterObject__1'>RegisterObject&lt;T&gt;()   </h3>
+ <p>Register extension bound to objects</p>
+<pre><code class='lang-csharp'>public static IDisposable[] RegisterObject&lt;T&gt;() where T : new()</code></pre><h4 class='section'>Returns</h4><dl class='parameters'><dt> <a href='https://learn.microsoft.com/dotnet/api/system.idisposable'>IDisposable</a>[]  </dt>
+<dd>
+
+
+
+</dd></dl><h4 class='section'>Type Parameters</h4><dl class='parameters'><dt><code>T</code>   </dt>
+<dd>
+
+
+
+</dd></dl>
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

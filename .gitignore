@@ -5,5 +5,5 @@ bin/
 */AC/*.xml
 */DC/*.xml
 */SVS/*.xml
-docfx/
+docfx/api
 *.zip
