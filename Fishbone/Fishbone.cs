@@ -72,6 +72,20 @@ namespace Fishbone
         sealed T Merge(int coordinateType, CoordLimit limit, U coord) =>
             Merge(coordinateType, Get(coordinateType).Merge(limit, coord));
     }
+    /// <summary>Inter game conversion interface for character extension. </summary>
+    /// <typeparam name="T">Concrete extension type.</typeparam>
+    public interface CharacterConversion<T> where T : CharacterExtension<T>, CharacterConversion<T>, new ()
+    {
+        /// <summary>Convert <b>this</b> extension originated in another game to applicatable form to provided <see cref="HumanData"/>.</summary>
+        T Convert(HumanData data);
+    }
+    /// <summary>Inter game conversion interface for coordinate extension. </summary>
+    /// <typeparam name="T">Concrete extension type.</typeparam>
+    public interface CoordinateConversion<T> where T : CoordinateExtension<T>, CoordinateConversion<T>, new ()
+    {
+        /// <summary>Convert <b>this</b> extension originated in another game to applicatable form to provided <see cref="HumanDataCoordinate"/>.</summary>
+        T Convert(HumanDataCoordinate data);
+    }
     /// <summary>Attribute used to specify a storage path for extension data within the zip archive.</summary>
     /// <summary>Base attribute that specifies a relative storage path inside the extension zip archive.</summary>
     public class PathAttribute : Attribute

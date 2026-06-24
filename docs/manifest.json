@@ -255,6 +255,16 @@
     },
     {
       "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.CharacterConversion-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.CharacterConversion-1.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
       "source_relative_path": "api/dc/Fishbone.CharacterExtension-1.yml",
       "output": {
         ".html": {
@@ -269,6 +279,16 @@
       "output": {
         ".html": {
           "relative_path": "api/dc/Fishbone.ComplexExtension-2.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "ApiPage",
+      "source_relative_path": "api/dc/Fishbone.CoordinateConversion-1.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/dc/Fishbone.CoordinateConversion-1.html"
         }
       },
       "version": ""

@@ -2,11 +2,11 @@
 <html>
   <head>
     <meta charset="utf-8">
-      <title>Namespace Fishbone | Fishbone </title>
+      <title>Interface CoordinateConversion&lt;T&gt; | Fishbone </title>
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <meta name="title" content="Namespace Fishbone | Fishbone ">
+      <meta name="title" content="Interface CoordinateConversion&lt;T&gt; | Fishbone ">
       
-      
+      <meta name="description" content="Inter game conversion interface for coordinate extension.">
       <link rel="icon" href="../../favicon.ico">
       <link rel="stylesheet" href="../../public/docfx.min.css">
       <link rel="stylesheet" href="../../public/main.css">
@@ -85,139 +85,27 @@
         </div>
 
         <article data-uid="">
-<h1 class='section api' data-uid='Fishbone' data-commentid='N:Fishbone' id='Fishbone'>Namespace Fishbone   </h1>
- <h3 class='section'>Classes</h3><dl class='parameters'><dt> <a href='Fishbone.Decode.html'>Decode</a>  </dt>
+<h1 class='section api' data-uid='Fishbone.CoordinateConversion`1' data-commentid='T:Fishbone.CoordinateConversion`1' id='Fishbone_CoordinateConversion_1'>Interface CoordinateConversion&lt;T&gt;   </h1>
+ <div class="facts text-secondary">
+<dl><dt>Namespace</dt><dd><a href='Fishbone.html'>Fishbone</a></dd></dl><dl><dt>Assembly</dt><dd>DC_Fishbone.dll</dd></dl>
+</div><p>Inter game conversion interface for coordinate extension.</p>
+<pre><code class='lang-csharp'>public interface CoordinateConversion&lt;T&gt; where T : CoordinateExtension&lt;T&gt;, CoordinateConversion&lt;T&gt;, new()</code></pre><h4 class='section'>Type Parameters</h4><dl class='parameters'><dt><code>T</code>   </dt>
 <dd>
 
 
-<p>Purpose-specific portable network graphics decoder.</p>
+<p>Concrete extension type.</p>
 
-</dd><dt> <a href='Fishbone.Encode.html'>Encode</a>  </dt>
+</dd></dl><h2 class='section'>Methods</h2><h3 class='section api' data-uid='Fishbone.CoordinateConversion`1.Convert(Character.HumanDataCoordinate)' data-commentid='M:Fishbone.CoordinateConversion`1.Convert(Character.HumanDataCoordinate)' id='Fishbone_CoordinateConversion_1_Convert_Character_HumanDataCoordinate_'>Convert(HumanDataCoordinate)   </h3>
+ <p>Convert <b>this</b> extension originated in another game to applicatable form to provided <span class="xref">Character.HumanDataCoordinate</span>.</p>
+<pre><code class='lang-csharp'>T Convert(HumanDataCoordinate data)</code></pre><h4 class='section'>Parameters</h4><dl class='parameters'><dt><code>data</code> HumanDataCoordinate  </dt>
 <dd>
 
 
-<p>Purpose-specific portable network graphics encoder.</p>
 
-</dd><dt> <a href='Fishbone.Extension.html'>Extension</a>  </dt>
+</dd></dl><h4 class='section'>Returns</h4><dl class='parameters'><dt> T  </dt>
 <dd>
 
 
-<p>Platform-level extension entrypoints for scene/object save and load hooks.</p>
-
-</dd><dt> <a href='Fishbone.Extension-2.html'>Extension&lt;T, U&gt;</a>  </dt>
-<dd>
-
-
-<p>Platform-specific adapters that expose storage and preprocessing observables for registered extensions.</p>
-
-</dd><dt> <a href='Fishbone.Extension-1.html'>Extension&lt;T&gt;</a>  </dt>
-<dd>
-
-
-<p>Platform-specific adapters for simple character extensions.</p>
-
-</dd><dt> <a href='Fishbone.ExtensionAttribute-2.html'>ExtensionAttribute&lt;T, U&gt;</a>  </dt>
-<dd>
-
-
-<p>Marks a complex extension type and declares its storage path components.</p>
-
-</dd><dt> <a href='Fishbone.ExtensionAttribute-1.html'>ExtensionAttribute&lt;T&gt;</a>  </dt>
-<dd>
-
-
-<p>Marks a simple character extension type and declares its storage path components.</p>
-
-</dd><dt> <a href='Fishbone.NetworkOrderBytes.html'>NetworkOrderBytes</a>  </dt>
-<dd>
-
-
-<p>Helpers for converting 32-bit unsigned integers to/from network (big-endian) byte order.</p>
-
-</dd><dt> <a href='Fishbone.Storage-3.Now.html'>Storage&lt;T, U, Index&gt;.Now</a>  </dt>
-<dd>
-
-
-<p>Helper record that enables indexer-style access to the current coordinate values.</p>
-
-</dd><dt> <a href='Fishbone.ObjectExtension-1.html'>ObjectExtension&lt;T&gt;</a>  </dt>
-<dd>
-
-
-<p>Platform-specific adapters for object extensions.</p>
-
-</dd><dt> <a href='Fishbone.ObjectExtensionAttribute-1.html'>ObjectExtensionAttribute&lt;T&gt;</a>  </dt>
-<dd>
-
-
-<p>Marks a object extension type and declares its related data type and storage path components.</p>
-
-</dd><dt> <a href='Fishbone.PathAttribute.html'>PathAttribute</a>  </dt>
-<dd>
-
-
-<p>Attribute used to specify a storage path for extension data within the zip archive.</p>
-
-</dd><dt> <a href='Fishbone.Plugin.html'>Plugin</a>  </dt>
-<dd>
-
-
-<p>DigitalCraft platform plugin marker for Fishbone.</p>
-
-</dd></dl><h3 class='section'>Interfaces</h3><dl class='parameters'><dt> <a href='Fishbone.CharacterConversion-1.html'>CharacterConversion&lt;T&gt;</a>  </dt>
-<dd>
-
-
-<p>Inter game conversion interface for character extension.</p>
-
-</dd><dt> <a href='Fishbone.CharacterExtension-1.html'>CharacterExtension&lt;T&gt;</a>  </dt>
-<dd>
-
-
-<p>Implemented by character-bound extension types to support merge semantics.</p>
-
-</dd><dt> <a href='Fishbone.ComplexExtension-2.html'>ComplexExtension&lt;T, U&gt;</a>  </dt>
-<dd>
-
-
-<p>Represents an extension that has both character and coordinate components.
-Implementations provide access to coordinate-specific data and merging logic.</p>
-
-</dd><dt> <a href='Fishbone.CoordinateConversion-1.html'>CoordinateConversion&lt;T&gt;</a>  </dt>
-<dd>
-
-
-<p>Inter game conversion interface for coordinate extension.</p>
-
-</dd><dt> <a href='Fishbone.CoordinateExtension-1.html'>CoordinateExtension&lt;T&gt;</a>  </dt>
-<dd>
-
-
-<p>Implement for coordinate-bound extension types to support merge semantics.</p>
-
-</dd><dt> <a href='Fishbone.MapStorage-3.html'>MapStorage&lt;T, U, Index&gt;</a>  </dt>
-<dd>
-
-
-<p>Storage that supports mapping from another index type <code class="typeparamref">U</code> to the primary index.</p>
-
-</dd><dt> <a href='Fishbone.Storage-2.html'>Storage&lt;T, Index&gt;</a>  </dt>
-<dd>
-
-
-<p>Storage abstraction for simple character extensions that supports character-limited accessors.</p>
-
-</dd><dt> <a href='Fishbone.Storage-3.html'>Storage&lt;T, U, Index&gt;</a>  </dt>
-<dd>
-
-
-<p>Rich storage abstraction for complex extensions that also exposes coordinate-aware accessors.</p>
-
-</dd><dt> <a href='Fishbone.ValueStorage-2.html'>ValueStorage&lt;T, Index&gt;</a>  </dt>
-<dd>
-
-
-<p>Minimal storage abstraction for mapping an index to a value.</p>
 
 </dd></dl>
 </article>

@@ -2,6 +2,8 @@
 
 Fishbone is a plugin framework for serializing (saving) and deserializing (loading) extended data in character and coordinate cards, currently for DigitalCraft, SamabakeScramble and Aicomi.
 
+[API Documentation](https://maybesamigroup.github.io/SVS-Fishbone/) is now available
+
 ---
 
 ## Quick Start
