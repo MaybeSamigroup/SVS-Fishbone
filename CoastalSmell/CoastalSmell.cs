@@ -12,11 +12,9 @@ using ILLGAMES.Unity.Component;
 using ILLGames.Unity.Component;
 #endif
 using Cysharp.Threading.Tasks;
-using HarmonyLib;
 using BepInEx;
 using BepInEx.Unity.IL2CPP;
 using Il2CppObjectBase = Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase;
-using TMPro;
 
 namespace CoastalSmell
 {
@@ -44,7 +42,7 @@ namespace CoastalSmell
         static Action Initialize = () =>
             SingletonInitializer<T>
                 .WaitUntilSetup(CancellationToken.None)
-                .ContinueWith(F.Apply(Startup.OnNext, Unit.Default));
+                .ContinueWith(F.Apply(Startup.OnNext, Unit.Default).TryWith());
         static SingletonInitializerExtension() => (
             OnDestroy.Subscribe(_ => UniTask.NextFrame().ContinueWith(Initialize)),
             OnStartup.Subscribe(cmp => cmp.OnDestroyAsObservable().Subscribe(Destroy.OnNext))
@@ -137,6 +135,11 @@ namespace CoastalSmell
         #endregion
 
         #region Try
+        internal static Action TryWith(this Action action) =>
+            action.TryWith(Plugin.Instance.Log.LogError);
+
+        public static Action TryWith(this Action action, Action<string> log) =>
+            Apply(action.Try, log);
 
         public static void Try(this Action action, Action<string> log)
         {
@@ -239,26 +242,6 @@ namespace CoastalSmell
 
         public int GetHashCode(Il2CppObjectBase obj) => obj.Pointer.GetHashCode();
     }
-    static partial class Hooks
-    {
-        internal static IObservable<TMP_FontAsset> OnFontInitialize =>
-            OnSceneLoaded.Where("Title".Equals)
-                .SelectMany(Manager.Scene.GetRootGameObjects)
-                .SelectMany(go => go.GetComponentsInChildren<TextMeshProUGUI>(true))
-                .Where(cmp => cmp.font != null).Select(cmp => cmp.font).FirstAsync();
-        internal static IObservable<string> OnSceneLoaded =>
-            SceneLoaded.AsObservable();
-        static Subject<string> SceneLoaded = new ();
-
-        [HarmonyPostfix]
-        [HarmonyWrapSafe]
-        [HarmonyPatch(typeof(Manager.Scene), nameof(Manager.Scene.LoadStart), typeof(Manager.Scene.Data), typeof(bool))]
-        static void OnLoadStart(Manager.Scene.Data data, ref UniTask __result) =>
-            __result = __result.ContinueWith(F.Apply(SceneLoaded.OnNext, data.LevelName));
-
-        internal static IDisposable Initialize() =>
-            Disposable.Create(Harmony.CreateAndPatchAll(typeof(Hooks), $"Hooks.{Plugin.Name}").UnpatchSelf);
-    }
 
     #region Plugin
 
@@ -275,9 +258,8 @@ namespace CoastalSmell
         internal static Plugin Instance;
         CompositeDisposable Subscriptions;
         public Plugin() : base() => Instance = this;
-        public override void Load() => Subscriptions = [
-            Sprites.Initialize(), UGUI.Initialize(), Hooks.Initialize()
-        ];
+        public override void Load() =>
+            Subscriptions = [Sprites.Initialize(), UGUI.Initialize(), .. Hooks.Initialize()];
         public override bool Unload() => true.With(Subscriptions.Dispose) && base.Unload();
     }
     #endregion

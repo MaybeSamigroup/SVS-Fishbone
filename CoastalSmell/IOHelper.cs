@@ -1,9 +1,12 @@
 using System;
 using System.IO;
+using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Text.Unicode;
 using System.Text.Encodings.Web;
 using System.Text.Json.Serialization;
+using System.Collections.Generic;
 using UnityEngine;
 #if Aicomi
 using ILLGAMES.IO;
@@ -111,4 +114,42 @@ namespace CoastalSmell
         };
     }
 
+    public static class StreamExtension
+    {
+        public static byte[] ReadBytes(this Stream stream, int length) =>
+            ReadBytes(length).ApplyDisposable(stream)
+                .Try(Plugin.Instance.Log.LogMessage, out var bytes) ? bytes : [];
+
+        static Func<Stream, byte[]> ReadBytes(int length) =>
+            stream => new BinaryReader(stream).ReadBytes(length);
+
+        public static Stream SkipBytes(this Stream stream, long offset) =>
+            stream.With(stream.CanSeek ? SeekToOffset(offset) : SkipToOffset(offset));
+
+        static Action<Stream> SeekToOffset(long offset) =>
+            stream => stream.Position = stream.Position + offset;
+
+        static Action<Stream> SkipToOffset(long offset) =>
+            stream => SkipToOffset(stream, offset, new byte[4096]);
+
+        static void SkipToOffset(Stream stream, long offset, byte[] buffer) {
+            while(offset > buffer.Length)
+            {
+                offset -= stream.Read(buffer);
+            }
+            while (offset > 0)
+            {
+                offset -= stream.Read(buffer, 0, (int)offset);
+            }
+        }
+
+        public static string ReadCString(this Stream stream) => stream.ReadCString([]);
+
+        static string ReadCString(this Stream stream, IEnumerable<byte> buffer) =>
+            stream.ReadByte() switch
+            {
+                0 => Encoding.UTF8.GetString(buffer.ToArray()),
+                var value => stream.ReadCString(buffer.Append((byte)value))
+            };
+    }
 }

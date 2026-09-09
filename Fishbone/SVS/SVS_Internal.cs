@@ -41,13 +41,13 @@ namespace Fishbone
     #region Load Chara
     static partial class Hooks
     {
-        static Subject<Unit> InitializeActors = new();
-        internal static IObservable<Unit> OnInitializeActors => InitializeActors.AsObservable();
+        internal static Subject<Unit> CleanupActors = new();
+        internal static IObservable<Unit> OnActorsCleanup => CleanupActors.AsObservable();
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(TitleScene), nameof(TitleScene.OnStart))]
         [HarmonyPatch(typeof(WorldData), nameof(WorldData.Load), typeof(string))]
-        static void NotifyInitializeActors() => InitializeActors.OnNext(Unit.Default); 
+        static void NotifyInitializeActors() => CleanupActors.OnNext(Unit.Default); 
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(WorldData), nameof(WorldData.Load), typeof(string))]

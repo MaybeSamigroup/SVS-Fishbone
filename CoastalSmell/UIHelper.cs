@@ -9,9 +9,11 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 #if Aicomi
+using ILLGAMES.Unity;
 using ILLGAMES.Unity.UI;
 using ILLGAMES.Unity.UI.ColorPicker;
 #else
+using ILLGames.Unity;
 using ILLGames.Unity.UI;
 using ILLGames.Unity.UI.ColorPicker;
 #endif
@@ -61,7 +63,7 @@ namespace CoastalSmell
         static string ToPath<T>(T item) =>
             Path.Combine(Util.UserDataPath, "plugins", Plugin.Name, $"{item}.png");
         static Func<string, Texture2D> ToTexture2D =
-            (path) => new Texture2D(64, 64).With(t2d => t2d.LoadImage(File.ReadAllBytes(path)));
+            (path) => File.ReadAllBytes(path).ToTexture2D();
         static Func<Texture2D, Sprite> Texture2DToSimpleSprite =
             (t2d) => Sprite.Create(t2d, new(0, 0, t2d.width, t2d.height), new(0.5f, 0.5f));
         static Func<Vector4, Texture2D, Sprite> Texture2DToBorderSprite =
@@ -84,7 +86,15 @@ namespace CoastalSmell
         public static IObservable<Transform> OnCommonSpaceInitialize => Ready;
 
         public static IObservable<Transform> Ready =>
-            Hooks.OnFontInitialize.AsObservable().Select(_ => Manager.Scene.CommonSpace.transform);
+            OnFontInitialize.AsObservable().Select(_ => Manager.Scene.CommonSpace.transform);
+
+        public static IEnumerable<(string Path, T Value)> GetComponentsInChildrenWithPath<T>(this GameObject go) where T : Component =>
+            go is null ? [] : GetComponentsInChildrenWithPath<T>(go.transform.name, go.transform);
+
+        static IEnumerable<(string Path, T Value)> GetComponentsInChildrenWithPath<T>(string path, Transform tf) where T : Component =>
+            Enumerable.Range(0, tf.childCount).Select(tf.GetChild)
+                .SelectMany(child => GetComponentsInChildrenWithPath<T>($"{path}/{child.name}", child))
+                .Concat(tf.TryGetComponent<T>(out var component) ? [(path, component)] : []);
 
         public static UIAction Identity = new UIAction(F.Ignoring<GameObject>(F.DoNothing));
 
@@ -117,7 +127,8 @@ namespace CoastalSmell
             F.With(go, action.Invoke);
 
         public static UIAction DestroyChildren =>
-            go => Enumerable.Repeat(new UIAction(UnityEngine.Object.Destroy).At(0), go.transform.childCount).Aggregate();
+            go => Enumerable.Range(0, go.transform.childCount).Reverse()
+                .ForEach(index => UnityEngine.Object.DestroyImmediate(go.transform.GetChild(index).gameObject));
 
         public static UIAction Aggregate(this IEnumerable<UIAction> actions) =>
             (actions ?? []).Aggregate(Identity, (f, g) => f + g);
@@ -342,6 +353,21 @@ namespace CoastalSmell
             margin ?? cmp.margin,
             text ?? cmp.m_text
         ));
+
+
+        static IObserver<bool> ToggleCameraController(CameraController cc) =>
+            cc is null ? Observer.Create(F.DoNothing.Ignoring<bool>()): Observer.Create<bool>(value => cc.enabled = value);
+
+        static IObserver<bool> ToggleCameraController() =>
+            ToggleCameraController(SceneRoot.GetComponentInChildren<CameraController>());
+
+        static IEnumerable<IDisposable> ToggleCameraController(TMP_InputField ui, IObserver<bool> observer) => [
+            ui.OnSelectAsObservable().Select(_ => false).Subscribe(observer),
+            ui.OnDeselectAsObservable().Select(_ => true).Subscribe(observer)
+        ];
+
+        public static IEnumerable<IDisposable> ToggleCamera(TMP_InputField ui) =>
+            ToggleCameraController(ui, ToggleCameraController());
 
         public static UIAction InputField(
             bool? restoreOriginalTextOnEscape = true,
@@ -645,8 +671,13 @@ namespace CoastalSmell
 
         static TMP_FontAsset FontAsset;
         static void Initialize(TMP_FontAsset font) => FontAsset = font;
+        static IObservable<TMP_FontAsset> OnFontInitialize =>
+            Hooks.OnSceneLoad.Where("Title".Equals)
+                .SelectMany(Manager.Scene.GetRootGameObjects)
+                .SelectMany(go => go.GetComponentsInChildren<TextMeshProUGUI>(true))
+                .Where(cmp => cmp.font != null).Select(cmp => cmp.font).FirstAsync();
         internal static IDisposable Initialize() =>
-            Hooks.OnFontInitialize.Subscribe(Initialize);
+            OnFontInitialize.Subscribe(Initialize);
     }
     public class WindowConfig
     {

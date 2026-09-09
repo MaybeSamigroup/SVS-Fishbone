@@ -16,7 +16,7 @@ namespace Fishbone
             OnSaveActor.Subscribe(Extension<T, U>.SaveActorChara),
             OnSaveChara.Subscribe(Extension<T, U>.SaveCustomChara),
             OnSaveCoord.Subscribe(Extension<T, U>.SaveCustomCoord),
-            Hooks.OnInitializeActors.Subscribe(Extension<T, U>.ClearActors),
+            OnActorsCleanup.Subscribe(Extension<T, U>.ClearActors),
             OnInitializeCustom.Subscribe(Extension<T, U>.ClearCustom),
             Extension<T, U>.OnLoadCustomChara.Subscribe(tuple => Extension<T, U>.Humans[tuple.Human, tuple.Limit] = tuple.Value),
             Extension<T, U>.OnLoadActorChara.Subscribe(tuple => Extension<T, U>.Indices[tuple.Index] = tuple.Value),
@@ -31,7 +31,7 @@ namespace Fishbone
         public static IDisposable[] Register<T>() where T : CharacterExtension<T>, new() => [
             OnSaveActor.Subscribe(Extension<T>.SaveActorChara),
             OnSaveChara.Subscribe(Extension<T>.SaveCustomChara),
-            Hooks.OnInitializeActors.Subscribe(Extension<T>.ClearActors),
+            OnActorsCleanup.Subscribe(Extension<T>.ClearActors),
             OnInitializeCustom.Subscribe(Extension<T>.ClearCustom),
             Extension<T>.OnLoadCustomChara.Subscribe(tuple => Extension<T>.Humans[tuple.Human, tuple.Limit] = tuple.Value),
             Extension<T>.OnLoadActorChara.Subscribe(tuple => Extension<T>.Indices[tuple.Index] = tuple.Value),

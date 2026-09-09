@@ -116,7 +116,7 @@ namespace Fishbone
         CharaCopyTrack() =>
             (OnDataUpdate, OnResolve) = (
                 Hooks.OnHumanDataCopy.Where(Match).Select(tuple => tuple.Dst),
-                Hooks.OnHumanResolve.Where(Match).FirstAsync());
+                HumanExtension.OnConstructionStart.Where(Match).Select(entry => entry.Human).FirstAsync());
         internal CharaCopyTrack(HumanData data) : this() =>
             (Data, Subscription) = (data, [
                 CharaLoadTrack.OnModeUpdate.Subscribe(_ => Dispose()),
@@ -124,7 +124,7 @@ namespace Fishbone
                 OnDataUpdate.Subscribe(Resolve),
             ]);
         bool Match<T>((HumanData Data, T Value) tuple) => Il2CppEquals.Apply(Data, tuple.Data);
-        bool Match(Human human) => Il2CppEquals.Apply(Data, human.data); 
+        bool Match((Human Human, HumanData Data) entry) => Il2CppEquals.Apply(Data, entry.Data); 
         void Resolve(HumanData value) => Il2CppEquals.Apply(Data, value);
         public void Dispose() => Subscription.Dispose();
     }

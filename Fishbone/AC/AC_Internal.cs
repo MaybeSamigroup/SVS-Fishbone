@@ -45,7 +45,7 @@ namespace Fishbone
     static partial class Hooks
     {
         static Subject<string> SaveDataConvertFilePath = new();
-        internal static IObservable<Unit> OnInitializeActors =>
+        internal static IObservable<Unit> OnActorsCleanup =>
             SaveDataConvertFilePath.AsObservable()
                 .Where(_ => ConvertFilePathAware).Select(_ => Unit.Default)
                 .Merge(SceneSingletonExtension<FreeHScene>.OnStartup.Select(_ => Unit.Default))
@@ -74,10 +74,6 @@ namespace Fishbone
     #region Load Chara
     static partial class Hooks
     {
-        [HarmonyPrefix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(Human), nameof(Human.Load))]
-        static void HumanLoadPrefix(Human __instance) => HumanResolve.OnNext(__instance);
-
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(ActorData), nameof(ActorData.DeserializeHumanData))]
         static void ActorDataDeserializeHumanDataPrefix() =>

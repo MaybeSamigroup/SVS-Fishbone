@@ -26,7 +26,7 @@ namespace CoastalSmell
     public static class DigitalCraftExtension
     {
         public static IObservable<MainScene> OnSceneStartup =>
-            Hooks.OnSceneLoaded.Where("Main".Equals).Select(_ => MainScene.Instance);
+            Hooks.OnSceneLoad.Where("Main".Equals).Select(_ => MainScene.Instance);
 
         public static IObservable<Unit> OnSceneDestroy =>
             OnSceneStartup.SelectMany(scene => scene.OnDestroyAsObservable());

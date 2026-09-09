@@ -1,42 +1,29 @@
-using System.Collections.Generic;
+using System;
 using System.Linq;
+using System.Collections.Generic;
+using CoastalSmell;
+using Chunk = (uint Size, (byte, byte, byte, byte) Name, byte[] Data, uint CRC32);
 
 namespace Fishbone
 {
-    /// <summary>
-    /// Helpers for converting 32-bit unsigned integers to/from network (big-endian) byte order.
-    /// </summary>
-    public static class NetworkOrderBytes
-    {
-        /// <summary>Convert a 32-bit unsigned integer to a 4-byte big-endian array.</summary>
-        /// <param name="bytes">Value to convert.</param>
-        /// <returns>4-byte big-endian representation.</returns>
-        public static byte[] To(uint bytes) =>
-            [(byte)(bytes >> 24), (byte)(bytes >> 16), (byte)(bytes >> 8), (byte)bytes];
-
-        /// <summary>Read a 32-bit unsigned integer from 4 big-endian bytes.</summary>
-        /// <param name="bytes">Enumerable of bytes (expects at least 4 bytes).</param>
-        /// <returns>Parsed 32-bit unsigned integer.</returns>
-        public static uint From(IEnumerable<byte> bytes) =>
-            ((uint)bytes.ElementAt(0) << 24) | ((uint)bytes.ElementAt(1) << 16) | ((uint)bytes.ElementAt(2) << 8) | bytes.ElementAt(3);
-    }
     /// <summary>
     /// Purpose-specific portable network graphics encoder.
     /// </summary>
     public static class Encode
     {
-        /// <summary>Compute CRC32 for the provided data (standard IEEE 802.3 polynomial).</summary>
-        /// <param name="bytes">Data to checksum.</param>
-        /// <returns>CRC32 value.</returns>
-        public static uint CRC32(IEnumerable<byte> bytes) =>
-            bytes.Aggregate(0xFFFFFFFFU, (crc32, value) => TABLE[(crc32 ^ value) & 0xff] ^ (crc32 >> 8)) ^ 0xFFFFFFFFU;
-
         /// <summary>Embed a custom `fsBN` chunk into an existing PNG byte sequence.</summary>
         /// <param name="pngData">Original PNG bytes.</param>
         /// <param name="bytes">Payload bytes to embed inside the `fsBN` chunk.</param>
         /// <returns>New PNG bytes containing the embedded chunk.</returns>
-        public static byte[] Implant(IEnumerable<byte> pngData, byte[] bytes) =>
-            [.. pngData.Take(8), .. ProcessSize(pngData.Skip(8), ToChunk([(byte)'f', (byte)'s', (byte)'B', (byte)'N'], bytes))];
+        public static byte[] Implant(byte[] pngData, byte[] bytes) => [
+            .. pngData[0..8],
+            .. PNG.ReadChunks(pngData[8..], out _)
+                .Where(chunk => chunk.Name is not ((byte)'f', (byte)'s', (byte)'B', (byte)'N'))
+                .Where(chunk => chunk.Name is not ((byte)'I', (byte)'E', (byte)'N', (byte)'D'))
+                .SelectMany(chunk => chunk.ToBytes()),
+            .. Chunk(((byte)'f', (byte)'s', (byte)'B', (byte)'N'), bytes).ToBytes(),
+            .. Chunk(((byte)'I', (byte)'E', (byte)'N', (byte)'D'), []).ToBytes()
+        ];
 
         /// <summary>Create a minimal PNG file containing a single `fsBN` chunk with the given payload.</summary>
         /// <param name="data">Payload bytes to place into the `fsBN` chunk.</param>
@@ -44,26 +31,15 @@ namespace Fishbone
         public static byte[] Implant(byte[] data) =>
             [
                 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
-                ..ToChunk([(byte)'I', (byte)'H', (byte)'D', (byte)'R'], [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]),
-                ..ToChunk([(byte)'I', (byte)'D', (byte)'A', (byte)'T'], []),
-                ..ToChunk([(byte)'f', (byte)'s', (byte)'B', (byte)'N'], data),
-                ..ToChunk([(byte)'I', (byte)'E', (byte)'N', (byte)'D'], [])
+                .. Chunk(((byte)'I', (byte)'H', (byte)'D', (byte)'R'), [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]).ToBytes(),
+                .. Chunk(((byte)'I', (byte)'D', (byte)'A', (byte)'T'), []).ToBytes(),
+                .. Chunk(((byte)'f', (byte)'s', (byte)'B', (byte)'N'), data).ToBytes(),
+                .. Chunk(((byte)'I', (byte)'E', (byte)'N', (byte)'D'), []).ToBytes()
             ];
-        private static readonly uint[] TABLE = [.. Enumerable.Range(0, 256)
-            .Select(i => (uint)i).Select(i => Enumerable.Range(0, 8).Aggregate(i, (i, _) => (i & 1) == 1 ? (0xEDB88320U ^ (i >> 1)) : (i >> 1)))];
-        private static IEnumerable<byte> Suffix(IEnumerable<byte> values) =>
-            values.Concat(NetworkOrderBytes.To(CRC32(values)));
-        private static IEnumerable<byte> ToChunk(IEnumerable<byte> name, IEnumerable<byte> bytes) =>
-            Suffix(NetworkOrderBytes.To((uint)bytes.Count()).Concat(Enumerable.Concat(name, bytes)));
-        private static IEnumerable<byte> ProcessName(uint size, IEnumerable<byte> bytes, IEnumerable<byte> data) =>
-            (bytes.ElementAt(4), bytes.ElementAt(5), bytes.ElementAt(6), bytes.ElementAt(7)) switch
-            {
-                ((byte)'I', (byte)'E', (byte)'N', (byte)'D') => data.Concat(bytes),
-                ((byte)'f', (byte)'s', (byte)'B', (byte)'N') => data.Concat(bytes.Skip((int)size + 12)),
-                _ => bytes.Take((int)size + 12).Concat(ProcessSize(bytes.Skip((int)size + 12), data))
-            };
-        private static IEnumerable<byte> ProcessSize(IEnumerable<byte> bytes, IEnumerable<byte> data) =>
-            ProcessName(NetworkOrderBytes.From(bytes), bytes, data);
+
+        static Chunk Chunk((byte, byte, byte, byte) name, byte[] data) =>
+            ((uint)data.Length, name, data, PNG.CRC32([name.Item1, name.Item2, name.Item3, name.Item4, ..data]));
+
     }
     /// <summary>
     /// Purpose-specific portable network graphics decoder.
@@ -73,16 +49,47 @@ namespace Fishbone
         /// <summary>Extract the payload bytes from an `fsBN` chunk inside a PNG file.</summary>
         /// <param name="bytes">PNG file bytes (or null).</param>
         /// <returns>Payload bytes if present; otherwise an empty array.</returns>
-        public static byte[] Extract(IEnumerable<byte> bytes) =>
-            bytes == null ? [] : ProcessSize(bytes?.Skip(8))?.ToArray() ?? [];
-        private static IEnumerable<byte> ProcessSize(IEnumerable<byte> bytes) =>
-            ProcessName(NetworkOrderBytes.From(bytes.Take(4)), bytes.Skip(4));
-        private static IEnumerable<byte> ProcessName(uint size, IEnumerable<byte> bytes) =>
-            (bytes.ElementAt(0), bytes.ElementAt(1), bytes.ElementAt(2), bytes.ElementAt(3)) switch
+        public static byte[] Extract(byte[] bytes) =>
+            ReadSpans.ReadMagicBytes(bytes, out var output) is not
+                (0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A) ? [] :
+                    PNG.ReadChunks(output, out _)
+                        .Where(chunk => chunk.Name is ((byte)'f' , (byte)'s', (byte)'B', (byte)'N'))
+                        .Select(chunk => chunk.Data).FirstOrDefault([]);
+    }
+    
+    internal static class PNG
+    {
+        internal static ReadSpan<IEnumerable<Chunk>> ReadChunks = (Span<byte> input, out Span<byte> output) =>
+            ReadChunk(input, out output) switch
             {
-                ((byte)'I', (byte)'E', (byte)'N', (byte)'D') => [],
-                ((byte)'f', (byte)'s', (byte)'B', (byte)'N') => bytes.Skip(4).Take((int)size),
-                _ => ProcessSize(bytes.Skip((int)size + 8))
+                var chunk => chunk is (_, ((byte)'I', (byte)'E', (byte)'N', (byte)'D'), _, _) ? [chunk] : [chunk, .. ReadChunks(output, out output)]
             };
+
+        static ReadSpan<Chunk> ReadChunk = (Span<byte> input, out Span<byte> output) =>
+            ReadBE.Uint(input, out output) switch
+            {
+                var size => (size, ReadName(output, out output), ReadSpans.ReadBytes((int)size)(output, out output), ReadBE.Uint(output, out output))
+            };
+
+        static ReadSpan<(byte, byte, byte, byte)> ReadName = (Span<byte> input, out Span<byte> output) =>
+            (output = input.Slice(4)) switch { _ => (input[0], input[1], input[2], input[3]) };
+
+        static byte[] ToBytes(uint bytes) =>
+            [(byte)(bytes >> 24), (byte)(bytes >> 16), (byte)(bytes >> 8), (byte)bytes];
+
+        internal static IEnumerable<byte> ToBytes(this Chunk chunk) => [
+            .. ToBytes((uint)chunk.Data.Length), chunk.Name.Item1, chunk.Name.Item2, chunk.Name.Item3, chunk.Name.Item4, .. chunk.Data, .. ToBytes(chunk.CRC32)
+        ];
+
+        private static readonly uint[] CRC32_TABLE = [.. Enumerable.Range(0, 256)
+            .Select(i => (uint)i).Select(i => Enumerable.Range(0, 8).Aggregate(i, (i, _) => (i & 1) == 1 ? (0xEDB88320U ^ (i >> 1)) : (i >> 1)))];
+
+        static ReadSpan<Func<uint, uint>> ReadCRC32 = (input, out output) =>
+            (output = input.Slice(1)) switch { _ => input[0] switch { var value => crc32 => CRC32_TABLE[(crc32 ^ value) & 0xff] ^ (crc32 >> 8) } };
+
+        internal static uint CRC32(Span<byte> data) =>
+            Enumerable.Repeat(ReadSpans.Lift(ReadCRC32), data.Length)
+                .Aggregate(ReadSpans.Identity<Func<uint, uint>>(), ReadSpans.Plus).Invoke(data, out var _)
+                .Aggregate(0xFFFFFFFFu, (crc32, f) => f(crc32)) ^ 0xFFFFFFFFu;
     }
 }

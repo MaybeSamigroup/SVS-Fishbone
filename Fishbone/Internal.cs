@@ -209,10 +209,8 @@ namespace Fishbone
     {
         static Subject<(HumanData, HumanData)> HumanDataCopy = new();
         static Subject<(HumanData, CharaLimit)> HumanDataLimit = new();
-        static Subject<Human> HumanResolve = new();
         internal static IObservable<(HumanData Src, HumanData Dst)> OnHumanDataCopy => HumanDataCopy.AsObservable();
         internal static IObservable<(HumanData Data, CharaLimit Value)> OnHumanDataLimit => HumanDataLimit.AsObservable();
-        internal static IObservable<Human> OnHumanResolve => HumanResolve.AsObservable();
 
         [HarmonyPrefix, HarmonyWrapSafe]
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.Copy))]
@@ -226,25 +224,6 @@ namespace Fishbone
         [HarmonyPatch(typeof(HumanData), nameof(HumanData.CopyLimited))]
         static void HumanDataCopyLimitedPrefix(HumanData dst, HumanData src, CharaLimit flags) =>
             (F.Apply(HumanDataCopy.OnNext, (src, dst)) + F.Apply(HumanDataLimit.OnNext, (dst, flags))).Invoke();
-
-        [HarmonyPrefix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(HumanBody), nameof(HumanBody.OnUpdateShader), [])]
-        static void HumanLoadPrefix(HumanBody __instance) =>
-#if Aicomi
-            HumanResolve.OnNext(__instance._human);
-#else
-            HumanResolve.OnNext(__instance.human);
-#endif
-        [HarmonyPrefix, HarmonyWrapSafe]
-        [HarmonyPatch(typeof(HumanFace), nameof(HumanFace.LoadGagMaterial), [])]
-        [HarmonyPatch(typeof(HumanFace), nameof(HumanFace.OnUpdateShader), [])]
-        [HarmonyPatch(typeof(HumanFace), nameof(HumanFace.ChangeHead), typeof(int), typeof(bool))]
-        static void HumanLoadPrefix(HumanFace __instance) =>
-#if Aicomi
-            HumanResolve.OnNext(__instance._human);
-#else
-            HumanResolve.OnNext(__instance.human);
-#endif
     }
     #endregion
 

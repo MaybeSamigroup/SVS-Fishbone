@@ -8,13 +8,17 @@
         <GamePrefix>$([System.IO.Path]::GetFileName($(MSBuildProjectDirectory)))</GamePrefix>
         <AssemblyName>$(GamePrefix)_$(PluginName)</AssemblyName>
         <DefineConstants>$(GameName)</DefineConstants>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="System.Reactive" Version="6.1.0"/>
         <Compile Include="../$(PluginName).cs"/>
+        <Compile Include="../../ReadSpan.cs"/>
         <Compile Include="../Reactive.cs"/>
         <Compile Include="../IOHelper.cs"/>
         <Compile Include="../UIHelper.cs"/>
+        <Compile Include="../Textures.cs"/>
+        <Compile Include="../Hooks.cs"/>
         <UITexture Include="Resource/*.*"/>
         <NetDll Include="../../Resource/*.*"/>
     </ItemGroup>

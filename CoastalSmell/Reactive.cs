@@ -22,6 +22,12 @@ namespace CoastalSmell
     /// </summary>
     public static class RxExtensions
     {
+        public static IObserver<T> Compose<T>(this IObserver<T> o1, IObserver<T> o2) =>
+            Observer.Create<T>(value => o2.OnNext(value.With(o1.OnNext)));
+
+        public static IObserver<T> Compose<T, U>(this IObserver<T> ot, IObserver<U> ou, Func<T, U> f) =>
+            Observer.Create<T>(value => ou.OnNext(f(value.With(ot.OnNext))));
+
         /// <summary>
         /// Converts a BepInEx <see cref="ConfigEntry{T}"/> into an observable stream of its current value.
         /// </summary>
@@ -134,6 +140,11 @@ namespace CoastalSmell
             cmp.gameObject.OnPointerEnterAsObservable();
         public static IObservable<PointerEventData> OnPointerExitAsObservable(this Component cmp) =>
             cmp.gameObject.OnPointerExitAsObservable();
+        public static IObservable<BaseEventData> OnSelectAsObservable(this Component cmp) =>
+            cmp.gameObject.OnSelectAsObservable();
+        public static IObservable<BaseEventData> OnDeselectAsObservable(this Component cmp) =>
+            cmp.gameObject.OnDeselectAsObservable();
+
         public static IObservable<Unit> OnUpdateAsObservable(this GameObject go) =>
             Rx.Triggers.ObservableTriggerExtensions
                 .GetOrAddComponent<Rx.Triggers.ObservableUpdateTrigger>(go)
@@ -158,10 +169,18 @@ namespace CoastalSmell
             Rx.Triggers.ObservableTriggerExtensions
                 .GetOrAddComponent<Rx.Triggers.ObservablePointerExitTrigger>(go)
                 .OnPointerExitAsObservable().Wrap();
+        public static IObservable<BaseEventData> OnSelectAsObservable(this GameObject go) =>
+            Rx.Triggers.ObservableTriggerExtensions
+                .GetOrAddComponent<Rx.Triggers.ObservableSelectTrigger>(go)
+                .OnSelectAsObservable().Wrap();
+        public static IObservable<BaseEventData> OnDeselectAsObservable(this GameObject go) =>
+            Rx.Triggers.ObservableTriggerExtensions
+                .GetOrAddComponent<Rx.Triggers.ObservableDeselectTrigger>(go)
+                .OnDeselectAsObservable().Wrap();
+
         public static IObservable<Unit> OnTransformChildrenChangedAsObservable(this GameObject go) =>
             Rx.Triggers.ObservableTriggerExtensions
                 .GetOrAddComponent<Rx.Triggers.ObservableTransformChangedTrigger>(go)
                 .OnTransformChildrenChangedAsObservable().Wrap();
-
     }
 }

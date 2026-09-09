@@ -1,5 +1,6 @@
 using System;
 using System.IO.Compression;
+using System.Reactive;
 using System.Reactive.Linq;
 using Character;
 using CharacterCreation;
@@ -126,6 +127,8 @@ namespace Fishbone
             Hooks.OnChangeActorCoord.Select(pair => pair.Human)
                 .Merge(OnTrackCoord.SelectMany(tuple => tuple.Track.OnResolve
                     .Where(_ => CharaLoadTrack.Mode != CharaLoadTrack.FlagAware).Select(pair => pair.Human)));
+
+        public static IObservable<Unit> OnActorsCleanup => Hooks.OnActorsCleanup;
 
         /// <summary>Register conversion for complex character and coordinate extension</summary>
         public static IDisposable[] RegisterConversion<T, U>()

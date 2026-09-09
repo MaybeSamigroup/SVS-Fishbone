@@ -323,7 +323,7 @@ namespace Fishbone
             (OnDataUpdate, OnLimitUpdate, OnResolveHuman, OnResolveActor) = (
                 Hooks.OnHumanDataCopy.Where(Match).Select(tuple => tuple.Dst),
                 Hooks.OnHumanDataLimit.Where(Match).Select(tuple => tuple.Value),
-                Hooks.OnHumanResolve.Where(Match).FirstAsync(),
+                HumanExtension.OnConstructionStart.Where(Match).Select(entry => entry.Human).FirstAsync(),
                 Hooks.OnActorResolve.Where(Match).FirstAsync());
         protected CharaCopyTrack(HumanData data) : this() =>
             (Data, Subscriptions) = (data, [
@@ -333,8 +333,8 @@ namespace Fishbone
             ]);
         bool Match<T>((HumanData Data, T Value) tuple) =>
             Il2CppEquals.Apply(Data, tuple.Data);
-        bool Match(Human human) =>
-            Il2CppEquals.Apply(Data, human.data);
+        bool Match((Human Human, HumanData Data) entry) =>
+            Il2CppEquals.Apply(Data, entry.Data);
         bool Match(Actor actor) =>
             Il2CppEquals.Apply(Data, actor.ToHumanData());
         void Resolve(HumanData value) => Data = value;
@@ -424,9 +424,10 @@ namespace Fishbone
                     .Select(entry => (entry.Value, tuple.Dst)).ToObservable());
 
         static IObservable<(Human human, ActorIndex Index)> OnActorToHuman =>
-            Hooks.OnHumanResolve.SelectMany(human => CurrentActors()
-                .Where(actor => Il2CppEquals.Apply(human.data, actor.ToHumanData()))
-                .Select(actor => (human, actor.ToIndex())));
+            HumanExtension.OnConstructionStart
+                .SelectMany(entry => CurrentActors()
+                .Where(actor => Il2CppEquals.Apply(entry.Data, actor.ToHumanData()))
+                .Select(actor => (entry.Human, actor.ToIndex())));
 
         static IObservable<(Human Human, ActorIndex Index)> OnActorHumanizeInternal =>
             OnActorToHuman.Merge(OnActorCopy.Merge(OnHumanCopy)
@@ -487,7 +488,7 @@ namespace Fishbone
             SingletonInitializerExtension<HumanCustom>.OnDestroy.Subscribe(_ => CharaLoadTrack.Mode = CharaLoadTrack.Ignore),
             OnInitializeCustom.Subscribe(CharaLoadTrack.OnDefault),
             OnInitializeCustom.Subscribe(InitializeCustom),
-            Hooks.OnInitializeActors.Subscribe(InitializeActors),
+            Hooks.OnActorsCleanup.Subscribe(InitializeActors),
             OnChangeCustomCoord.Subscribe(coordinateType => CustomCoordinateType = coordinateType),
             OnActorHumanize.Select(tuple => tuple.Human)
                .Where(human => !HumanToActors.ContainsKey(human))
@@ -508,7 +509,7 @@ namespace Fishbone
             OnActorCopy.Subscribe(_ => Plugin.Instance.Log.LogDebug("actor data copy")),
             OnHumanCopy.Subscribe(_ => Plugin.Instance.Log.LogDebug("human data copy")),
             OnActorToHuman.Subscribe(_ => Plugin.Instance.Log.LogDebug("actor data to human data copy")),
-            Hooks.OnInitializeActors.Subscribe(_ => Plugin.Instance.Log.LogDebug("actors initialized")),
+            Hooks.OnActorsCleanup.Subscribe(_ => Plugin.Instance.Log.LogDebug("actors initialized")),
             OnInitializeCustom.Subscribe(_ => Plugin.Instance.Log.LogDebug("custom initialized")),
             OnPreprocessChara.Subscribe(_ => Plugin.Instance.Log.LogDebug($"preprocess chara:{CharaLoadTrack.Mode.ToString()}")),
             OnPreprocessCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("preprocess coord")),
@@ -518,7 +519,7 @@ namespace Fishbone
             OnLoadActorCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("actor coord load")),
             OnActorHumanize.Subscribe(pair => Plugin.Instance.Log.LogDebug($"actor humanized: {pair.Index}")),
             OnChangeCustomCoord.Subscribe(_ => Plugin.Instance.Log.LogDebug("custom coordinate change")),
-            OnChangeActorCoord.Subscribe(tuple => Plugin.Instance.Log.LogDebug($"actor coordinate change: {tuple.Index}, {tuple.CoordinateType}"))
+            OnChangeActorCoord.Subscribe(tuple => Plugin.Instance.Log.LogDebug($"actor coordinate change: {tuple.Index}, {tuple.CoordinateType}")),
 #endif
         ];
     }

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <Description>Syntax suggers for DigitalCraft BepinEx plugins</Description>
+        <Description>Syntax suggers for SamabakeScramble BepinEx plugins</Description>
         <GameName>SamabakeScramble</GameName>
     </PropertyGroup>
     <ItemGroup>
